@@ -1,0 +1,5 @@
+{
+  "name": "claude-toolkit",
+  "description": "Commands, agents, scripts, and hooks for Claude Code development workflows",
+  "version": "1.0.0"
+}
