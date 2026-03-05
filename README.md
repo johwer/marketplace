@@ -1,25 +1,41 @@
-# Claude Plugins
+# Marketplace
 
-Plugin marketplace for Claude Code workflows and tools.
+Plugin marketplace for Claude Code workflows and tools. Any repo can use any command, agent, or script from this marketplace.
 
 ## Install
 
 ```bash
-/plugin marketplace add johwer/claude-plugins
+/plugin marketplace add johwer/marketplace
+/plugin install claude-toolkit@marketplace
 ```
 
-## Available Plugins
+## What's Included
 
-| Plugin | Description |
-|--------|-------------|
-| `dream-team` | Multi-agent development workflow framework — orchestrates teams of Claude agents with quality gates, retros, and Jira integration |
+| Type | Contents |
+|------|----------|
+| **Commands** | Dream Team orchestration, PR review, ticket scout, retro analysis, workspace management |
+| **Agents** | Architect (Opus), PR reviewer (Opus), backend/frontend/data devs (Sonnet) |
+| **Scripts** | Quality gates, Chrome queue, workspace launch/cleanup, CI polling |
+| **Docs** | Dev workflow checklist, learning system, integration guides |
 
-## Install a Plugin
+## For Development Repos
 
-```bash
-/plugin install dream-team@claude-plugins
+This marketplace is repo-agnostic. Point any development repo at it:
+
+```json
+// your-repo/.claude/settings.json
+{
+  "extraKnownMarketplaces": {
+    "marketplace": {
+      "source": {
+        "source": "github",
+        "repo": "johwer/marketplace"
+      }
+    }
+  }
+}
 ```
 
-## Adding Plugins
+## Companion Repos
 
-Add entries to `.claude-plugin/marketplace.json`. Plugins can source from GitHub repos, git URLs, npm packages, or relative paths within this repo.
+- [dream-team-flow](https://github.com/johwer/dream-team-flow) — DTF framework documentation, improvement plan, and `dtf` CLI for company-specific setup
