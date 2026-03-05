@@ -5,7 +5,7 @@ You are setting up a new development workspace from a Jira ticket.
 ## Config Resolution
 
 Read `~/.claude/dtf-config.json` if it exists. Use:
-- `paths.monorepo` instead of `~/Documents/MedHelp`
+- `paths.monorepo` instead of `~/Documents/Repo`
 - `paths.worktreeParent` instead of `~/Documents`
 - `terminal` instead of the hardcoded terminal name
 If no config exists, fall back to the values in `~/.claude/CLAUDE.md`.
@@ -13,7 +13,7 @@ If no config exists, fall back to the values in `~/.claude/CLAUDE.md`.
 ## Input
 
 The user provides either:
-- A **ticket ID** (e.g., `PLRS-1234`)
+- A **ticket ID** (e.g., `PROJ-1234`)
 - An **image/screenshot** of a ticket (fallback if ACLI is unavailable)
 
 $ARGUMENTS
@@ -42,7 +42,7 @@ If ACLI is not installed or the command fails, fall back to reading the provided
 **Fallback — Image extraction:**
 
 If an image was provided instead of a ticket ID, read it carefully and extract:
-- **Ticket ID** (e.g., `PLRS-1234`)
+- **Ticket ID** (e.g., `PROJ-1234`)
 - **Ticket title/description** — capture ALL rows/details visible in the image
 
 ### Step 2: Handle Attachments
@@ -71,11 +71,11 @@ Present the extracted ticket info to the user for confirmation before proceeding
 ### Step 4: Create Git Worktree
 
 ```bash
-cd ~/Documents/MedHelp
+cd ~/Documents/Repo
 git worktree add ~/Documents/<TICKET_ID> -b <TICKET_ID>
 ```
 
-Replace `<TICKET_ID>` with the ticket ID (e.g., `PLRS-1234`).
+Replace `<TICKET_ID>` with the ticket ID (e.g., `PROJ-1234`).
 
 If the branch already exists, use:
 ```bash
@@ -131,7 +131,7 @@ Display the full extracted ticket text (including description, acceptance criter
 ## Important Rules
 
 - Always confirm the extracted ticket ID with the user before creating the worktree
-- The main repo is always at `~/Documents/MedHelp`
+- The main repo is always at `~/Documents/Repo`
 - Worktrees are always created at `~/Documents/<TICKET_ID>`
 - If anything fails, stop and report the error — do not continue blindly
 - After setup is complete, remind the user they can run `/workspace-cleanup <TICKET_ID>` when done

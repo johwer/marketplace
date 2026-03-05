@@ -6,7 +6,7 @@ Quick reference for all available slash commands.
 
 ## /my-dream-team {#my-dream-team}
 
-Orchestrates a multi-agent team to implement a MedHelp feature ticket end-to-end — architecture analysis, backend/frontend implementation, PR review, testing, and GitHub review cycle.
+Orchestrates a multi-agent team to implement a Repo feature ticket end-to-end — architecture analysis, backend/frontend implementation, PR review, testing, and GitHub review cycle.
 
 **Flags:** `--lite` · `--local` · `--no-worktree` · `--resume`
 

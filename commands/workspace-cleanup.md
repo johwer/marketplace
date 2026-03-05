@@ -5,13 +5,13 @@ Tear down a workspace that was created by `/workspace-launch`.
 ## Config Resolution
 
 Read `~/.claude/dtf-config.json` if it exists. Use:
-- `paths.monorepo` instead of `~/Documents/MedHelp`
+- `paths.monorepo` instead of `~/Documents/Repo`
 - `paths.worktreeParent` instead of `~/Documents`
 If no config exists, fall back to the values in `~/.claude/CLAUDE.md`.
 
 ## Input
 
-The user provides a ticket ID (e.g., `PLRS-1234`). If not provided, list existing worktrees and ask which one to clean up.
+The user provides a ticket ID (e.g., `PROJ-1234`). If not provided, list existing worktrees and ask which one to clean up.
 
 $ARGUMENTS
 
@@ -19,10 +19,10 @@ $ARGUMENTS
 
 ### Step 0: Ensure We're Not Inside the Worktree
 
-**CRITICAL:** If the current working directory is inside the worktree being cleaned up (e.g., `~/Documents/PLRS-1234`), you MUST `cd ~/Documents/MedHelp` first. Git cannot remove a worktree while a process has its cwd inside it. Always run all cleanup commands from `~/Documents/MedHelp`.
+**CRITICAL:** If the current working directory is inside the worktree being cleaned up (e.g., `~/Documents/PROJ-1234`), you MUST `cd ~/Documents/Repo` first. Git cannot remove a worktree while a process has its cwd inside it. Always run all cleanup commands from `~/Documents/Repo`.
 
 ```bash
-cd ~/Documents/MedHelp
+cd ~/Documents/Repo
 ```
 
 ### Step 1: Identify Worktree
@@ -30,7 +30,7 @@ cd ~/Documents/MedHelp
 If no ticket ID was provided, list worktrees:
 
 ```bash
-cd ~/Documents/MedHelp && git worktree list
+cd ~/Documents/Repo && git worktree list
 ```
 
 Ask the user which one to remove.
@@ -40,7 +40,7 @@ Ask the user which one to remove.
 Before any destructive action, check if there's an open PR for this branch:
 
 ```bash
-cd ~/Documents/MedHelp && gh pr list --head <TICKET_ID> --state all --json number,state,mergedAt,title
+cd ~/Documents/Repo && gh pr list --head <TICKET_ID> --state all --json number,state,mergedAt,title
 ```
 
 **Based on PR status:**
@@ -74,7 +74,7 @@ If there are uncommitted changes, **STOP** and tell the user. Only proceed if th
 ### Step 6: Remove Git Worktree
 
 ```bash
-cd ~/Documents/MedHelp && git worktree remove ~/Documents/<TICKET_ID> --force
+cd ~/Documents/Repo && git worktree remove ~/Documents/<TICKET_ID> --force
 ```
 
 ### Step 7: Clean Up Directory (if leftover)
@@ -91,13 +91,13 @@ Ask the user if they want to delete the branch too. If the PR is merged, suggest
 
 If yes:
 ```bash
-cd ~/Documents/MedHelp && git branch -D <TICKET_ID>
+cd ~/Documents/Repo && git branch -D <TICKET_ID>
 ```
 
 ### Step 9: Prune Worktree References
 
 ```bash
-cd ~/Documents/MedHelp && git worktree prune
+cd ~/Documents/Repo && git worktree prune
 ```
 
 ### Step 9.5: Remove Status File (if exists)
@@ -111,7 +111,7 @@ rm -f ~/.claude/workspace-status/<TICKET_ID>.json
 Show the updated worktree list:
 
 ```bash
-cd ~/Documents/MedHelp && git worktree list
+cd ~/Documents/Repo && git worktree list
 ```
 
 ## Important Rules
@@ -119,5 +119,5 @@ cd ~/Documents/MedHelp && git worktree list
 - **Never delete a worktree without checking PR status first**
 - Always confirm with the user before deleting the branch
 - If PR is open/unmerged, default to keeping both worktree and branch — user must explicitly confirm deletion
-- The main repo is always at `~/Documents/MedHelp`
+- The main repo is always at `~/Documents/Repo`
 - If the worktree directory doesn't exist, skip the removal step and just clean up the branch

@@ -6,7 +6,7 @@ Analyze the structured review findings in `pr-learnings.json` (collected by `/sc
 
 ## Data Source
 
-Read `~/.claude/projects/-Users-johanwergelius-Documents-MedHelp/memory/pr-learnings.json`.
+Read `~/.claude/projects/-Users-username-Documents-Repo/memory/pr-learnings.json`.
 
 If the file doesn't exist or has fewer than 10 PRs, tell the user to run `/scrape-pr-history` first.
 

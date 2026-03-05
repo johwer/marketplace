@@ -94,7 +94,7 @@ After the health report, route deferred learnings to the right destination files
 | `repo-docs` | Repo docs | `docs/<file>.md` | Team-wide coding standards and conventions |
 | `memory` | Memory file | Project memory directory | Notes for future reference only |
 
-### Repo File Decision Tree (MedHelp)
+### Repo File Decision Tree (Repo)
 
 **Always read the target file before proposing a change.** Use this decision tree to pick the right file — wrong placement has happened before (learnings routed to `AGENTS.md` that belonged in style guide docs).
 
@@ -103,14 +103,14 @@ After the health report, route deferred learnings to the right destination files
 - Tailwind classes, color tokens, breakpoints, twMerge, CVA → `repo-docs:docs/TAILWIND_CONVENTIONS.md`
 - Backend C# pattern, domain modelling, EF Core, enum design, DI, error handling → `repo-docs:docs/CODING_STYLE_BACKEND.md`
 - API endpoint conventions, response shape, versioning, auth attributes → `repo-docs:docs/API_CONVENTIONS.md`
-- i18n, translation keys, Lokalise workflow, defaultValue pattern → `repo-docs:docs/INTERNATIONALIZATION.md`
+- i18n, translation keys, TranslationService workflow, defaultValue pattern → `repo-docs:docs/INTERNATIONALIZATION.md`
 - Route URL paths, page name → full URL mapping → `repo-docs:docs/APP_SITEMAP.md`
 - Frontend component library patterns (CVA, Radix, design tokens) → `repo-docs:docs/FRONTEND_COMPONENTS.md`
 - Backend testing patterns, unit/integration test conventions → `repo-docs:docs/TESTING_GUIDELINES_BACKEND.md`
 
 **Is it a service-specific operational gotcha** (not a coding convention — something you need to *run* or *operate*)?
-- Database names for psql, service ports, Docker quirks, seed data gaps for a specific service → `agents-md:services/<SVC>/AGENTS.md` (e.g. `services/HCM/AGENTS.md`)
-- Cross-service operational gotchas (auth script, local dev login, worktree IAM swap) → `agents-md:services/AGENTS.md`
+- Database names for psql, service ports, Docker quirks, seed data gaps for a specific service → `agents-md:services/<SVC>/AGENTS.md` (e.g. `services/ServiceB/AGENTS.md`)
+- Cross-service operational gotchas (auth script, local dev login, worktree ServiceC swap) → `agents-md:services/AGENTS.md`
 - Frontend agent commands, quick-ref for running/building the web app → `agents-md:apps/web/AGENTS.md`
 
 > ⚠️ **`apps/web/AGENTS.md` and `services/AGENTS.md` are NOT for coding conventions.** They are for quick-reference commands and agent-specific operational gotchas. If you catch yourself writing "use X pattern instead of Y" in an AGENTS.md, it belongs in a style guide doc instead.
@@ -181,17 +181,17 @@ Learnings split into two tracks based on who they affect:
    ### Direct Apply (personal config)
    | # | Learning | Source Session | Destination | File | Proposed Change |
    |---|---------|---------------|-------------|------|-----------------|
-   | 1 | Kenji shares contracts late | PLRS-1359 | dream-team | my-dream-team.md | Add timing instruction to Kenji prompt |
-   | 2 | Check API endpoints exist | PLRS-1562 | agent:architect + skill:review-pr | architect.md, review-pr.md | Add checklist item |
-   | 3 | Theme token colors unreliable | PLRS-1569 | memory | ticket-patterns.md | Note only — convention goes to repo-docs |
+   | 1 | Kenji shares contracts late | PROJ-1359 | dream-team | my-dream-team.md | Add timing instruction to Kenji prompt |
+   | 2 | Check API endpoints exist | PROJ-1562 | agent:architect + skill:review-pr | architect.md, review-pr.md | Add checklist item |
+   | 3 | Theme token colors unreliable | PROJ-1569 | memory | ticket-patterns.md | Note only — convention goes to repo-docs |
 
    ### Ticket + PR (shared repo — needs team review)
    | # | Learning | Source Session | Destination | File | Proposed Change |
    |---|---------|---------------|-------------|------|-----------------|
-   | 4 | Use Dapper for heavy SQL | PLRS-1359 | repo-docs | docs/CODING_STYLE_BACKEND.md | Add to DB / query section |
-   | 5 | HCM soft-delete quirk | PLRS-1359 | agents-md:services/HCM | services/HCM/AGENTS.md | Add Known Issues section |
-   | 6 | Date helper convention | PLRS-1692 | repo-docs | docs/CODING_STYLE_FRONTEND.md | Add date parsing section |
-   | 7 | Theme token colors unreliable | PLRS-1569 | repo-docs | docs/TAILWIND_CONVENTIONS.md | Add warning next to token listing |
+   | 4 | Use Dapper for heavy SQL | PROJ-1359 | repo-docs | docs/CODING_STYLE_BACKEND.md | Add to DB / query section |
+   | 5 | ServiceB soft-delete quirk | PROJ-1359 | agents-md:services/ServiceB | services/ServiceB/AGENTS.md | Add Known Issues section |
+   | 6 | Date helper convention | PROJ-1692 | repo-docs | docs/CODING_STYLE_FRONTEND.md | Add date parsing section |
+   | 7 | Theme token colors unreliable | PROJ-1569 | repo-docs | docs/TAILWIND_CONVENTIONS.md | Add warning next to token listing |
 
    ### No Route (already addressed or no longer relevant)
    - [item] — [reason it's skipped]
@@ -232,7 +232,7 @@ Learnings split into two tracks based on who they affect:
 
    d. **Create a draft PR**:
       ```bash
-      gh pr create --draft --title "PLRS-XXXX: Apply retro learnings to repo conventions" \
+      gh pr create --draft --title "PROJ-XXXX: Apply retro learnings to repo conventions" \
         --body "$(cat <<'EOF'
       ## Summary
       Applies learnings from Dream Team retrospectives to shared repo files.
@@ -250,7 +250,7 @@ Learnings split into two tracks based on who they affect:
 
 8. **Mark applied/ticketed items** in `dream-team-learnings.md`:
    - Direct items: `- ~~[description]~~ → Applied to [destination] on [date]`
-   - Repo items: `- ~~[description]~~ → Ticketed as [PLRS-XXXX] / PR #[number] on [date]`
+   - Repo items: `- ~~[description]~~ → Ticketed as [PROJ-XXXX] / PR #[number] on [date]`
    - This prevents re-proposing already-handled learnings in future reviews
 
 ## Actions

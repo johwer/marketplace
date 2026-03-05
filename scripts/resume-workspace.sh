@@ -12,7 +12,7 @@ fi
 # Load config for worktree parent path (falls back to ~/Documents)
 source "$(dirname "$0")/dtf-env.sh" 2>/dev/null || true
 WORKTREE_PARENT="${DTF_WORKTREE_PARENT:-$HOME/Documents}"
-MONOREPO="${DTF_MONOREPO:-$HOME/Documents/MedHelp}"
+MONOREPO="${DTF_MONOREPO:-$HOME/Documents/Repo}"
 
 WORKTREE="$WORKTREE_PARENT/$TICKET_ID"
 

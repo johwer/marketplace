@@ -15,7 +15,7 @@ The script will:
 2. Show which files are new or changed
 3. Copy updated files to the repo
 4. Commit with a descriptive message listing what changed
-5. Push to GitHub (switching to the `johwer` account if needed, then switching back)
+5. Push to GitHub (switching to the `your-username` account if needed, then switching back)
 
 If the script reports no changes, tell the user everything is already in sync.
 
