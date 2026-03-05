@@ -8,17 +8,17 @@ $ARGUMENTS
 
 ## Already-Scouted Tracking
 
-Before analyzing any ticket, read `~/.claude/projects/-Users-johanwergelius/memory/scouted-tickets.json`. This is a JSON array of objects tracking previously scouted tickets:
+Before analyzing any ticket, read `~/.claude/projects/-Users-username/memory/scouted-tickets.json`. This is a JSON array of objects tracking previously scouted tickets:
 
 ```json
 [
-  { "key": "PLRS-1234", "scoutedAt": "2026-02-21", "complexity": "M", "team": "Kenji + Ingrid" }
+  { "key": "PROJ-1234", "scoutedAt": "2026-02-21", "complexity": "M", "team": "Kenji + Ingrid" }
 ]
 ```
 
 **Skip tickets that are already in this file** unless the user passes `--force` or scouts a single ticket by ID. After scouting new tickets, append them to this file.
 
-When presenting results, show skipped tickets as: `⏭️ PLRS-1234 — already scouted (2026-02-21)`
+When presenting results, show skipped tickets as: `⏭️ PROJ-1234 — already scouted (2026-02-21)`
 
 ## Modes
 
@@ -80,7 +80,7 @@ View full details of one ticket including description and comments.
 
 ### For scouting mode (my tickets / sprint / uat)
 
-Write the analysis to `~/.claude/projects/-Users-johanwergelius/memory/ticket-scout.md`:
+Write the analysis to `~/.claude/projects/-Users-username/memory/ticket-scout.md`:
 
 ```markdown
 # Ticket Scout Report — [date]
@@ -93,7 +93,7 @@ Write the analysis to `~/.claude/projects/-Users-johanwergelius/memory/ticket-sc
 
 ## Tickets
 
-### PLRS-1234 — [summary]
+### PROJ-1234 — [summary]
 | Dimension | Rating |
 |-----------|--------|
 | Complexity | M |
@@ -108,7 +108,7 @@ Write the analysis to `~/.claude/projects/-Users-johanwergelius/memory/ticket-sc
 - Which user roles can access this feature?
 
 **Pre-observation for Dream Team:**
-> Start with API contract definition. The ticket mentions "similar to the settings page" — check `apps/web/src/pages/Settings/` for patterns. Backend changes are in HCM service only.
+> Start with API contract definition. The ticket mentions "similar to the settings page" — check `apps/web/src/pages/Settings/` for patterns. Backend changes are in ServiceB service only.
 
 ---
 [repeat for each ticket]
@@ -118,7 +118,7 @@ Present the report to the user and save it.
 
 ### For learning mode (`done`)
 
-Read completed tickets and extract patterns. Write to `~/.claude/projects/-Users-johanwergelius/memory/ticket-patterns.md`:
+Read completed tickets and extract patterns. Write to `~/.claude/projects/-Users-username/memory/ticket-patterns.md`:
 
 ```markdown
 # Ticket Patterns — Learned from completed work

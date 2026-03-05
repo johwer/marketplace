@@ -103,7 +103,7 @@ Not all documentation is automatically loaded. Understanding what agents see on 
 |--------|---------|
 | `~/.claude/docs/dev-workflow-checklist.md` | Hard gates, quality checks, PR resolution |
 | `~/.claude/docs/learning-system.md` | This file |
-| `visual-testing.md`, `medhelp-navigation.md` | Detailed operational guides in memory folder |
+| `visual-testing.md`, `repo-navigation.md` | Detailed operational guides in memory folder |
 | `docs/*.md` in repo | Coding style, API conventions, testing guidelines |
 
 ### The duplication problem

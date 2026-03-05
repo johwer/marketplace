@@ -5,23 +5,23 @@ You are orchestrating the full development lifecycle for one or more Jira ticket
 ## Config Resolution
 
 Read `~/.claude/dtf-config.json` if it exists. Use:
-- `paths.monorepo` instead of `~/Documents/MedHelp`
+- `paths.monorepo` instead of `~/Documents/Repo`
 - `paths.worktreeParent` instead of `~/Documents`
 - `terminal` instead of the hardcoded terminal name
 If no config exists, fall back to the values in `~/.claude/CLAUDE.md`.
 
 ## Input
 
-The user provides one or more **ticket IDs** (e.g., `PLRS-1234` or `PLRS-1234 PLRS-1434`), space or comma separated.
+The user provides one or more **ticket IDs** (e.g., `PROJ-1234` or `PROJ-1234 PROJ-1434`), space or comma separated.
 
 $ARGUMENTS
 
 ## Trigger
 
 This skill should be invoked when the user says things like:
-- "Create stories for PLRS-1234 and PLRS-1434"
-- "Set up these tickets: PLRS-1234, PLRS-1434"
-- "Work on PLRS-1234 and PLRS-1434"
+- "Create stories for PROJ-1234 and PROJ-1434"
+- "Set up these tickets: PROJ-1234, PROJ-1434"
+- "Work on PROJ-1234 and PROJ-1434"
 - "Launch these stories: ..."
 
 ## Flags
@@ -46,7 +46,7 @@ Before creating new workspaces, check if any existing worktrees have merged/clos
 
 1. **List existing worktrees and check PR status:**
    ```bash
-   cd ~/Documents/MedHelp && git worktree list
+   cd ~/Documents/Repo && git worktree list
    ```
    For each worktree (excluding main), check its PR status:
    ```bash
@@ -59,14 +59,14 @@ Before creating new workspaces, check if any existing worktrees have merged/clos
 
    | Worktree | PR | Status |
    |----------|----|--------|
-   | PLRS-1234 | #1700 | MERGED |
-   | PLRS-1235 | #1701 | CLOSED |
+   | PROJ-1234 | #1700 | MERGED |
+   | PROJ-1235 | #1701 | CLOSED |
    ```
    Ask the user with AskUserQuestion which ones to clean up. **Always ask** — some may need to be kept (e.g., reverted PRs with code that a new ticket references).
 
 3. **For each confirmed cleanup**, run from the main repo (NOT from inside the worktree):
    ```bash
-   cd ~/Documents/MedHelp && git worktree remove ~/Documents/<TICKET_ID> --force
+   cd ~/Documents/Repo && git worktree remove ~/Documents/<TICKET_ID> --force
    rm -rf ~/Documents/<TICKET_ID>
    git branch -D <TICKET_ID>
    git worktree prune
@@ -77,7 +77,7 @@ Before creating new workspaces, check if any existing worktrees have merged/clos
 
 5. **Also kill any orphan tmux sessions** that don't have a matching worktree:
    ```bash
-   tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^PLRS-'
+   tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^PROJ-'
    ```
    For each session without a matching worktree, kill it:
    ```bash
@@ -129,7 +129,7 @@ Spawn **parallel explore agents** (one per ticket, subagent_type `Explore`, mode
 ```
 For each ticket, spawn an explore agent with this prompt:
 
-"You are pre-analyzing ticket <TICKET_ID> for the MedHelp monorepo at ~/Documents/MedHelp.
+"You are pre-analyzing ticket <TICKET_ID> for the Repo monorepo at ~/Documents/Repo.
 
 Ticket: <FULL_TICKET_TEXT_FROM_STEP_1>
 
@@ -160,9 +160,9 @@ After all pre-hydration agents return, present a summary table to the user:
 
 | Ticket | Summary | Scope | Complexity | Recommended | Key Files |
 |--------|---------|-------|------------|-------------|-----------|
-| PLRS-1234 | Add mobile number field | full-stack | medium | Dream Team | EmployeeContact.tsx, HCM/ContactController.cs |
-| PLRS-1235 | Fix date picker styling | frontend-only | small | Lite | DatePicker.tsx |
-| PLRS-1236 | Update seed data | backend-only | small | Just worktree | database-init/seed.sql |
+| PROJ-1234 | Add mobile number field | full-stack | medium | Dream Team | EmployeeContact.tsx, ServiceB/ContactController.cs |
+| PROJ-1235 | Fix date picker styling | frontend-only | small | Lite | DatePicker.tsx |
+| PROJ-1236 | Update seed data | backend-only | small | Just worktree | database-init/seed.sql |
 ```
 
 For any tickets where ACLI failed in Step 1, note "Ticket fetch failed — need details from you" in the table.
@@ -189,25 +189,25 @@ For each ticket, run Steps 6-8 sequentially. Complete one ticket fully before st
 **Pull latest main once** before the first worktree (not per ticket):
 
 ```bash
-cd ~/Documents/MedHelp && git checkout main && git pull origin main
+cd ~/Documents/Repo && git checkout main && git pull origin main
 ```
 
 Then for each ticket, create the worktree:
 
 ```bash
-cd ~/Documents/MedHelp && git worktree add ~/Documents/<TICKET_ID> -b <TICKET_ID>
+cd ~/Documents/Repo && git worktree add ~/Documents/<TICKET_ID> -b <TICKET_ID>
 ```
 
 If the branch already exists:
 ```bash
-cd ~/Documents/MedHelp && git worktree add ~/Documents/<TICKET_ID> <TICKET_ID>
+cd ~/Documents/Repo && git worktree add ~/Documents/<TICKET_ID> <TICKET_ID>
 ```
 
 #### Step 7: Install Dependencies & Copy Environment
 
 ```bash
 cd ~/Documents/<TICKET_ID>/apps/web && source ~/.nvm/nvm.sh && nvm use && npm i
-cp ~/Documents/MedHelp/apps/web/.env.local ~/Documents/<TICKET_ID>/apps/web/.env.local
+cp ~/Documents/Repo/apps/web/.env.local ~/Documents/<TICKET_ID>/apps/web/.env.local
 ```
 
 #### Step 8: Write Pre-Hydrated Context File
@@ -301,11 +301,11 @@ After all tickets are launched, present a summary:
 - List all created workspaces with their ticket IDs and tmux session names
 - Show which mode each ticket is running in (Dream Team / Lite / Just worktree)
 - Remind the user they can attach to any session: `tmux attach -t <TICKET_ID>`
-- Remind the user to run `/workspace-cleanup <TICKET_ID>` when done with each story (or they can say "clean up PLRS-1234" and you will handle it)
+- Remind the user to run `/workspace-cleanup <TICKET_ID>` when done with each story (or they can say "clean up PROJ-1234" and you will handle it)
 
 ## Pausing a Workspace (Close for the Day)
 
-When the user says "pause PLRS-1234", "close PLRS-1234", "stop for today", or "kill the session":
+When the user says "pause PROJ-1234", "close PROJ-1234", "stop for today", or "kill the session":
 
 ```bash
 bash ~/.claude/scripts/pause-workspace.sh <TICKET_ID>
@@ -315,18 +315,18 @@ This kills the tmux session and any Vite dev servers, but **preserves everything
 
 To pause **all running workspaces**:
 ```bash
-for session in $(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^PLRS-'); do
+for session in $(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^PROJ-'); do
   bash ~/.claude/scripts/pause-workspace.sh "$session"
 done
 ```
 
 ## Resuming a Workspace
 
-When the user says "resume PLRS-1234" or "pick up PLRS-1234" or "continue PLRS-1234":
+When the user says "resume PROJ-1234" or "pick up PROJ-1234" or "continue PROJ-1234":
 
 1. **Verify the worktree exists**:
    ```bash
-   cd ~/Documents/MedHelp && git worktree list | grep <TICKET_ID>
+   cd ~/Documents/Repo && git worktree list | grep <TICKET_ID>
    ```
    If not found, tell the user the worktree doesn't exist.
 
@@ -356,14 +356,14 @@ ls ~/.claude/workspace-status/*.json 2>/dev/null && cat ~/.claude/workspace-stat
 tmux list-sessions 2>/dev/null
 
 # Check which worktrees exist
-cd ~/Documents/MedHelp && git worktree list
+cd ~/Documents/Repo && git worktree list
 ```
 
 Report a summary table showing each workspace's status (running / done-awaiting-merge / no session).
 
 ### When the user says "it's merged" or "clean up"
 
-When the user indicates a story is done or merged (e.g., "PLRS-1234 is merged", "clean up PLRS-1234", "that story is finished"):
+When the user indicates a story is done or merged (e.g., "PROJ-1234 is merged", "clean up PROJ-1234", "that story is finished"):
 
 1. **Check the status file** (if exists):
    ```bash
@@ -374,22 +374,22 @@ When the user indicates a story is done or merged (e.g., "PLRS-1234 is merged", 
 
    ```bash
    # Safety: check PR status first
-   cd ~/Documents/MedHelp && gh pr list --head <TICKET_ID> --state all --json number,state,mergedAt,title
+   cd ~/Documents/Repo && gh pr list --head <TICKET_ID> --state all --json number,state,mergedAt,title
 
    # Kill tmux session if running
    tmux kill-session -t <TICKET_ID> 2>/dev/null || true
 
-   # Remove worktree (we're in MedHelp, not inside the worktree)
-   cd ~/Documents/MedHelp && git worktree remove ~/Documents/<TICKET_ID> --force
+   # Remove worktree (we're in Repo, not inside the worktree)
+   cd ~/Documents/Repo && git worktree remove ~/Documents/<TICKET_ID> --force
 
    # Clean up leftover directory
    rm -rf ~/Documents/<TICKET_ID>
 
    # Delete branch (ask user first if PR is not merged)
-   cd ~/Documents/MedHelp && git branch -D <TICKET_ID>
+   cd ~/Documents/Repo && git branch -D <TICKET_ID>
 
    # Prune worktree references
-   cd ~/Documents/MedHelp && git worktree prune
+   cd ~/Documents/Repo && git worktree prune
 
    # Remove status file
    rm -f ~/.claude/workspace-status/<TICKET_ID>.json
@@ -410,7 +410,7 @@ When the user says "clean up all done workspaces" or similar:
 ## Important Rules
 
 - Always confirm extracted ticket info with the user before creating worktrees
-- The main repo is always at `~/Documents/MedHelp`
+- The main repo is always at `~/Documents/Repo`
 - Worktrees are always at `~/Documents/<TICKET_ID>`
 - tmux sessions are always named `<TICKET_ID>`
 - If anything fails, stop and report — do not continue blindly

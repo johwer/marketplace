@@ -38,7 +38,7 @@ If the file does not exist on disk:
 
 ---
 
-## Section 2: i18n / Lokalise — HARD GATE
+## Section 2: i18n / TranslationService — HARD GATE
 
 Applies to all tickets that add or modify user-facing text.
 
@@ -46,18 +46,18 @@ Applies to all tickets that add or modify user-facing text.
 
 - Use **bare `t("key")` only** — NEVER use `defaultValue`
 - Before creating new keys, **grep the codebase** for existing keys to avoid duplicates and casing mismatches (e.g., `common_logout` not `common_logOut`)
-- Key naming pattern: `{page}_{section}_{element}` (e.g., `employeeCard_absenceForm_submitButton`)
+- Key naming pattern: `{page}_{section}_{element}` (e.g., `employeeCard_service-aForm_submitButton`)
 - Dynamic keys: add pattern to `scripts/lokalise_whitelist.json`
 
 ### Workflow
 
 1. Implement all UI text using `t("key")` references
 2. Grep your changed files for all `t(` calls — collect every key
-3. For each new key, create it in Lokalise via the API with **all 5 languages** (en, sv, da, no, fi):
+3. For each new key, create it in TranslationService via the API with **all 5 languages** (en, sv, da, no, fi):
    ```bash
-   LOKALISE_KEY=$(grep LOKALISE_API_KEY apps/web/.env.local | cut -d= -f2)
+   TRANSLATION_SERVICE_KEY=$(grep TRANSLATION_SERVICE_API_KEY apps/web/.env.local | cut -d= -f2)
    curl -X POST "https://api.lokalise.com/api2/projects/3907704568ac1345097c75.30587214/keys" \
-     -H "X-Api-Token: $LOKALISE_KEY" \
+     -H "X-Api-Token: $TRANSLATION_SERVICE_KEY" \
      -H "Content-Type: application/json" \
      -d '{ "keys": [{ "key_name": "your_key", "platforms": ["web"], "translations": [
        {"language_iso": "en", "translation": "English text"},
@@ -71,7 +71,7 @@ Applies to all tickets that add or modify user-facing text.
 
 ### Gate Check
 
-**Completion is blocked** until Lokalise API calls succeed for every new key. If the API is unavailable, note it in the completion message and flag for the team lead.
+**Completion is blocked** until TranslationService API calls succeed for every new key. If the API is unavailable, note it in the completion message and flag for the team lead.
 
 Reference: `docs/INTERNATIONALIZATION.md`
 
@@ -267,8 +267,8 @@ Run the applicable categories based on changed file types:
 
 | File | Pattern | Example |
 |------|---------|---------|
-| Before GIF | `<TICKET_ID>-before.gif` | `PLRS-1831-before.gif` |
-| After GIF | `<TICKET_ID>-after.gif` | `PLRS-1831-after.gif` |
+| Before GIF | `<TICKET_ID>-before.gif` | `PROJ-1831-before.gif` |
+| After GIF | `<TICKET_ID>-after.gif` | `PROJ-1831-after.gif` |
 | Jira attachments | Original filename from Jira | `image-20260227-140735.png` |
 
 ### Jira Attachments

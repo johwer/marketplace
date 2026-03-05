@@ -3,7 +3,7 @@
 ## Config Resolution
 
 Read `~/.claude/dtf-config.json` if it exists. Use:
-- `paths.monorepo` instead of `~/Documents/MedHelp`
+- `paths.monorepo` instead of `~/Documents/Repo`
 If no config exists, fall back to the values in `~/.claude/CLAUDE.md`.
 
 Review a pull request with line-level comments on GitHub. Can approve, request changes, or leave advisory comments. Supports skipping files that aren't valuable to review (generated code, large diffs, lock files).
@@ -35,7 +35,7 @@ If the user provided a PR number, URL, or branch name, use it directly.
 If **no PR was specified** (arguments are empty or only flags), auto-detect from the current branch:
 
 ```bash
-cd ~/Documents/MedHelp
+cd ~/Documents/Repo
 gh pr view --json number,headRefName --jq '.number' 2>/dev/null
 ```
 
@@ -47,7 +47,7 @@ No PR found for the current branch. Please specify a PR number: /review-pr <numb
 ### Step 1: Fetch PR Details
 
 ```bash
-cd ~/Documents/MedHelp
+cd ~/Documents/Repo
 gh pr view <PR> --json number,title,body,author,baseRefName,headRefName,additions,deletions,url
 ```
 
@@ -68,7 +68,7 @@ Full mode uses Claude Code's worktree conventions — worktrees live inside `.cl
 If `--full` was passed, create a temporary worktree for the PR branch:
 
 ```bash
-cd ~/Documents/MedHelp
+cd ~/Documents/Repo
 git fetch origin pull/<PR>/head:worktree-pr-review-<PR>
 git worktree add .claude/worktrees/pr-review-<PR> worktree-pr-review-<PR>
 ```
@@ -78,7 +78,7 @@ If the fetch or worktree creation fails, fall back to fast mode and inform the u
 ⚠ Could not create local worktree — falling back to fast (API-only) review.
 ```
 
-Set a variable to track the worktree path for later cleanup: `WORKTREE=~/Documents/MedHelp/.claude/worktrees/pr-review-<PR>`
+Set a variable to track the worktree path for later cleanup: `WORKTREE=~/Documents/Repo/.claude/worktrees/pr-review-<PR>`
 
 > **Experimental: Native worktree integration**
 >
@@ -108,7 +108,7 @@ Show the user which files will be reviewed and which are skipped:
 
 ## Skipped Files (3)
 - package-lock.json (auto-skipped: lock file)
-- src/store/rtk-apis/hcm/hcmApi.generated.ts (auto-skipped: generated file)
+- src/store/rtk-apis/service-b/service-bApi.generated.ts (auto-skipped: generated file)
 - ...
 ```
 
@@ -132,7 +132,7 @@ For files with very large patches (1000+ lines), summarize rather than reading e
 Read diffs locally from the worktree with full file context:
 
 ```bash
-cd ~/Documents/MedHelp/.claude/worktrees/pr-review-<PR>
+cd ~/Documents/Repo/.claude/worktrees/pr-review-<PR>
 # Get the merge base for accurate diffs
 BASE=$(git merge-base HEAD origin/<baseRefName>)
 # Diff per file against the base branch
@@ -162,7 +162,7 @@ Run build and type checks in the worktree to catch compilation errors, type mism
 **Backend — if any `.cs`, `.csproj`, or `.sln` files changed:**
 
 ```bash
-cd ~/Documents/MedHelp/.claude/worktrees/pr-review-<PR>
+cd ~/Documents/Repo/.claude/worktrees/pr-review-<PR>
 # Find the relevant solution file(s) for changed services
 dotnet build services/<service>/<service>.sln 2>&1
 ```
@@ -172,7 +172,7 @@ Report any build errors or warnings related to the changed files.
 **Frontend — if any files under `apps/web` changed:**
 
 ```bash
-cd ~/Documents/MedHelp/.claude/worktrees/pr-review-<PR>/apps/web
+cd ~/Documents/Repo/.claude/worktrees/pr-review-<PR>/apps/web
 
 # Type check
 npx tsc --noEmit 2>&1
@@ -187,10 +187,10 @@ Report any TypeScript errors or ESLint violations in the changed files.
 
 ```bash
 # Frontend tests
-cd ~/Documents/MedHelp/.claude/worktrees/pr-review-<PR>/apps/web && npx vitest run --reporter=verbose <changed-test-files> 2>&1
+cd ~/Documents/Repo/.claude/worktrees/pr-review-<PR>/apps/web && npx vitest run --reporter=verbose <changed-test-files> 2>&1
 
 # Backend tests (if applicable)
-cd ~/Documents/MedHelp/.claude/worktrees/pr-review-<PR> && dotnet test services/<service>/<service>.sln --filter "FullyQualifiedName~<test-class>" 2>&1
+cd ~/Documents/Repo/.claude/worktrees/pr-review-<PR> && dotnet test services/<service>/<service>.sln --filter "FullyQualifiedName~<test-class>" 2>&1
 ```
 
 Include build/type/lint/test results in the review — any failures become **MUST FIX** items.
@@ -301,7 +301,7 @@ Show the user:
 After the review is posted (or if the user cancels), always clean up the temporary worktree:
 
 ```bash
-cd ~/Documents/MedHelp
+cd ~/Documents/Repo
 git worktree remove .claude/worktrees/pr-review-<PR> --force
 git branch -D worktree-pr-review-<PR>
 git worktree prune
@@ -310,7 +310,7 @@ git worktree prune
 If cleanup fails, inform the user so they can clean up manually:
 ```
 ⚠ Could not remove worktree automatically. Run:
-  cd ~/Documents/MedHelp && git worktree remove .claude/worktrees/pr-review-<PR> --force && git branch -D worktree-pr-review-<PR>
+  cd ~/Documents/Repo && git worktree remove .claude/worktrees/pr-review-<PR> --force && git branch -D worktree-pr-review-<PR>
 ```
 
 **Important:** Always attempt cleanup, even if the review was cancelled or an error occurred during earlier steps. Never leave orphaned worktrees.

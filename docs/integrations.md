@@ -150,7 +150,7 @@ Use the architect subagent to analyze what files need changing for this feature
 ### GitHub Actions — Claude Code in CI
 
 **Status:** Workflow created, needs API key setup
-**Location:** `~/Documents/MedHelp/.github/workflows/claude.yml`
+**Location:** `~/Documents/Repo/.github/workflows/claude.yml`
 
 **What it does:**
 - Responds to `@claude` mentions in PR comments and issues
@@ -166,7 +166,7 @@ Use the architect subagent to analyze what files need changing for this feature
    Required permissions: Contents (R/W), Issues (R/W), Pull Requests (R/W)
 
 2. **Add API key as repository secret:**
-   - Go to MedHelp repo → Settings → Secrets and variables → Actions
+   - Go to Repo repo → Settings → Secrets and variables → Actions
    - Create secret: `ANTHROPIC_API_KEY` with your Claude API key
    - Get key from: https://console.anthropic.com
 
@@ -219,8 +219,8 @@ Used by the Dream Team in Phase 5.5 (after PR push) to wait for CI and AI bot re
 
 Both scripts are standalone and can be used outside Dream Team:
 ```bash
-bash ~/.claude/scripts/poll-ci-checks.sh MedHelpAB/MedHelp 1709 10 30
-bash ~/.claude/scripts/poll-ai-reviews.sh MedHelpAB/MedHelp 1709 6 45
+bash ~/.claude/scripts/poll-ci-checks.sh RepoAB/Repo 1709 10 30
+bash ~/.claude/scripts/poll-ai-reviews.sh RepoAB/Repo 1709 6 45
 ```
 
 ---
@@ -244,7 +244,7 @@ bash ~/.claude/scripts/poll-ai-reviews.sh MedHelpAB/MedHelp 1709 6 45
 |-------------|---------|
 | Claude Plan | Pro, Max, Teams, or Enterprise with Claude Code access |
 | Claude Code on the Web | Must be enabled at claude.ai/code |
-| GitHub Account | Connected to Claude Code on the Web with MedHelp repo authenticated |
+| GitHub Account | Connected to Claude Code on the Web with Repo repo authenticated |
 | Slack App | Claude app installed from Slack Marketplace by workspace admin |
 | Slack Auth | Individual Slack account linked to Claude account |
 
@@ -278,7 +278,7 @@ bash ~/.claude/scripts/poll-ai-reviews.sh MedHelpAB/MedHelp 1709 6 45
 # Browse marketplace for TypeScript/C# code intelligence plugins
 ```
 
-**Benefit for MedHelp:** TypeScript + C# stack means two language servers worth of navigation. Especially useful for:
+**Benefit for Repo:** TypeScript + C# stack means two language servers worth of navigation. Especially useful for:
 - Verifying imports resolve during PR reviews
 - Following type hierarchies in EF Core models
 - Finding all references to a changed interface

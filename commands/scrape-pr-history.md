@@ -4,8 +4,8 @@ Extract review findings from merged GitHub PRs using parallel Haiku agents and s
 
 ## Config
 
-- **Repo**: `MedHelpAB/MedHelp`
-- **Storage**: `~/.claude/projects/-Users-johanwergelius-Documents-MedHelp/memory/pr-learnings.json`
+- **Repo**: `RepoAB/Repo`
+- **Storage**: `~/.claude/projects/-Users-username-Documents-Repo/memory/pr-learnings.json`
 - **Batch size**: 30 agents in parallel
 - **Default PRs to fetch**: 100
 
@@ -20,7 +20,7 @@ Extract review findings from merged GitHub PRs using parallel Haiku agents and s
 
 ## Step 1: Load Existing Data
 
-Read `~/.claude/projects/-Users-johanwergelius-Documents-MedHelp/memory/pr-learnings.json` if it exists.
+Read `~/.claude/projects/-Users-username-Documents-Repo/memory/pr-learnings.json` if it exists.
 
 Extract the list of already-processed PR numbers. These will be skipped unless `--force` is passed.
 
@@ -29,7 +29,7 @@ If the file doesn't exist, start with an empty array `[]`.
 ## Step 2: Fetch Merged PRs
 
 ```bash
-gh pr list --repo MedHelpAB/MedHelp --state merged --limit <N> \
+gh pr list --repo RepoAB/Repo --state merged --limit <N> \
   --json number,title,headRefName,mergedAt,author \
   --jq 'sort_by(.mergedAt) | reverse'
 ```
@@ -37,8 +37,8 @@ gh pr list --repo MedHelpAB/MedHelp --state merged --limit <N> \
 Filter out PR numbers already in the stored data (unless `--force`).
 
 Extract the ticket ID from branch name or title using this priority:
-1. Branch name: find `PLRS-\d+` pattern (case-insensitive)
-2. PR title: find `PLRS-\d+` pattern
+1. Branch name: find `PROJ-\d+` pattern (case-insensitive)
+2. PR title: find `PROJ-\d+` pattern
 3. If neither: `ticket: null`
 
 ## Step 3: Fan Out — 30 Haiku Agents in Parallel
@@ -59,19 +59,19 @@ Use this exact prompt structure for each Haiku agent. Replace `{PR_NUMBER}` with
 You are extracting structured review findings from a merged GitHub PR.
 
 PR: {PR_NUMBER}
-Repo: MedHelpAB/MedHelp
+Repo: RepoAB/Repo
 
 Run these commands in sequence:
 
-1. gh pr view {PR_NUMBER} --repo MedHelpAB/MedHelp --json number,title,headRefName,mergedAt,author,body
-2. gh api repos/MedHelpAB/MedHelp/pulls/{PR_NUMBER}/comments
-3. gh api repos/MedHelpAB/MedHelp/pulls/{PR_NUMBER}/reviews
+1. gh pr view {PR_NUMBER} --repo RepoAB/Repo --json number,title,headRefName,mergedAt,author,body
+2. gh api repos/RepoAB/Repo/pulls/{PR_NUMBER}/comments
+3. gh api repos/RepoAB/Repo/pulls/{PR_NUMBER}/reviews
 
 Then return ONLY a JSON object (no markdown, no explanation) in this exact shape:
 
 {
   "pr": {PR_NUMBER},
-  "ticket": "PLRS-XXXX or null",
+  "ticket": "PROJ-XXXX or null",
   "title": "PR title",
   "merged_at": "ISO date",
   "author": "github login",
@@ -96,7 +96,7 @@ Rules:
 - Only include findings from actual review comments (not general PR description text)
 - Include findings from ALL reviewers: humans AND bots (Gemini, Claude, etc.) — mark reviewer_is_bot accordingly
 - `was_resolved` = true if the comment thread is marked resolved OR a follow-up commit clearly addresses it
-- `has_dream_team_markers` = true if the PR body or branch name suggests it was a Dream Team session (branch named exactly PLRS-XXXX, or body mentions "Dream Team" or "my-dream-team")
+- `has_dream_team_markers` = true if the PR body or branch name suggests it was a Dream Team session (branch named exactly PROJ-XXXX, or body mentions "Dream Team" or "my-dream-team")
 - `severity` = your best judgment: must-fix (blocking approval), suggestion (improvement), question (clarification), nitpick (style/minor)
 - If there are no review comments, return findings: []
 - Return ONLY the JSON object, nothing else
@@ -153,8 +153,8 @@ Then ask the user:
 [
   {
     "pr": 1838,
-    "ticket": "PLRS-1577",
-    "title": "PLRS-1577: Password reset initialization endpoint",
+    "ticket": "PROJ-1577",
+    "title": "PROJ-1577: Password reset initialization endpoint",
     "merged_at": "2026-02-27T15:15:28Z",
     "author": "cachpachios",
     "findings": [

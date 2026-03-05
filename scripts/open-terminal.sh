@@ -9,7 +9,7 @@
 #   Windows (WSL):  Windows-Terminal
 #
 # Example:
-#   open-terminal.sh Alacritty "bash ~/.claude/scripts/launch-workspace.sh PLRS-1234"
+#   open-terminal.sh Alacritty "bash ~/.claude/scripts/launch-workspace.sh PROJ-1234"
 
 TERMINAL_APP="$1"
 shift

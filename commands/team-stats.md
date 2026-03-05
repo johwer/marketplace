@@ -1,6 +1,6 @@
 # Team Stats — Dream Team Leaderboard & History
 
-Show cumulative statistics, achievements, and shoutouts for the Dream Team agents.
+Show cumulative service-e, achievements, and shoutouts for the Dream Team agents.
 
 ## Workflow
 
