@@ -1,0 +1,22 @@
+{
+  "name": "claude-plugins",
+  "owner": {
+    "name": "johwer"
+  },
+  "metadata": {
+    "description": "Plugin marketplace for Claude Code workflows and tools"
+  },
+  "plugins": [
+    {
+      "name": "dream-team",
+      "source": {
+        "source": "github",
+        "repo": "johwer/dream-team-flow"
+      },
+      "description": "Multi-agent development workflow framework — orchestrates teams of Claude agents with quality gates, retros, and Jira integration",
+      "version": "1.0.0",
+      "keywords": ["multi-agent", "workflow", "dream-team", "orchestration"],
+      "category": "workflow"
+    }
+  ]
+}
