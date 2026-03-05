@@ -31,7 +31,7 @@ case "$TEAMMATE_NAME" in
   *) exit 0 ;;
 esac
 
-# Extract ticket ID from team name (dream-team-PLRS-1234 -> PLRS-1234)
+# Extract ticket ID from team name (dream-team-PROJ-1234 -> PROJ-1234)
 TICKET_ID=$(echo "$TEAM_NAME" | sed 's/^dream-team-//')
 if [ -z "$TICKET_ID" ]; then
   exit 0

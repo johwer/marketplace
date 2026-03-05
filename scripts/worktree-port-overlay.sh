@@ -1,7 +1,7 @@
 #!/bin/bash
-# worktree-port-overlay.sh — Apply worktree port config from PLRS-1847 branch
+# worktree-port-overlay.sh — Apply worktree port config from PROJ-1847 branch
 #
-# Copies the worktree port infrastructure files from the PLRS-1847/worktree-port-config
+# Copies the worktree port infrastructure files from the PROJ-1847/worktree-port-config
 # branch into a worktree WITHOUT committing them. Uses git assume-unchanged +
 # .gitignore to keep them invisible to git status/diff/PRs.
 #
@@ -16,14 +16,14 @@
 #   5. Marks modified tracked files as assume-unchanged (for tracked files)
 #   6. Runs allocate-ports.sh to generate unique ports
 #
-# After PLRS-1847 merges to main, this script is no longer needed — remove it.
+# After PROJ-1847 merges to main, this script is no longer needed — remove it.
 
 set -euo pipefail
 
 TICKET_ID="${1:?Usage: $0 <TICKET_ID>}"
 WORKTREE_DIR="$HOME/Documents/$TICKET_ID"
-MEDHELP_ROOT="${MEDHELP_ROOT:-$HOME/Documents/MedHelp}"
-SOURCE_BRANCH="origin/PLRS-1847/worktree-port-config"
+MEDHELP_ROOT="${MEDHELP_ROOT:-$HOME/Documents/Repo}"
+SOURCE_BRANCH="origin/PROJ-1847/worktree-port-config"
 
 if [ ! -d "$WORKTREE_DIR" ]; then
     echo "ERROR: Worktree $WORKTREE_DIR does not exist" >&2
@@ -34,7 +34,7 @@ echo "Applying worktree port overlay for $TICKET_ID..."
 
 # Ensure we have the branch ref
 cd "$MEDHELP_ROOT"
-git fetch origin PLRS-1847/worktree-port-config 2>/dev/null || true
+git fetch origin PROJ-1847/worktree-port-config 2>/dev/null || true
 
 # Files to overlay from the branch
 OVERLAY_FILES=(
@@ -74,7 +74,7 @@ git update-index --assume-unchanged apps/web/vite.config.mts 2>/dev/null || true
 if ! grep -q "Worktree port overlay" .gitignore 2>/dev/null; then
     cat >> .gitignore << 'GITIGNORE'
 
-# Worktree port overlay (temporary until PLRS-1847 merges)
+# Worktree port overlay (temporary until PROJ-1847 merges)
 docker-compose.worktree.yml
 scripts/allocate-ports.sh
 scripts/worktree-service.sh
@@ -97,5 +97,5 @@ echo ""
 echo "Worktree port overlay applied for $TICKET_ID."
 echo "Files are invisible to git — they won't appear in PRs."
 echo ""
-echo "After PLRS-1847/worktree-port-config merges to main, run:"
+echo "After PROJ-1847/worktree-port-config merges to main, run:"
 echo "  rm ~/.claude/scripts/worktree-port-overlay.sh"
