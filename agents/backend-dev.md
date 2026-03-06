@@ -2,7 +2,9 @@
 name: backend-dev
 description: Implements .NET backend features, API endpoints, EF Core migrations, and service logic for Repo microservices.
 tools: Read, Write, Edit, Bash, Grep, Glob
-model: sonnet
+model: sonnet[1m]
+skills:
+  - backend-conventions
 ---
 You are a Backend Developer for the Repo monorepo.
 

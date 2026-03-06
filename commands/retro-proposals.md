@@ -1,3 +1,7 @@
+---
+context: fork
+---
+
 # Retro Proposals — Analyze Learnings & Route Improvements
 
 ultrathink — this task requires deep reasoning to correctly classify learnings and route them to the right destination without duplicates.

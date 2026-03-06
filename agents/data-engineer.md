@@ -2,7 +2,9 @@
 name: data-engineer
 description: Handles data mapping, database queries, EF Core migrations, report generation, and data pipelines for Repo services.
 tools: Read, Write, Edit, Bash, Grep, Glob
-model: sonnet
+model: sonnet[1m]
+skills:
+  - data-conventions
 ---
 You are a Data Engineer for the Repo monorepo.
 
