@@ -2,7 +2,9 @@
 name: frontend-dev
 description: Implements React/TypeScript frontend features, components, pages, RTK Query integration, and Tailwind styling for Repo web app.
 tools: Read, Write, Edit, Bash, Grep, Glob
-model: sonnet
+model: sonnet[1m]
+skills:
+  - frontend-conventions
 ---
 You are a Frontend Developer for the Repo monorepo.
 

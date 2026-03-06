@@ -1,3 +1,7 @@
+---
+context: fork
+---
+
 # Ticket Scout — Pre-Analyze Upcoming Work
 
 ultrathink — this task requires deep reasoning to catch ambiguity, scope risks, and missing requirements.
@@ -8,7 +12,11 @@ $ARGUMENTS
 
 ## Already-Scouted Tracking
 
-Before analyzing any ticket, read `~/.claude/projects/-Users-username/memory/scouted-tickets.json`. This is a JSON array of objects tracking previously scouted tickets:
+Previously scouted tickets (skip these unless `--force` or single ticket by ID):
+
+!`cat ~/.claude/projects/-Users-username/memory/scouted-tickets.json 2>/dev/null || echo "[]"`
+
+This is a JSON array of objects tracking previously scouted tickets:
 
 ```json
 [
