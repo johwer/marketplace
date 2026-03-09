@@ -64,7 +64,19 @@ Shows the Dream Team leaderboard and session history. Tracks per-agent achieveme
 
 ## /ticket-scout {#ticket-scout}
 
-Pre-analyzes upcoming Jira tickets before sprint planning. Flags ambiguous requirements, missing designs, domain model risks, and missing seed data before implementation starts.
+Batch sprint triage. Scans upcoming Jira tickets, assigns story points (1-4), and gives each a verdict: READY / REFINE / PUSH BACK / SKIP. Cheap and fast — no codebase exploration. Use this first, then `/ticket-refine` for tickets that need deeper analysis.
+
+---
+
+## /ticket-refine {#ticket-refine}
+
+Deep quality gate for a single ticket. Checks consistency (title vs description vs attachments), completeness, domain model impact, UX flow coverage, and generates concrete pushback posted as a Jira comment. Depth scales with story points — 1pt gets a quick sanity check, 4pt gets full analysis.
+
+---
+
+## /ticket-examples {#ticket-examples}
+
+Generates concrete code variation examples from the codebase for a ticket. Enumerates all enum values, type combinations, data mappings, and rendering scenarios that need handling. Best used on-demand when existing patterns exist and completeness matters. Posts examples as a Jira comment.
 
 ---
 

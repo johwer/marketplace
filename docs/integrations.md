@@ -223,6 +223,81 @@ bash ~/.claude/scripts/poll-ci-checks.sh RepoAB/Repo 1709 10 30
 bash ~/.claude/scripts/poll-ai-reviews.sh RepoAB/Repo 1709 6 45
 ```
 
+### Playwright CLI (Verification & Testing)
+
+**Status:** Active (optional install — falls back to AppleScript if not installed)
+**Location:** `~/.claude/skills/playwright-cli/`
+
+The recommended verification method for Dream Team agents. Replaces the AppleScript + `screencapture` workflow with a token-efficient CLI designed specifically for coding agents.
+
+**Why Playwright CLI over AppleScript:**
+- No Retina coordinate issues — uses element refs, not pixel coordinates
+- Named sessions per agent (`-s=agent-name`) — eliminates Chrome queue
+- Headless by default — no Chrome window management needed
+- Auto test generation — every interaction outputs Playwright TypeScript code
+- Video recording built-in — `video-start` / `video-stop`
+- DOM snapshots as YAML — richer than screenshots alone
+- `playwright-cli show` — visual dashboard to monitor all agent sessions
+
+**Installation (required for testing & verification):**
+
+```bash
+# 1. Install globally
+npm install -g @playwright/cli@latest
+
+# 2. Verify
+playwright-cli --help
+```
+
+The skill files are already included in DTF at `~/.claude/skills/playwright-cli/`. The global npm install provides the `playwright-cli` binary.
+
+**Configuration in `dtf-config.json`:**
+
+```json
+{
+  "verification": "playwright-cli"
+}
+```
+
+Set to `"applescript"` to use the legacy AppleScript + screencapture workflow instead. If `playwright-cli` is configured but not installed, agents fall back to AppleScript automatically.
+
+**Basic usage (agents use these automatically):**
+
+```bash
+# Open browser and navigate
+playwright-cli open http://localhost:3000/some/route --headed
+
+# Interact using element refs from snapshots
+playwright-cli snapshot                    # get element refs
+playwright-cli click e5                    # click by ref
+playwright-cli fill e3 "test@example.com"  # fill input
+playwright-cli screenshot --filename=verify.png
+
+# Named sessions (multi-agent)
+playwright-cli -s=frontend open http://localhost:3000 --headed
+playwright-cli -s=frontend click e12
+
+# Video recording
+playwright-cli video-start
+# ... do interactions ...
+playwright-cli video-stop demo.webm
+
+# Monitor all agent sessions
+playwright-cli show
+```
+
+**Moving to project repo (optional):**
+If your team wants the skill committed to the project repo instead of relying on DTF:
+
+```bash
+cd ~/Documents/YourProject
+playwright-cli install --skills
+# Creates .claude/skills/playwright-cli/ in the project
+# Commit to share with all devs via git
+```
+
+This way the skill lives in the repo and worktrees inherit it. DTF's copy becomes a fallback.
+
 ---
 
 ## Requires External Setup

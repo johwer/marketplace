@@ -2,11 +2,11 @@
 context: fork
 ---
 
-# Ticket Scout — Pre-Analyze Upcoming Work
+# Ticket Scout — Sprint Triage & Story Points
 
-ultrathink — this task requires deep reasoning to catch ambiguity, scope risks, and missing requirements.
+ultrathink — this task requires reasoning across multiple tickets to assess relative complexity and assign fair story points.
 
-Scan upcoming Jira tickets, pre-analyze them, and write observations so the Dream Team starts each ticket with better context.
+Batch-scan upcoming Jira tickets, assign story points (1-4), and flag obvious blockers. This is a quick triage — not deep analysis. Use `/ticket-refine` for deep single-ticket refinement.
 
 $ARGUMENTS
 
@@ -20,13 +20,13 @@ This is a JSON array of objects tracking previously scouted tickets:
 
 ```json
 [
-  { "key": "PROJ-1234", "scoutedAt": "2026-02-21", "complexity": "M", "team": "Kenji + Ingrid" }
+  { "key": "PROJ-1234", "scoutedAt": "2026-02-21", "points": 2, "team": "Kenji + Ingrid" }
 ]
 ```
 
 **Skip tickets that are already in this file** unless the user passes `--force` or scouts a single ticket by ID. After scouting new tickets, append them to this file.
 
-When presenting results, show skipped tickets as: `⏭️ PROJ-1234 — already scouted (2026-02-21)`
+When presenting results, show skipped tickets as: "PROJ-1234 — already scouted (2026-02-21, 2 pts)"
 
 ## Modes
 
@@ -44,18 +44,28 @@ acli jira workitem search --jql "project = PLRS AND assignee = currentUser() AND
 acli jira workitem search --jql "project = PLRS AND sprint in openSprints() AND status not in (Done) ORDER BY priority DESC" --fields "key,summary,status,assignee,story_points" --json
 ```
 
-### `uat` — Scout UAT/review tickets
-```bash
-acli jira workitem search --jql "project = PLRS AND status in ('UAT', 'Review', 'QA') ORDER BY updated DESC" --fields "key,summary,status,assignee" --json
-```
+### `<TICKET-ID>` — Scout a single ticket
+View full details of one ticket. Don't skip even if already scouted.
 
-### `done [N]` — Learn from last N completed tickets (default 5)
-```bash
-acli jira workitem search --jql "project = PLRS AND status = Done AND assignee = currentUser() ORDER BY updated DESC" --fields "key,summary,status" --limit N --json
-```
+## Story Points Scale
 
-### `<TICKET-ID>` — Deep scout a single ticket
-View full details of one ticket including description and comments.
+Assign points 1-4 based on effort and risk. These map roughly to t-shirt sizes:
+
+| Points | Size | Typical scope | Examples |
+|--------|------|---------------|----------|
+| **1** | S | Single file/component, one service, trivial change | Copy change, styling fix, config update |
+| **2** | M | 2-5 files, one service or light full-stack, clear path | New form field end-to-end, simple API endpoint, component refactor |
+| **3** | L | 5-10 files, full-stack, some unknowns or coordination | New feature with API + UI + translations, multi-step form, new list/detail view |
+| **4** | XL | 10+ files, multiple services, domain model changes, high risk | New entity/domain concept, cross-service feature, migration-heavy work, new page with complex state |
+
+### Calibration rules
+- If it needs a **new database table or EF migration** → minimum 3 points
+- If it touches **3+ services** → minimum 3 points
+- If **acceptance criteria are vague** → bump up 1 point (uncertainty tax)
+- If it's **purely frontend styling** with clear specs → likely 1 point
+- If it needs **new API endpoints** → minimum 2 points
+- If the work is **mechanical/repetitive** (same pattern applied N times, e.g., writing similar tests, config setup, adding fields to existing forms) → keep low even if many files — count distinct problems, not files touched
+- **Infrastructure/config tickets** (adding tooling, npm scripts, directory structure) are typically 1 point — the real work is what uses the infrastructure
 
 ## For Each Ticket
 
@@ -64,114 +74,87 @@ View full details of one ticket including description and comments.
    acli jira workitem view <KEY> --json
    ```
 
-2. **Analyze and rate** (do this with reasoning, don't call APIs):
+2. **Quick analysis** (reasoning only, NO codebase exploration — this must be cheap):
 
-   | Dimension | Rating | Notes |
-   |-----------|--------|-------|
-   | **Complexity** | S / M / L / XL | Based on scope: how many services, files, features |
-   | **Requirements quality** | 🟢 Clear / 🟡 Partial / 🔴 Vague | Are acceptance criteria specific? Missing edge cases? |
-   | **Team composition** | e.g., "Kenji + Ingrid" | Which Dream Team agents would be needed |
-   | **Model tier** | e.g., "Kenji: sonnet, Ingrid: haiku" | Recommended model per agent |
-   | **Needs testing** | Yes / No | Would Suki be needed? |
-   | **Infra concerns** | Yes / No | Would Diego be needed? (migrations, Docker, new services) |
-   | **Collaboration risk** | Low / Medium / High | How much cross-agent coordination is needed |
-   | **Missing info** | List of questions | What should be clarified before starting |
+   | Dimension | Assessment |
+   |-----------|------------|
+   | **Story points** | 1 / 2 / 3 / 4 |
+   | **Scope** | backend-only / frontend-only / full-stack |
+   | **Team** | Which Dream Team agents needed |
+   | **Model tier** | Recommended model per agent |
+   | **Verdict** | See below |
 
-3. **Flag requirement gaps** — Be specific:
-   - "No acceptance criteria listed"
-   - "Says 'update the form' but doesn't specify which fields"
-   - "Missing error handling requirements"
-   - "No mention of i18n for new UI text"
-   - "API contract not defined — backend and frontend will need to agree"
+3. **Assign a verdict** for each ticket:
+
+   | Verdict | Meaning | Next step |
+   |---------|---------|-----------|
+   | READY | Clear enough to start work | Go to `/create-stories` |
+   | REFINE | Has gaps but worth doing — needs `/ticket-refine` first | Run `/ticket-refine <ID>` |
+   | PUSH BACK | Not ready — missing critical info, contradictory, or questionable value | Post questions to Jira, discuss with PO |
+   | SKIP | Too vague, duplicate, or not worth the effort | Flag to PO with reason |
+
+   **Verdict criteria:**
+   - READY: Has clear ACs, description matches title, scope is obvious, no domain model ambiguity
+   - REFINE: Has ACs but they're incomplete, or implies domain changes that need investigation, or 3-4 points with unknowns
+   - PUSH BACK: No ACs, contradictory info, missing context that blocks even rough sizing, unclear business value
+   - SKIP: Description is a single sentence with no context, duplicate of another ticket, effort clearly outweighs value
+
+4. **Flag obvious risks** — keep it brief:
+   - "No acceptance criteria"
+   - "Implies domain model change (new entity mentioned)"
+   - "Dependencies on other tickets"
+   - "Conflicting description and title"
+   - "Questionable value — effort vs impact unclear"
 
 ## Output
-
-### For scouting mode (my tickets / sprint / uat)
 
 Write the analysis to `~/.claude/projects/-Users-username/memory/ticket-scout.md`:
 
 ```markdown
-# Ticket Scout Report — [date]
+# Ticket Scout — [date]
 
 ## Summary
 - Tickets analyzed: N
-- Complexity: S(x) M(x) L(x) XL(x)
-- Requirements quality: 🟢(x) 🟡(x) 🔴(x)
-- Total estimated agents needed: N unique agents across all tickets
+- Total points: X (estimated)
+- Distribution: 1pt(x) 2pt(x) 3pt(x) 4pt(x)
+- Verdicts: READY(x) REFINE(x) PUSH BACK(x) SKIP(x)
 
 ## Tickets
 
 ### PROJ-1234 — [summary]
-| Dimension | Rating |
-|-----------|--------|
-| Complexity | M |
-| Requirements | 🟡 Partial |
-| Team | Kenji (sonnet) + Ingrid (sonnet) |
-| Testing | Yes — API behavior change |
-| Infra | No |
-| Collaboration | Medium — API contract needed |
+| Points | Scope | Team | Verdict |
+|--------|-------|------|---------|
+| 2 | full-stack | Kenji + Ingrid | READY |
 
-**Missing info:**
-- No error handling for invalid input specified
-- Which user roles can access this feature?
+### PROJ-1235 — [summary]
+| Points | Scope | Team | Verdict |
+|--------|-------|------|---------|
+| 4 | full-stack | Full team | REFINE |
+Reason: Implies new database entity but no schema described. Run /ticket-refine first.
 
-**Pre-observation for Dream Team:**
-> Start with API contract definition. The ticket mentions "similar to the settings page" — check `apps/web/src/pages/Settings/` for patterns. Backend changes are in ServiceB service only.
+### PROJ-1236 — [summary]
+| Points | Scope | Team | Verdict |
+|--------|-------|------|---------|
+| ? | unclear | ? | PUSH BACK |
+Reason: Single-sentence description, no ACs, no mockup. Not ready for estimation.
 
 ---
 [repeat for each ticket]
 ```
 
-Present the report to the user and save it.
-
-### For learning mode (`done`)
-
-Read completed tickets and extract patterns. Write to `~/.claude/projects/-Users-username/memory/ticket-patterns.md`:
-
-```markdown
-# Ticket Patterns — Learned from completed work
-
-## Last updated: [date]
-## Tickets analyzed: N
-
-### Complexity Calibration
-- Small tickets (S): [common characteristics — e.g., "single service, 1-3 files, styling or copy changes"]
-- Medium tickets (M): [common characteristics]
-- Large tickets (L): [common characteristics]
-
-### Common Requirement Gaps
-- [Pattern that keeps recurring — e.g., "i18n keys never mentioned but always needed for UI tickets"]
-
-### Team Composition Patterns
-- Backend-only tickets: [frequency, typical complexity]
-- Frontend-only tickets: [frequency, typical complexity]
-- Full-stack tickets: [frequency, what made them complex]
-
-### What Caused Extra Review Rounds
-- [Pattern from tickets that had multiple review cycles]
-```
+Present the report to the user as a clean table and save it.
 
 ## Token Budget
 
-This command reads ticket descriptions and comments which can be verbose. To manage token cost:
+- **Batch mode**: Read full details for max 10 tickets. If more exist, show a summary list and let the user pick.
+- **Single ticket mode**: No limit — read everything including comments.
+- Summarize descriptions rather than quoting in full.
 
-- **Sprint/my tickets mode**: Read full details for max 10 tickets. If more exist, show a summary list and let the user pick which ones to deep-scout.
-- **Done mode**: Read max 5 tickets by default. Use `done 10` to increase.
-- **Single ticket mode**: No limit — read everything including all comments.
-- **Skip attachments**: Don't try to download Jira attachments (they require browser auth anyway).
-- For each ticket, summarize the description in your analysis rather than quoting it in full.
-
-## Optional: Write Jira Comments
+## Optional: Post Points to Jira
 
 After analysis, ask the user:
-- "Should I add pre-observations as Jira comments on the tickets?"
-- If yes, add a comment to each analyzed ticket:
+- "Should I set story points on the tickets?"
+- If yes, use the REST API script (ACLI doesn't support custom fields):
   ```bash
-  acli jira workitem comment create --key "<KEY>" --body "🔍 **Dream Team Pre-Scout**
-
-  **Complexity:** M | **Team:** Kenji + Ingrid | **Model:** sonnet + sonnet
-  **Requirements:** 🟡 Partial — missing error handling spec and i18n requirements
-  **Notes:** Check Settings page for UI patterns. API contract needed before parallel work.
-
-  _Auto-generated by Dream Team Ticket Scout_"
+  bash ~/.claude/scripts/jira-set-field.sh <KEY> customfield_10437 <N>
   ```

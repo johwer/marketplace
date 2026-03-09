@@ -22,7 +22,8 @@ This Skill provides a structured workflow for visual development tasks. Claude w
 
 **IMPORTANT**: Before implementing changes, ask the user which platform(s) to test on using the AskUserQuestion tool:
 
-- **Web (Puppeteer)**: Desktop/mobile web browser testing
+- **Web (Playwright CLI)**: Desktop/mobile web browser testing (recommended)
+- **Web (AppleScript)**: Legacy fallback — AppleScript + screencapture (if Playwright CLI not installed)
 - **iOS Simulator** (macOS only): Native iOS app testing
 - **Both**: Test on both web and iOS platforms
 
@@ -38,35 +39,79 @@ This Skill provides a structured workflow for visual development tasks. Claude w
 
 **⚠️ IMPORTANT: Pre-Verification Check**
 
-Before running Puppeteer or iOS Simulator MCP tools, **ALWAYS verify the page renders correctly first**:
+Before running verification tools, **ALWAYS verify the page renders correctly first**:
 
-1. **Manually check** that the development server is running and the page loads in Chrome or Safari
+1. **Check** that the development server is running and the page loads
 2. **If the page turns white or shows errors**:
-   - Check browser console for errors
-   - Verify the development server logs for compilation errors
+   - Check browser console for errors (`playwright-cli console` or dev server logs)
    - Fix any rendering issues, TypeScript errors, or runtime errors
-   - **Do NOT proceed with Puppeteer/simulator until the page renders correctly**
-3. **Why this matters**: If the page doesn't render, MCP tools will run indefinitely trying to capture screenshots of broken pages, wasting time and resources
+   - **Do NOT proceed until the page renders correctly**
+3. **Why this matters**: Broken pages waste time with any verification method
 
-**Only proceed with MCP tools after confirming the page renders correctly in a browser.**
+**Only proceed with verification tools after confirming the page renders correctly.**
 
 Always verify changes visually based on the chosen platform(s):
 
-#### Option A: Web Browser Testing (Puppeteer)
+#### Option A: Web Browser Testing — Playwright CLI (Recommended)
+
+Playwright CLI is the default verification method. It's headless, token-efficient, and auto-generates test code from interactions. Check `dtf-config.json` `verification` field — if set to `"applescript"`, use Option B instead.
 
 ```bash
-# Connect to browser
-mcp__puppeteer-mcp-server__puppeteer_connect_active_tab
+# Open browser and navigate (use --headed to watch)
+playwright-cli open http://localhost:3000/[relevant-path]
 
-# Navigate to the relevant page
-mcp__puppeteer-mcp-server__puppeteer_navigate
-# URL: http://localhost:3000/[relevant-path]
+# Take a DOM snapshot to get element refs
+playwright-cli snapshot
 
-# Take screenshot
-mcp__puppeteer-mcp-server__puppeteer_screenshot
+# Interact using refs from snapshot output
+playwright-cli click e5
+playwright-cli fill e3 "test value"
+playwright-cli select e9 "option-value"
+
+# Take screenshot for visual verification
+playwright-cli screenshot --filename=verify-feature.png
+
+# Check for console errors
+playwright-cli console
+
+# Close when done
+playwright-cli close
 ```
 
-#### Option B: iOS Simulator Testing (macOS only)
+**Multi-agent sessions** — use named sessions to avoid conflicts:
+```bash
+playwright-cli -s=frontend open http://localhost:3000 --headed
+playwright-cli -s=frontend snapshot
+playwright-cli -s=frontend screenshot
+```
+
+**Video recording** for PR evidence:
+```bash
+playwright-cli video-start
+# ... perform interactions ...
+playwright-cli video-stop feature-demo.webm
+```
+
+**Test generation** — every CLI interaction outputs Playwright TypeScript code. Collect the generated code and write it as a test file:
+```bash
+# Each command outputs code like:
+# await page.getByRole('button', { name: 'Submit' }).click();
+# Collect these into a .spec.ts file
+```
+
+#### Option B: Web Browser Testing — AppleScript (Legacy Fallback)
+
+Use this if Playwright CLI is not installed or `dtf-config.json` has `"verification": "applescript"`. See `~/.claude/projects/-Users-username-Documents/memory/visual-testing.md` for the full AppleScript workflow.
+
+```bash
+# Navigate via Chrome
+osascript -e 'tell application "Google Chrome" to set URL of active tab of first window to "http://localhost:3000/..."'
+
+# Wait + capture
+sleep 4 && osascript -e 'tell application "Google Chrome" to activate' && sleep 0.5 && screencapture -x ~/Downloads/screenshot.png
+```
+
+#### Option C: iOS Simulator Testing (macOS only)
 
 ```bash
 # List available simulators
@@ -84,9 +129,9 @@ mcp__ios-simulator__tap
 mcp__ios-simulator__swipe
 ```
 
-#### Option C: Both Platforms
+#### Option D: Both Platforms
 
-Test on web first, then iOS simulator, comparing behavior and appearance across both.
+Test on web first (Playwright CLI), then iOS simulator, comparing behavior and appearance across both.
 
 ### 4. Compare and Analyze
 
@@ -184,11 +229,17 @@ Claude:
 
 ## Tools Required
 
-### Web Testing
+### Web Testing (Playwright CLI — Recommended)
 
-- **Puppeteer MCP Server**: For browser automation and screenshots
+- **Playwright CLI**: `npm install -g @playwright/cli@latest` — headless browser automation
 - **Development Server**: Must be running (`npm start`)
-- **Browser**: Chrome instance for Puppeteer to connect to
+- **No browser management needed** — Playwright CLI handles its own browser
+
+### Web Testing (AppleScript — Legacy Fallback)
+
+- **Google Chrome**: Must be open with a tab on localhost
+- **Development Server**: Must be running on port 3000
+- **screencapture**: macOS built-in
 
 ### iOS Testing (macOS only)
 
