@@ -21,15 +21,17 @@ Applies to all tickets with UI changes. Skip for backend-only/infra-only tickets
 ### Requirements
 
 - **Before** and **after** videos/screenshots MUST exist as files on disk
-- File naming: `<TICKET_ID>-before.webm`, `<TICKET_ID>-after.webm` (video) or `.png` (screenshot)
-- Screenshots (.png): `docs/verification/<TICKET_ID>/` in the repo (committed with the PR)
-- Videos (.webm): `~/Downloads/` (Hämtade filer) — too large to commit, attach to PR comment if needed
+- **Screenshots (.png)**: Co-located with the component in `__screenshots__/` folder, committed with the PR
+  - Path: `<component-dir>/__screenshots__/<ComponentName>-<state>.png`
+  - Example: `apps/web/src/pages/.../components/__screenshots__/MedicalCertificateModal-degree-handling.png`
+  - Name describes the **state being verified**, not the ticket ID
+- **Videos (.webm)**: `~/Downloads/<TICKET_ID>-after.webm` — too large to commit, attach to PR comment if needed
 
 ### Verification
 
 ```bash
-# This MUST succeed before pushing
-ls docs/verification/<TICKET_ID>/<TICKET_ID>-after.png 2>/dev/null
+# This MUST succeed before pushing — find the after screenshot near the component
+find apps/web/src -path '*__screenshots__/*' -name '*-after*' -o -path '*__screenshots__/*' -newer .git/refs/heads/main 2>/dev/null | head -5
 ```
 
 If no file exists on disk:
@@ -53,17 +55,17 @@ playwright-cli -s=<agent-name> snapshot
 playwright-cli -s=<agent-name> click e5
 playwright-cli -s=<agent-name> fill e3 "value"
 
-# 4. Stop recording and save video to Downloads
+# 4. Stop recording — save video to Downloads
 playwright-cli -s=<agent-name> video-stop --filename=~/Downloads/<TICKET_ID>-after.webm
 
-# 5. Take screenshot directly into repo verification folder
-mkdir -p docs/verification/<TICKET_ID>
-playwright-cli -s=<agent-name> screenshot --filename=docs/verification/<TICKET_ID>/<TICKET_ID>-after.png
+# 5. Take screenshot — save co-located with the component
+mkdir -p <component-dir>/__screenshots__
+playwright-cli -s=<agent-name> screenshot --filename=<component-dir>/__screenshots__/<ComponentName>-<state>.png
 
 # 6. Verify screenshot exists
-ls docs/verification/<TICKET_ID>/<TICKET_ID>-after.png
+ls <component-dir>/__screenshots__/<ComponentName>-<state>.png
 
-# 6. Close session
+# 7. Close session
 playwright-cli -s=<agent-name> close
 ```
 
@@ -293,38 +295,47 @@ Run the applicable categories based on changed file types:
 
 ### Verification Artifacts — Storage
 
-All visual verification files go in **`docs/verification/<TICKET_ID>/`** in the repo, committed with the PR:
+Screenshots and videos are stored in two places:
 
+**Screenshots (.png)** — co-located with the component, committed with the PR:
 ```
-docs/verification/
-  PROJ-1939/
-    PROJ-1939-before.webm
-    PROJ-1939-after.webm
-    PROJ-1939-after.png
+apps/web/src/pages/.../components/
+  MedicalCertificateModal.tsx
+  __screenshots__/
+    MedicalCertificateModal-default.png
+    MedicalCertificateModal-edit-mode.png
+    MedicalCertificateModal-degree-handling.png
 ```
 
-This keeps verification evidence alongside the code, reviewable in the PR diff.
+**Videos (.webm)** — saved to `~/Downloads/` (too large to commit):
+```
+~/Downloads/
+  PROJ-1939-after.webm
+  PROJ-1939-before.webm
+```
 
-**Playwright CLI** supports `--filename` to control output paths directly:
-- Screenshots: `playwright-cli screenshot --filename=docs/verification/<TICKET_ID>/<TICKET_ID>-after.png`
+**Why co-located?** Screenshots live next to the component they verify — easy to find, and ready for future automated visual regression testing (Playwright `toHaveScreenshot()` uses the same `__snapshots__/` pattern).
+
+**Playwright CLI** `--filename` controls output paths directly:
+- Screenshots: `playwright-cli screenshot --filename=<component-dir>/__screenshots__/<ComponentName>-<state>.png`
 - Videos: `playwright-cli video-stop --filename=~/Downloads/<TICKET_ID>-after.webm`
 
 Config reference: `playwright-cli.json` supports `outputDir` for default output directory. See https://github.com/microsoft/playwright-cli
 
 ### File Naming
 
-| File | Pattern | Example |
-|------|---------|---------|
-| Before video | `<TICKET_ID>-before.webm` | `PROJ-1831-before.webm` |
-| After video | `<TICKET_ID>-after.webm` | `PROJ-1831-after.webm` |
-| Screenshot | `<TICKET_ID>-after.png` | `PROJ-1831-after.png` |
-| Jira attachments | Original filename from Jira | `image-20260227-140735.png` |
+| File | Location | Pattern | Example |
+|------|----------|---------|---------|
+| Screenshot | `__screenshots__/` next to component | `<ComponentName>-<state>.png` | `MedicalCertificateModal-degree-handling.png` |
+| Before video | `~/Downloads/` | `<TICKET_ID>-before.webm` | `PROJ-1831-before.webm` |
+| After video | `~/Downloads/` | `<TICKET_ID>-after.webm` | `PROJ-1831-after.webm` |
+| Jira attachments | `~/Downloads/` | Original filename from Jira | `image-20260227-140735.png` |
 
-### Download Location (Jira only)
+### Download Location
 
 - macOS path: `~/Downloads/`
 - On Swedish macOS, Finder shows this as **"Hämtade filer"** but the filesystem path is still `~/Downloads/`
-- Jira attachments download here before being moved to the appropriate location
+- Videos and Jira attachments download here
 
 ### Jira Attachments
 
@@ -343,7 +354,7 @@ Before transitioning a ticket to Done (Phase 7), **every item below must be conf
 | # | Item | How to verify |
 |---|------|---------------|
 | 1 | **All PR review comments resolved** | `gh api graphql` query returns 0 unresolved threads (see Section 3) |
-| 2 | **Video/screenshots committed** (if UI changes) | `ls docs/verification/<TICKET_ID>/<TICKET_ID>-after.png` succeeds (see Section 1) |
+| 2 | **Screenshots committed** (if UI changes) | `find apps/web/src -path '*__screenshots__/*' -newer .git/refs/heads/main` finds at least one file (see Section 1) |
 | 3 | **Retrospective completed** | Phase 6.75 ran, learnings saved to `.dream-team/journal/` and memory |
 | 4 | **Jira completion comment posted** | `acli jira workitem comment create` succeeded with PR link + summary |
 | 5 | **CI is green** | Last push has all checks passing |
