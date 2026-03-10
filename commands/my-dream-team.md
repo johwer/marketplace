@@ -84,9 +84,9 @@ Check if the arguments contain `--lite`. If present:
   - **Phase 5.5**: Full GitHub review cycle — trigger AI bot reviews (Gemini `/gemini review`), poll for AI feedback, fix any issues, poll CI checks, mark PR ready only after user confirms, then assign reviewers from `reviewers.json`
   - **Phase 6**: User review loop — ask user for feedback, route fixes, iterate until "ship it"
   - **Phase 6.5**: Summary (write it yourself instead of spawning Tane)
-  - **Phase 4.75 (Visual verification)**: Use the **Playwright CLI** (`playwright-cli`) for browser verification — each agent gets an isolated named session (`-s=<agent-name>`), no Chrome queue needed. Start Vite on the worktree's port, then use `playwright-cli -s=<agent> open http://localhost:<port>/<path> --headed` to verify. Record video with `playwright-cli video-start` / `playwright-cli video-stop <TICKET_ID>-after.webm`. Take snapshots with `playwright-cli snapshot`. See `~/.claude/skills/playwright-cli/SKILL.md` for full command reference.
+  - **Phase 4.75 (Visual verification)**: Use the **Playwright CLI** (`playwright-cli`) for browser verification — each agent gets an isolated named session (`-s=<agent-name>`), no Chrome queue needed. Start Vite on the worktree's port, then use `playwright-cli -s=<agent> open http://localhost:<port>/<path> --headed` to verify. Record video with `playwright-cli video-start` / `playwright-cli video-stop`. Take snapshots with `playwright-cli snapshot`. Copy artifacts to `docs/verification/<TICKET_ID>/` in the repo. See `~/.claude/skills/playwright-cli/SKILL.md` for full command reference.
   - **Phase 6.75**: Retrospective — write your own retro learnings using the same 4 categories with destination hints: instruction improvements (`dream-team`/`agent:<name>`/`skill:<name>`), convention discoveries (`project-claude`/`agents-md:<path>`/`repo-docs`), doc gaps (`repo-docs`/`agents-md:<path>`), process improvements (`dream-team`/`memory`). Tag each item with a suggested destination so [`/retro-proposals`](commands.md#team-review) can route it later.
-  - **Phase 7**: Cleanup — runs the **Completion Gate** first (see `dev-workflow-checklist.md` Section 7): all PR comments resolved, screenshots on disk, retro done, CI green, PR description complete. Then posts a **Jira completion comment** with PR link + summary, @mentioning the ticket creator if different from assignee. Then transitions ticket to Klart.
+  - **Phase 7**: Cleanup — runs the **Completion Gate** first (see `dev-workflow-checklist.md` Section 7): all PR comments resolved, screenshots in `docs/verification/<TICKET_ID>/`, retro done, CI green, PR description complete. Then posts a **Jira completion comment** with PR link + summary, @mentioning the ticket creator if different from assignee. Then transitions ticket to Klart.
 - The key principle: minimize agent overhead for small/medium tasks while keeping all quality gates, feedback loops, and process steps intact.
 - **Shared quality gates**: Before reporting completion or pushing, follow ALL sections in `~/.claude/docs/dev-workflow-checklist.md`. These gates apply in both Dream Team and lite mode.
 
@@ -329,10 +329,11 @@ Immediately after creating the draft PR, spawn Lena to record the current (broke
     2. Start video recording: `playwright-cli -s=lena video-start`
     3. Take a snapshot: `playwright-cli -s=lena snapshot`
     4. Walk through the reproduction steps using `playwright-cli` commands (click, fill, etc.)
-    5. Stop recording: `playwright-cli -s=lena video-stop <TICKET_ID>-before.webm`
+    5. Stop recording: `playwright-cli -s=lena video-stop`
     6. Take a screenshot: `playwright-cli -s=lena screenshot --filename=<TICKET_ID>-before.png`
+    7. Copy artifacts to repo: `mkdir -p docs/verification/<TICKET_ID> && cp .playwright-cli/*.webm docs/verification/<TICKET_ID>/<TICKET_ID>-before.webm && cp <TICKET_ID>-before.png docs/verification/<TICKET_ID>/`
   - **Close session**: Run `playwright-cli -s=lena close`
-  - **Report to team lead**: Send a message with the video/screenshot filenames and a brief description of what the bug looks like visually.
+  - **Report to team lead**: Send a message with the filenames in `docs/verification/<TICKET_ID>/` and a brief description of what the bug looks like visually.
   - **IMPORTANT**: Do NOT edit any files. Do NOT run git commit. You are read-only.
 
 **Don't wait for Lena to finish** — proceed to Phase 2 immediately. Lena runs in parallel with dev agent spawning. When Lena reports back, include the visual reference in a message to Ingrid so she knows what the bug looks like.
@@ -432,13 +433,15 @@ Based on the tech-architect's scope assessment, spawn the needed agents. **Use t
        - Start video recording: `playwright-cli -s=ingrid video-start`
        - Use `playwright-cli snapshot` to get element refs, then interact with `click`, `fill`, etc.
        - Walk through the user flow from the ticket's verification steps, showing the fix works
-       - Stop recording: `playwright-cli -s=ingrid video-stop <TICKET_ID>-after.webm`
+       - Stop recording: `playwright-cli -s=ingrid video-stop`
        - Take a screenshot: `playwright-cli -s=ingrid screenshot --filename=<TICKET_ID>-after.png`
+       - Copy to repo: `mkdir -p docs/verification/<TICKET_ID> && cp .playwright-cli/*.webm docs/verification/<TICKET_ID>/<TICKET_ID>-after.webm && cp <TICKET_ID>-after.png docs/verification/<TICKET_ID>/`
        - (Note: the "BEFORE" video was already recorded by Lena before you started. You only need to record "after".)
     5. **Compare against the design**: If the ticket has a Figma link or Jira image attachment, take a screenshot of both side by side. Compare layout, colors, spacing, and typography against the design reference.
     6. **Check acceptance criteria**: Walk through the ticket's verification steps. If the fix doesn't match expectations, fix your code immediately and re-verify. Don't report completion until it passes.
     7. **Close session**: Run `playwright-cli -s=ingrid close` when done.
-    8. **Report visual status**: In your completion message, note whether you visually verified, include the "after" video/screenshot filename, and any deviations from the design (with justification). The team lead will attach them to the PR.
+    8. **Verify artifacts**: `ls docs/verification/<TICKET_ID>/<TICKET_ID>-after.png` must succeed.
+    9. **Report visual status**: In your completion message, note whether you visually verified, reference files in `docs/verification/<TICKET_ID>/`, and any deviations from the design (with justification).
   - **Context management**: Follow the Context Management Protocol (see below). Create your notes file at `.dream-team/notes/ingrid.md`.
   - **Communication**: Follow the Communication Protocol (see below). Your contacts: `kenji` (backend), `diego` (infra), `amara` (architect). Be proactive — if you find API contract issues, message `kenji` immediately.
   - If the architect provided an API contract, build your RTK Query types and components against it. You don't need to wait for backend — work in parallel.
@@ -707,18 +710,20 @@ After Maya's code review is approved (all MUST FIX items resolved), spawn:
     3. Start video: `playwright-cli -s=lena video-start`
     4. Take a snapshot: `playwright-cli -s=lena snapshot`
     5. Walk through the reproduction steps using playwright-cli commands
-    6. Stop video: `playwright-cli -s=lena video-stop <TICKET_ID>-before.webm`
+    6. Stop video: `playwright-cli -s=lena video-stop`
     7. Screenshot: `playwright-cli -s=lena screenshot --filename=<TICKET_ID>-before.png`
+    8. Copy to repo: `mkdir -p docs/verification/<TICKET_ID> && cp .playwright-cli/*.webm docs/verification/<TICKET_ID>/<TICKET_ID>-before.webm && cp <TICKET_ID>-before.png docs/verification/<TICKET_ID>/`
   - **Step 2 — Record AFTER video**:
     1. If you stashed changes, run `git stash pop` to restore the fix. Otherwise the fix should already be in the working tree.
     2. Wait for Vite hot reload (2-3 seconds), then reload: `playwright-cli -s=lena reload`
     3. Start video: `playwright-cli -s=lena video-start`
     4. Take a snapshot: `playwright-cli -s=lena snapshot`
     5. Walk through the same steps, showing the fix works
-    6. Stop video: `playwright-cli -s=lena video-stop <TICKET_ID>-after.webm`
+    6. Stop video: `playwright-cli -s=lena video-stop`
     7. Screenshot: `playwright-cli -s=lena screenshot --filename=<TICKET_ID>-after.png`
+    8. Copy to repo: `cp .playwright-cli/*.webm docs/verification/<TICKET_ID>/<TICKET_ID>-after.webm && cp <TICKET_ID>-after.png docs/verification/<TICKET_ID>/`
   - **Close session**: Run `playwright-cli -s=lena close`
-  - **Report to team lead**: Send a message with the video/screenshot filenames and a brief description of what each shows. Note any issues or deviations.
+  - **Report to team lead**: Send a message with files in `docs/verification/<TICKET_ID>/` and a brief description of what each shows. Note any issues or deviations.
   - **IMPORTANT**: Do NOT edit any files. Do NOT run git commit. You are read-only.
 
 **Note for team lead**: The "before" state can be tricky since the fix is already committed. Options:
@@ -726,7 +731,7 @@ After Maya's code review is approved (all MUST FIX items resolved), spawn:
 - If already committed: check out `main` briefly for "before", then switch back for "after" (`git checkout main -- <file>` then `git checkout - -- <file>`)
 - If the "before" is obvious from the ticket screenshots: skip the "before" video and only record "after"
 
-Tell the user the video/screenshot filenames and their locations, ready to attach to the PR as a comment.
+Tell the user the files are in `docs/verification/<TICKET_ID>/` and will be committed with the PR.
 
 ### Phase 5: Commit, Push & Initial Summary
 
@@ -735,11 +740,11 @@ Before proceeding with ANY push, confirm that visual verification was completed.
 1. Did Ingrid's completion message include visual verification results? OR
 2. Did Lena record before/after videos in Phase 4.75?
 
-**A verbal report of "verified in browser" is NOT sufficient.** The "after" video or screenshot file must exist on disk — run:
+**A verbal report of "verified in browser" is NOT sufficient.** The "after" screenshot must exist in `docs/verification/<TICKET_ID>/` — run:
 ```bash
-ls .playwright-cli/<TICKET_ID>-after.webm .playwright-cli/<TICKET_ID>-after.png 2>/dev/null || ls ~/Downloads/<TICKET_ID>-after.* 2>/dev/null
+ls docs/verification/<TICKET_ID>/<TICKET_ID>-after.png 2>/dev/null
 ```
-If no files found, visual verification has not been completed. Do NOT push.
+If no file found, visual verification has not been completed. Do NOT push.
 
 If NEITHER the video/screenshot file exists NOR Ingrid's completion message documented visual verification: **STOP. Do NOT push.** Spawn Lena (Phase 4.75) first. This gate exists because skipping visual verification has caused user-facing bugs in 2 out of 7 sessions (PROJ-1701, PROJ-1562). Runtime errors visible in the browser were shipped because nobody checked.
 
@@ -1569,7 +1574,12 @@ playwright-cli -s=ingrid screenshot --filename=<TICKET_ID>-after.png
 # Video recording
 playwright-cli -s=ingrid video-start
 # ... do interactions ...
-playwright-cli -s=ingrid video-stop <TICKET_ID>-after.webm
+playwright-cli -s=ingrid video-stop
+
+# Copy artifacts to repo verification folder
+mkdir -p docs/verification/<TICKET_ID>
+cp .playwright-cli/*.webm docs/verification/<TICKET_ID>/<TICKET_ID>-after.webm
+cp <TICKET_ID>-after.png docs/verification/<TICKET_ID>/
 
 # Close session when done
 playwright-cli -s=ingrid close
