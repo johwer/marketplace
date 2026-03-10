@@ -11,30 +11,51 @@ Applies to all tickets with UI changes. Skip for backend-only/infra-only tickets
 
 ### Requirements
 
-- **Before** and **after** GIFs/screenshots MUST exist as files on disk
-- File naming: `<TICKET_ID>-before.gif`, `<TICKET_ID>-after.gif`
-- Storage location: `~/Downloads/` (see Section 6 for macOS locale notes)
+- **Before** and **after** videos/screenshots MUST exist as files on disk
+- File naming: `<TICKET_ID>-before.webm`, `<TICKET_ID>-after.webm` (video) or `.png` (screenshot)
+- Storage location: `.playwright-cli/` in the worktree (video) or worktree root (screenshot)
 
 ### Verification
 
 ```bash
 # This MUST succeed before pushing
-ls ~/Downloads/<TICKET_ID>-after.gif
+ls .playwright-cli/<TICKET_ID>-after.webm <TICKET_ID>-after.png 2>/dev/null
 ```
 
-If the file does not exist on disk:
+If no file exists on disk:
 1. **DO NOT push.** Record visual evidence first.
 2. A verbal claim of "verified in browser" is NOT sufficient.
 3. If the agent claims "verified" but the file doesn't exist after 3 attempts, escalate to user.
 
-### Recording Steps
+### Recording Steps — Playwright CLI
 
-1. Get Chrome access via the Chrome Browser Queue (`~/.claude/scripts/chrome-queue.sh`)
-2. Start Vite dev server on port 3000: `VITE_DEV_PORT=3000 npm start` — the Chrome plugin connects to port 3000. The queue ensures only one workspace uses it at a time.
-3. Navigate to the affected page on `https://localhost:3000/...`
-4. Record GIF: `gif_creator action=start_recording` → screenshots → `action=stop_recording` → `action=export filename="<TICKET_ID>-after.gif" download=true`
-5. Verify file exists on disk with `ls`
-6. Release Chrome
+Use `playwright-cli` (NOT Puppeteer MCP, NOT Chrome extension, NOT `gif_creator`).
+
+```bash
+# 1. Open browser with named session
+playwright-cli -s=<agent-name> open http://localhost:<port>/<path> --headed
+
+# 2. Start video recording
+playwright-cli -s=<agent-name> video-start
+
+# 3. Get element refs and interact
+playwright-cli -s=<agent-name> snapshot
+playwright-cli -s=<agent-name> click e5
+playwright-cli -s=<agent-name> fill e3 "value"
+
+# 4. Stop recording and take screenshot
+playwright-cli -s=<agent-name> video-stop
+playwright-cli -s=<agent-name> screenshot --filename=<TICKET_ID>-after.png
+
+# 5. Verify files exist
+ls .playwright-cli/*.webm <TICKET_ID>-after.png
+
+# 6. Close session
+playwright-cli -s=<agent-name> close
+```
+
+Each agent uses their own named session (`-s=ingrid`, `-s=lena`, etc.) — no queue needed.
+Full docs: `~/.claude/skills/playwright-cli/SKILL.md`
 
 ---
 
@@ -267,8 +288,9 @@ Run the applicable categories based on changed file types:
 
 | File | Pattern | Example |
 |------|---------|---------|
-| Before GIF | `<TICKET_ID>-before.gif` | `PROJ-1831-before.gif` |
-| After GIF | `<TICKET_ID>-after.gif` | `PROJ-1831-after.gif` |
+| Before video | `<TICKET_ID>-before.webm` | `PROJ-1831-before.webm` |
+| After video | `<TICKET_ID>-after.webm` | `PROJ-1831-after.webm` |
+| Screenshot | `<TICKET_ID>-after.png` | `PROJ-1831-after.png` |
 | Jira attachments | Original filename from Jira | `image-20260227-140735.png` |
 
 ### Jira Attachments
@@ -288,7 +310,7 @@ Before transitioning a ticket to Done (Phase 7), **every item below must be conf
 | # | Item | How to verify |
 |---|------|---------------|
 | 1 | **All PR review comments resolved** | `gh api graphql` query returns 0 unresolved threads (see Section 3) |
-| 2 | **Screenshots/GIFs on disk** (if UI changes) | `ls ~/Downloads/<TICKET_ID>-after.gif` succeeds (see Section 1) |
+| 2 | **Video/screenshots on disk** (if UI changes) | `ls .playwright-cli/<TICKET_ID>-after.webm` or `<TICKET_ID>-after.png` succeeds (see Section 1) |
 | 3 | **Retrospective completed** | Phase 6.75 ran, learnings saved to `.dream-team/journal/` and memory |
 | 4 | **Jira completion comment posted** | `acli jira workitem comment create` succeeded with PR link + summary |
 | 5 | **CI is green** | Last push has all checks passing |
