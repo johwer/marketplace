@@ -22,8 +22,8 @@ Applies to all tickets with UI changes. Skip for backend-only/infra-only tickets
 
 - **Before** and **after** videos/screenshots MUST exist as files on disk
 - File naming: `<TICKET_ID>-before.webm`, `<TICKET_ID>-after.webm` (video) or `.png` (screenshot)
-- Storage location: `docs/verification/<TICKET_ID>/` in the repo (committed with the PR)
-- Videos (.webm) are also saved to `.playwright-cli/` by the tool — copy to `docs/verification/<TICKET_ID>/` or attach to the PR comment if too large (>5MB)
+- Screenshots (.png): `docs/verification/<TICKET_ID>/` in the repo (committed with the PR)
+- Videos (.webm): `~/Downloads/` (Hämtade filer) — too large to commit, attach to PR comment if needed
 
 ### Verification
 
@@ -53,16 +53,14 @@ playwright-cli -s=<agent-name> snapshot
 playwright-cli -s=<agent-name> click e5
 playwright-cli -s=<agent-name> fill e3 "value"
 
-# 4. Stop recording and take screenshot
-playwright-cli -s=<agent-name> video-stop
-playwright-cli -s=<agent-name> screenshot --filename=<TICKET_ID>-after.png
+# 4. Stop recording and save video to Downloads
+playwright-cli -s=<agent-name> video-stop --filename=~/Downloads/<TICKET_ID>-after.webm
 
-# 5. Copy artifacts to repo verification folder
+# 5. Take screenshot directly into repo verification folder
 mkdir -p docs/verification/<TICKET_ID>
-cp .playwright-cli/*.webm docs/verification/<TICKET_ID>/<TICKET_ID>-after.webm 2>/dev/null || true
-cp <TICKET_ID>-after.png docs/verification/<TICKET_ID>/
+playwright-cli -s=<agent-name> screenshot --filename=docs/verification/<TICKET_ID>/<TICKET_ID>-after.png
 
-# 6. Verify files exist
+# 6. Verify screenshot exists
 ls docs/verification/<TICKET_ID>/<TICKET_ID>-after.png
 
 # 6. Close session
@@ -307,7 +305,11 @@ docs/verification/
 
 This keeps verification evidence alongside the code, reviewable in the PR diff.
 
-**Playwright CLI saves files to `.playwright-cli/` by default** — always copy them to `docs/verification/<TICKET_ID>/` before committing. Videos >5MB can alternatively be attached as PR comments instead of committed.
+**Playwright CLI** supports `--filename` to control output paths directly:
+- Screenshots: `playwright-cli screenshot --filename=docs/verification/<TICKET_ID>/<TICKET_ID>-after.png`
+- Videos: `playwright-cli video-stop --filename=~/Downloads/<TICKET_ID>-after.webm`
+
+Config reference: `playwright-cli.json` supports `outputDir` for default output directory. See https://github.com/microsoft/playwright-cli
 
 ### File Naming
 
