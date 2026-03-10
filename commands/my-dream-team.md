@@ -75,7 +75,7 @@ Check if the arguments contain `--lite`. If present:
   - **Phase 5.5**: Full GitHub review cycle — trigger AI bot reviews (Gemini `/gemini review`), poll for AI feedback, fix any issues, poll CI checks, mark PR ready only after user confirms, then assign reviewers from `reviewers.json`
   - **Phase 6**: User review loop — ask user for feedback, route fixes, iterate until "ship it"
   - **Phase 6.5**: Summary (write it yourself instead of spawning Tane)
-  - **Phase 4.75 (Visual verification)**: Use the **Chrome Browser Queue** (`~/.claude/scripts/chrome-queue.sh`) to coordinate Chrome access — only one workspace at a time. Screenshots always use **port 3000** (the Chrome plugin connects there). Start Vite with `VITE_DEV_PORT=3000 npm start` to override the worktree's default port. Full workflow: join queue → check turn → start Vite on 3000 → `gif_creator` → export → verify file on disk → stop Vite → release Chrome.
+  - **Phase 4.75 (Visual verification)**: Use the **Playwright CLI** (`playwright-cli`) for browser verification — each agent gets an isolated named session (`-s=<agent-name>`), no Chrome queue needed. Start Vite on the worktree's port, then use `playwright-cli -s=<agent> open http://localhost:<port>/<path> --headed` to verify. Record video with `playwright-cli video-start` / `playwright-cli video-stop <TICKET_ID>-after.webm`. Take snapshots with `playwright-cli snapshot`. See `~/.claude/skills/playwright-cli/SKILL.md` for full command reference.
   - **Phase 6.75**: Retrospective — write your own retro learnings using the same 4 categories with destination hints: instruction improvements (`dream-team`/`agent:<name>`/`skill:<name>`), convention discoveries (`project-claude`/`agents-md:<path>`/`repo-docs`), doc gaps (`repo-docs`/`agents-md:<path>`), process improvements (`dream-team`/`memory`). Tag each item with a suggested destination so [`/retro-proposals`](commands.md#team-review) can route it later.
   - **Phase 7**: Cleanup — runs the **Completion Gate** first (see `dev-workflow-checklist.md` Section 7): all PR comments resolved, screenshots on disk, retro done, CI green, PR description complete. Then posts a **Jira completion comment** with PR link + summary, @mentioning the ticket creator if different from assignee. Then transitions ticket to Klart.
 - The key principle: minimize agent overhead for small/medium tasks while keeping all quality gates, feedback loops, and process steps intact.
@@ -181,10 +181,11 @@ This phase runs instead of the normal Phase 1-7 workflow when `--resume` is dete
      - The monorepo has: `apps/web/` (React/Vite/TypeScript/Tailwind frontend), `services/` (.NET microservices: ServiceA, ServiceB, ServiceC, ServiceD, ServiceE), `shared/` (shared .NET libs), `docs/` (conventions)
      - Read only the docs relevant to the ticket scope in `docs/` — if it's frontend-only, skip backend docs; if backend-only, skip frontend docs. Available docs: SERVICE_ARCHITECTURE.md, CODING_STYLE_BACKEND.md, CODING_STYLE_FRONTEND.md, FRONTEND_COMPONENTS.md, API_CONVENTIONS.md
      - **i18n architecture note**: This project loads translations from S3/TranslationService at runtime — there are no local JSON translation files. When tickets say "hardcode in JSON files," the correct approach is bare `t("key")`. Do NOT use `defaultValue`. Do NOT search for local JSON translation files — they don't exist.
+     - **First-visit / empty-state checkpoint**: For every affected page, verify what renders when there's no data (empty lists, null values, new users). Include this in the architecture report so Ingrid can verify it visually.
+     - **Visual test plan for access control tickets**: When the ticket involves permissions/access control, include: (a) which test user to log in as per scenario, (b) expected UI per user/role, (c) whether seed data supports those users. Pass this to Ingrid and Suki.
+     - **Design intent check**: For new features, verify the implementation approach matches the ticket's stated purpose — not just code quality. Flag when the proposed solution solves a different problem than what was described.
      - Analyze the ticket/story provided
-     - **Check for Jira attachments**: If the ticket mentions attached images, screenshots, or design references, use the Chrome Browser Queue (see protocol below) to get Chrome access, then browse `https://your-company.atlassian.net/browse/<TICKET_ID>` to view attachments. Images are the source of truth over text descriptions if they conflict. Include key visual details (colors, layout, shapes) in your architecture report so dev agents have the specs.
-       - **Chrome queue**: Run `bash ~/.claude/scripts/chrome-queue.sh join <TICKET_ID> amara` then `bash ~/.claude/scripts/chrome-queue.sh my-turn <TICKET_ID>`. If exit 0, use Chrome. When done, run `bash ~/.claude/scripts/chrome-queue.sh done <TICKET_ID>`. If not your turn, work from text specs instead.
-       - If the Chrome extension fails to connect, ask the user to: (1) open Chrome, (2) click the Claude extension icon in the toolbar, (3) log in if not already logged in, (4) wait a few seconds for the connection to establish, then say "try again".
+     - **Check for Jira attachments**: If the ticket mentions attached images, screenshots, or design references, use **Playwright CLI** to browse `https://your-company.atlassian.net/browse/<TICKET_ID>` and view attachments: `playwright-cli -s=amara open https://your-company.atlassian.net/browse/<TICKET_ID> --headed`. Use `playwright-cli snapshot` to get element refs and `playwright-cli screenshot --filename=jira-attachment.png` to capture images. Images are the source of truth over text descriptions if they conflict. Include key visual details (colors, layout, shapes) in your architecture report so dev agents have the specs. If authentication is needed, ask the user to log in via the headed browser.
      - Explore the codebase to determine what files/services are affected. **Start with Glob patterns for file/folder names** before grepping file contents — folder naming often differs from code naming conventions (e.g., `medicalcertificate` vs `MedicalCertificate`).
      - Determine if the ticket needs: backend-only, frontend-only, or both
      - **Check main for partial implementations**: Run `git diff origin/main -- <key-files>` to see if main already has partial work from previous PRs. Report any overlap to avoid duplicating existing changes.
@@ -303,26 +304,26 @@ _No open questions yet._
 Immediately after creating the draft PR, spawn Lena to record the current (broken) state before any code changes. This gives the frontend dev a visual reference of the bug and provides "before" evidence for the PR.
 
 - **Name:** `lena`
-- **Model:** `haiku` (read-only Chrome work — no file edits)
+- **Model:** `haiku` (read-only browser work — no file edits)
 - **Subagent type:** `general-purpose`
 - **Team:** `dream-team-<TICKET_ID>`
 - **Prompt:** Tell the agent:
   - You are **Lena**, the Visual Verifier for Repo. Your teammates know you by name.
-  - Your job is to record a "BEFORE" GIF showing the current bug state. You do NOT edit any files.
-  - **Use the Chrome Browser Queue** to get Chrome access: `bash ~/.claude/scripts/chrome-queue.sh join <TICKET_ID> lena` then `bash ~/.claude/scripts/chrome-queue.sh my-turn <TICKET_ID>`. If not your turn, wait 30 seconds and retry (up to 3 times). If still busy, message the team lead that Chrome is unavailable.
+  - Your job is to record a "BEFORE" video showing the current bug state. You do NOT edit any files.
+  - **Use Playwright CLI** for browser automation — no Chrome queue needed, you get your own isolated session.
   - **Dev server**: Check if Vite is running with `lsof -i -P | grep node | grep LISTEN`. If not running, start it: `cd apps/web && npm start &` and wait for it to be ready.
-  - **Login**: Navigate to `http://localhost:<port>`. If you see a login page, use "More login options" → "Username and password" → enter "gunner" as username. You CANNOT enter passwords — message the team lead to ask the user to log in, then continue once you can see the app.
+  - **Login**: Open the browser with `playwright-cli -s=lena open http://localhost:<port> --headed`. If you see a login page, use `playwright-cli snapshot` to get element refs, then `playwright-cli click <ref>` to click "More login options" → "Username and password" → `playwright-cli fill <ref> "gunner"` for username. If you cannot enter a password, message the team lead to ask the user to log in, then continue.
   - **Page path**: [Include the specific page path from the architect's analysis]
   - **Reproduction steps**: [Include the ticket's reproduction steps]
-  - **Record the "BEFORE" GIF**:
-    1. Navigate to the affected page
-    2. Start GIF recording: `gif_creator action=start_recording`
-    3. Take a screenshot (captures initial frame)
-    4. Walk through the reproduction steps from the ticket, showing the bug
-    5. Take a final screenshot, then stop: `gif_creator action=stop_recording`
-    6. Export: `gif_creator action=export filename="<TICKET_ID>-before.gif" download=true`
-  - **Release Chrome**: Run `bash ~/.claude/scripts/chrome-queue.sh done <TICKET_ID>`
-  - **Report to team lead**: Send a message with the GIF filename and a brief description of what the bug looks like visually.
+  - **Record the "BEFORE" video**:
+    1. Navigate to the affected page: `playwright-cli -s=lena goto http://localhost:<port>/<path>`
+    2. Start video recording: `playwright-cli -s=lena video-start`
+    3. Take a snapshot: `playwright-cli -s=lena snapshot`
+    4. Walk through the reproduction steps using `playwright-cli` commands (click, fill, etc.)
+    5. Stop recording: `playwright-cli -s=lena video-stop <TICKET_ID>-before.webm`
+    6. Take a screenshot: `playwright-cli -s=lena screenshot --filename=<TICKET_ID>-before.png`
+  - **Close session**: Run `playwright-cli -s=lena close`
+  - **Report to team lead**: Send a message with the video/screenshot filenames and a brief description of what the bug looks like visually.
   - **IMPORTANT**: Do NOT edit any files. Do NOT run git commit. You are read-only.
 
 **Don't wait for Lena to finish** — proceed to Phase 2 immediately. Lena runs in parallel with dev agent spawning. When Lena reports back, include the visual reference in a message to Ingrid so she knows what the bug looks like.
@@ -377,6 +378,7 @@ Based on the tech-architect's scope assessment, spawn the needed agents. **Use t
   - **Dapper for heavyweight SQL**: Use Dapper instead of EF Core for complex reporting queries, bulk operations, multi-join aggregations, or any query where EF Core LINQ becomes unwieldy or has performance issues. EF Core is fine for standard CRUD and simple queries.
   - For API authentication in local dev: `bash scripts/local-api-login.sh` stores token at `/tmp/repo-local-dev-token`
   - **Testing**: Write unit tests only when you're adding new service methods with testable logic, or modifying code that already has tests. Don't write tests for thin controller wrappers or simple CRUD with no logic. If the architect's analysis says "no tests needed", skip them.
+  - **Seed data for access control**: For access control features, ensure seed data exists for BOTH the entity owner AND a non-owner with access — so frontend can test masking/visibility. If seed data is missing, add it to `scripts/database-init/`.
   - **Formatting**: Run `dotnet csharpier .` on your changed files before reporting completion. Fix any formatting issues — these will fail the GitHub build if left unfixed.
   - **Context management**: Follow the Context Management Protocol (see below). Create your notes file at `.dream-team/notes/kenji.md`.
   - **Communication**: Follow the Communication Protocol (see below). Your contacts: `ingrid` (frontend), `diego` (infra), `amara` (architect). Be proactive — when you complete an API endpoint, message `ingrid` immediately with details and any contract deviations.
@@ -402,7 +404,7 @@ Based on the tech-architect's scope assessment, spawn the needed agents. **Use t
   - **Use Amara's conventions summary** as your primary reference. Only read the full docs (`docs/CODING_STYLE_FRONTEND.md`, `docs/FRONTEND_COMPONENTS.md`, etc.) if something in the summary is unclear or you need more detail on a specific pattern.
   - Follow existing component patterns — check similar pages/components for reference
   - For RTK Query API generation: use `npm run generate:api:<service>` (requires backend service running), NOT `npx @rtk-query/codegen-openapi` directly
-  - **i18n — HARD GATE**: See `~/.claude/docs/dev-workflow-checklist.md` Section 2. You MUST create all new keys in TranslationService via the API before reporting completion. Use bare `t("key")` only — never `defaultValue`. Before using `common_*` keys, grep the codebase to verify exact key name and casing. The TranslationService API key is in `apps/web/.env.local` under `TRANSLATION_SERVICE_API_KEY`. See `docs/INTERNATIONALIZATION.md` for the full API workflow. Do NOT attempt to sync translations to S3 — that is handled automatically by CI/CD. Completion is blocked until all TranslationService API calls succeed.
+  - **i18n — HARD GATE**: See `~/.claude/docs/dev-workflow-checklist.md` Section 2. You MUST create all new keys in TranslationService via the API before reporting completion. Use bare `t("key")` only — never `defaultValue`. Before using `common_*` keys, grep the codebase to verify exact key name and casing (e.g., `common_logout` not `common_logOut`). The TranslationService API key is in `apps/web/.env.local` under `TRANSLATION_SERVICE_API_KEY`. See `docs/INTERNATIONALIZATION.md` for the full API workflow. Do NOT attempt to sync translations to S3 — that is handled automatically by CI/CD. Completion is blocked until all TranslationService API calls succeed.
   - **Testing**: Frontend tests are optional. Only write them if the architect specifically requests it or you're modifying code that already has tests. Don't create test files for new components by default.
   - **React skills**: You have access to these skills — use them when relevant:
     - `reactjs/react.dev:react-expert` — Look up React API usage, caveats, and best practices when unsure about a React feature
@@ -412,30 +414,31 @@ Based on the tech-architect's scope assessment, spawn the needed agents. **Use t
     - `npx eslint --fix .` on your changed files
     - `npx tsc --noEmit` to verify no type errors
     Fix any issues — these will fail the GitHub build if left unfixed.
-  - **Visual verification via Chrome plugin (MANDATORY for UI changes)**: If the ticket involves UI changes, you MUST verify your work visually in Chrome before reporting completion. This is not optional — it catches z-index, overlay, and layout issues that unit tests miss. **Use the Chrome Browser Queue** (see protocol below) to coordinate access:
-    1. **Get Chrome access**: Run `bash ~/.claude/scripts/chrome-queue.sh join <TICKET_ID> ingrid` then `bash ~/.claude/scripts/chrome-queue.sh my-turn <TICKET_ID>`. If not your turn, skip visual verification (note it in completion message).
-    2. **Start the Vite dev server on port 3000** for visual verification: `VITE_DEV_PORT=3000 npm start` (override the worktree's default `31xx` port). The Chrome plugin connects to port 3000, and the Chrome Browser Queue ensures only one workspace uses it at a time. When you're done, stop Vite and release the queue so the next workspace can use port 3000.
-    2b. **Verify you're on the right dev server**: Run `lsof -i :<port> | grep node` and confirm the process path contains your worktree directory (e.g., `/Documents/PROJ-1801/`), not another open worktree. Testing against the wrong server means testing old code silently.
-    3. **Figure out the path**: Use the verified route paths from Amara's architecture report. If not provided, check the router config (`apps/web/src/routes/`). If the page requires authentication, check `.env.local` or mock data for test credentials.
-    4. **Open the page in Chrome** using the Chrome plugin to navigate to `http://localhost:<port>/<path>`
-    5. **Record an "AFTER" GIF** showing the fixed behavior:
-       - Start GIF recording: `gif_creator action=start_recording`
-       - Take a screenshot to capture the initial frame
+  - **Visual verification via Playwright CLI (MANDATORY for UI changes)**: If the ticket involves UI changes, you MUST verify your work visually before reporting completion. This is not optional — it catches z-index, overlay, and layout issues that unit tests miss. Use **Playwright CLI** with a named session — no Chrome queue needed:
+    1. **Start the Vite dev server**: Check if one is already running for this worktree with `lsof -i -P | grep node | grep LISTEN`. If not, start it: `cd apps/web && npm start &`. Use the worktree's configured port.
+    1b. **Verify you're on the right dev server**: Run `lsof -i :<port> | grep node` and confirm the process path contains your worktree directory (e.g., `/Documents/PROJ-1801/`), not another open worktree. Testing against the wrong server means testing old code silently.
+    2. **Figure out the path**: Use the verified route paths from Amara's architecture report. If not provided, check the router config (`apps/web/src/routes/`). If the page requires authentication, check `.env.local` or mock data for test credentials.
+    3. **Open the page**: `playwright-cli -s=ingrid open http://localhost:<port>/<path> --headed`
+    4. **Record an "AFTER" video** showing the fixed behavior:
+       - Start video recording: `playwright-cli -s=ingrid video-start`
+       - Use `playwright-cli snapshot` to get element refs, then interact with `click`, `fill`, etc.
        - Walk through the user flow from the ticket's verification steps, showing the fix works
-       - Take a final screenshot, then stop recording: `gif_creator action=stop_recording`
-       - Export: `gif_creator action=export filename="<TICKET_ID>-after.gif" download=true`
-       - (Note: the "BEFORE" GIF was already recorded by Lena before you started. You only need to record "after".)
-    6. **Compare against the design**: If the ticket has a Figma link or Jira image attachment, view both side by side. Use the Chrome plugin to screenshot your implementation and compare layout, colors, spacing, and typography against the design reference.
-    7. **Check acceptance criteria**: Walk through the ticket's verification steps. If the fix doesn't match expectations, fix your code immediately and re-verify. Don't report completion until it passes.
-    8. **Heartbeat**: If verification takes more than 2 minutes, ask a teammate to run `bash ~/.claude/scripts/chrome-queue.sh heartbeat <TICKET_ID>` periodically to keep your slot.
-    9. **Release Chrome**: Run `bash ~/.claude/scripts/chrome-queue.sh done <TICKET_ID>` as soon as you're done.
-    10. **Report visual status**: In your completion message, note whether you visually verified, include the "after" GIF filename, and any deviations from the design (with justification). The team lead will attach the GIFs to the PR.
+       - Stop recording: `playwright-cli -s=ingrid video-stop <TICKET_ID>-after.webm`
+       - Take a screenshot: `playwright-cli -s=ingrid screenshot --filename=<TICKET_ID>-after.png`
+       - (Note: the "BEFORE" video was already recorded by Lena before you started. You only need to record "after".)
+    5. **Compare against the design**: If the ticket has a Figma link or Jira image attachment, take a screenshot of both side by side. Compare layout, colors, spacing, and typography against the design reference.
+    6. **Check acceptance criteria**: Walk through the ticket's verification steps. If the fix doesn't match expectations, fix your code immediately and re-verify. Don't report completion until it passes.
+    7. **Close session**: Run `playwright-cli -s=ingrid close` when done.
+    8. **Report visual status**: In your completion message, note whether you visually verified, include the "after" video/screenshot filename, and any deviations from the design (with justification). The team lead will attach them to the PR.
   - **Context management**: Follow the Context Management Protocol (see below). Create your notes file at `.dream-team/notes/ingrid.md`.
   - **Communication**: Follow the Communication Protocol (see below). Your contacts: `kenji` (backend), `diego` (infra), `amara` (architect). Be proactive — if you find API contract issues, message `kenji` immediately.
   - If the architect provided an API contract, build your RTK Query types and components against it. You don't need to wait for backend — work in parallel.
   - **API code generation**: Don't run `npm run generate:api:<service>` until Kenji messages you that the Docker service is up and gives you the port. He'll message you with the exact command. If you need the generated types to continue, build your components against the API contract first (manual types), then swap to generated types once Kenji's service is ready. **Current limitation**: Docker services run on static ports, so only one workspace can run a given service at a time — don't try to start your own Docker service.
   - **Ambiguous requirements**: If the ticket doesn't clearly specify UI behavior, message the team lead. Do NOT guess — wrong guesses waste more context than asking.
   - **Completion protocol**: When done, use the **Completion → Team Lead** template from the Communication Protocol. If testing is needed, also send a **Dev → Tester handoff** to Suki with what to test and edge cases. Always include `git diff --name-only` output in your `files_touched`.
+  - **TSDoc updates**: When changing component behavior (e.g., changing from NotFound to a dialog, swapping data source), update the existing JSDoc/TSDoc to reflect the new behavior. Don't leave stale docs that describe the old behavior.
+  - **Auto-lint hook mitigation for manual types**: Auto-lint hooks may strip 'unused' types. When adding manual RTK types before the consumer is saved, either add types and consumers in the same commit, or use `// eslint-disable-next-line` to prevent removal.
+  - **API regeneration timing**: Do NOT run `npm run generate:api:<service>` mid-session if manual types exist — regeneration may remove enum values other code depends on. Keep manual types until backend Docker is confirmed stable.
   - **Journal gate**: Before sending your completion message, you MUST have written at least one entry in your journal at `.dream-team/journal/ingrid.md`. If the file is empty or missing, write at least one entry now — use one of these categories: `instruction-gap`, `tool-failure`, `convention-gap`, `codebase-surprise`, `assumption-wrong`, or `positive`. Your completion will not be accepted without at least one journal entry.
   - **Permission vs mode gating**: When removing UI gating (e.g., making a button always visible), distinguish between (a) mode-based gating (edit vs view mode) and (b) permission-based gating (user authorization via `useActionAuthorization`). Always preserve permission checks (`can({ userActions: [...] })`) unless explicitly told to remove them. Only remove mode-based conditions.
   - **TSDoc on new components**: Add a brief TSDoc comment to every new component and hook you create. Focus on *intent*, not types — TypeScript already covers the types. Example:
@@ -559,7 +562,7 @@ Assign all tasks to the agent with `owner` set immediately. Use `addBlockedBy` t
 - Suki's testing tasks must be `blockedBy` all dev agent tasks (Kenji, Ingrid, etc.). Suki cannot start until devs report done.
 - **TaskCompleted hook enforced**: The `task-completed-gate.sh` hook runs on every task completion. Dev agents cannot mark implementation tasks complete without: notes file, journal entry, "For Next Phase" filled in, code changes on disk, and passing type checks. This is automatic — agents don't need to remember, the system enforces it.
 - **TeammateIdle hook enforced**: Dev agents cannot go idle without notes file, journal entries, and clean formatting. If they try to idle prematurely, the hook sends them back to finish quality gates.
-- **Idle agents can help**: If an agent finishes early and is free, they can assist with shared coordination — e.g., running `chrome-queue.sh heartbeat` for a teammate using Chrome, or other lightweight support. They should message the team lead to ask what they can help with.
+- **Idle agents can help**: If an agent finishes early and is free, they can assist with shared coordination or other lightweight support. They should message the team lead to ask what they can help with.
 
 ### Phase 3: Monitor & Coordinate
 
@@ -602,6 +605,8 @@ Once implementation agents complete their work, spawn:
     - **Insecure defaults**: CORS set to *, missing HTTPS enforcement, overly permissive RBAC roles
   - **Verify formatting was done**: Check that backend code has been formatted with CSharpier and frontend code with Prettier. If not, flag it as MUST FIX.
   - **TSDoc on new components**: Check that new React components and hooks have a TSDoc comment explaining intent/usage. Missing TSDoc on meaningful components = SUGGESTION (not blocking, but flag it).
+  - **Design intent check**: Verify the implementation matches the ticket's stated purpose — not just code quality. If the solution solves a different problem than what was described, flag as MUST FIX.
+  - **Access control rendering**: When backend changes affect frontend data shape (e.g., masking/filtering by role), verify frontend tests or visual checks cover BOTH masked and unmasked rendering paths.
   - For each issue found, categorize as: MUST FIX (blocking) or SUGGESTION (nice-to-have)
   - Send your review using the **Reviewer → Dev feedback** template from the Communication Protocol. Include file:line references for every issue and cite the specific convention doc or pattern that is violated.
   - Be specific — don't say "fix the naming", say "file.ts:42 MUST FIX — use camelCase per CODING_STYLE_FRONTEND.md §Naming"
@@ -673,61 +678,61 @@ After Maya's code review is approved (all MUST FIX items resolved), spawn:
 - The ticket has no UI changes, OR
 - Ingrid already recorded an "after" GIF during her visual verification step (check her completion message)
 
-**Only run this if Ingrid did NOT visually verify** (e.g., went idle, Chrome was busy, or skipped verification). Spawn Lena to record the "after" GIF as a fallback:
+**Only run this if Ingrid did NOT visually verify** (e.g., went idle or skipped verification). Spawn Lena to record the "after" video as a fallback:
 
 - **Name:** `lena`
-- **Model:** `haiku` (read-only Chrome work — no file edits)
+- **Model:** `haiku` (read-only browser work — no file edits)
 - **Subagent type:** `general-purpose`
 - **Team:** `dream-team-<TICKET_ID>`
 - **Prompt:** Tell the agent:
   - You are **Lena**, the Visual Verifier for Repo. Your teammates know you by name.
-  - Your ONLY job is to record before/after GIFs of UI changes in Chrome. You do NOT edit any files.
-  - **Use the Chrome Browser Queue** to get Chrome access: `bash ~/.claude/scripts/chrome-queue.sh join <TICKET_ID> lena` then `bash ~/.claude/scripts/chrome-queue.sh my-turn <TICKET_ID>`. If not your turn, wait 30 seconds and retry (up to 3 times). If still busy, message the team lead that Chrome is unavailable.
+  - Your ONLY job is to record before/after videos of UI changes. You do NOT edit any files.
+  - **Use Playwright CLI** for browser automation — each agent gets an isolated named session, no Chrome queue needed.
   - **Dev server**: The Vite dev server should already be running. Check with `lsof -i -P | grep node | grep LISTEN` to find the port. If not running, message the team lead.
-  - **Login**: Navigate to `http://localhost:<port>`. If you see a login page, use "More login options" → "Username and password" → enter "gunner" as username. You CANNOT enter passwords — message the team lead to ask the user to log in, then continue once you can see the app.
+  - **Login**: Open the browser: `playwright-cli -s=lena open http://localhost:<port> --headed`. If you see a login page, use `playwright-cli snapshot` to get element refs, then interact with `click`/`fill` commands. If you cannot enter a password, message the team lead to ask the user to log in.
   - **Page path**: [Include the specific page path from the ticket, e.g., `/<customerId>/reports-service-e/service-e`]. Get the customerId from the URL after login.
   - **Reproduction steps**: [Include the ticket's reproduction steps]
-  - **Step 1 — Record BEFORE GIF**:
+  - **Step 1 — Record BEFORE video**:
     1. The feature branch is already checked out but you need to see the bug. Check `git stash list` — if there are stashed changes, the "before" state is the current working tree. Otherwise, ask the team lead how to see the "before" state.
-    2. Navigate to the affected page
-    3. Start GIF recording: `gif_creator action=start_recording`
-    4. Take a screenshot (captures initial frame)
-    5. Walk through the reproduction steps from the ticket
-    6. Take a final screenshot, then stop: `gif_creator action=stop_recording`
-    7. Export: `gif_creator action=export filename="<TICKET_ID>-before.gif" download=true`
-  - **Step 2 — Record AFTER GIF**:
+    2. Navigate to the affected page: `playwright-cli -s=lena goto http://localhost:<port>/<path>`
+    3. Start video: `playwright-cli -s=lena video-start`
+    4. Take a snapshot: `playwright-cli -s=lena snapshot`
+    5. Walk through the reproduction steps using playwright-cli commands
+    6. Stop video: `playwright-cli -s=lena video-stop <TICKET_ID>-before.webm`
+    7. Screenshot: `playwright-cli -s=lena screenshot --filename=<TICKET_ID>-before.png`
+  - **Step 2 — Record AFTER video**:
     1. If you stashed changes, run `git stash pop` to restore the fix. Otherwise the fix should already be in the working tree.
-    2. Wait for Vite hot reload (2-3 seconds), then refresh the page
-    3. Start GIF recording: `gif_creator action=start_recording`
-    4. Take a screenshot (captures initial frame)
+    2. Wait for Vite hot reload (2-3 seconds), then reload: `playwright-cli -s=lena reload`
+    3. Start video: `playwright-cli -s=lena video-start`
+    4. Take a snapshot: `playwright-cli -s=lena snapshot`
     5. Walk through the same steps, showing the fix works
-    6. Take a final screenshot, then stop: `gif_creator action=stop_recording`
-    7. Export: `gif_creator action=export filename="<TICKET_ID>-after.gif" download=true`
-  - **Release Chrome**: Run `bash ~/.claude/scripts/chrome-queue.sh done <TICKET_ID>`
-  - **Report to team lead**: Send a message with the GIF filenames and a brief description of what each shows. Note any issues or deviations.
+    6. Stop video: `playwright-cli -s=lena video-stop <TICKET_ID>-after.webm`
+    7. Screenshot: `playwright-cli -s=lena screenshot --filename=<TICKET_ID>-after.png`
+  - **Close session**: Run `playwright-cli -s=lena close`
+  - **Report to team lead**: Send a message with the video/screenshot filenames and a brief description of what each shows. Note any issues or deviations.
   - **IMPORTANT**: Do NOT edit any files. Do NOT run git commit. You are read-only.
 
 **Note for team lead**: The "before" state can be tricky since the fix is already committed. Options:
 - If running Phase 4.75 before committing: stash the changes first (`git stash`), let Lena record "before", then `git stash pop` for "after"
 - If already committed: check out `main` briefly for "before", then switch back for "after" (`git checkout main -- <file>` then `git checkout - -- <file>`)
-- If the "before" is obvious from the ticket screenshots: skip the "before" GIF and only record "after"
+- If the "before" is obvious from the ticket screenshots: skip the "before" video and only record "after"
 
-Tell the user the GIF filenames are in their Chrome downloads, ready to attach to the PR as a comment.
+Tell the user the video/screenshot filenames and their locations, ready to attach to the PR as a comment.
 
 ### Phase 5: Commit, Push & Initial Summary
 
 **HARD GATE — Visual verification (UI tickets only):**
 Before proceeding with ANY push, confirm that visual verification was completed. Check:
 1. Did Ingrid's completion message include visual verification results? OR
-2. Did Lena record before/after GIFs in Phase 4.75?
+2. Did Lena record before/after videos in Phase 4.75?
 
-**A verbal report of "verified in browser" is NOT sufficient.** The "after" GIF file must exist on disk — run:
+**A verbal report of "verified in browser" is NOT sufficient.** The "after" video or screenshot file must exist on disk — run:
 ```bash
-ls ~/Downloads/<TICKET_ID>-after.gif
+ls .playwright-cli/<TICKET_ID>-after.webm .playwright-cli/<TICKET_ID>-after.png 2>/dev/null || ls ~/Downloads/<TICKET_ID>-after.* 2>/dev/null
 ```
-If this command fails, visual verification has not been completed. Do NOT push.
+If no files found, visual verification has not been completed. Do NOT push.
 
-If NEITHER the GIF file exists NOR Ingrid's completion message documented visual verification: **STOP. Do NOT push.** Spawn Lena (Phase 4.75) first. This gate exists because skipping visual verification has caused user-facing bugs in 2 out of 7 sessions (PROJ-1701, PROJ-1562). Runtime errors visible in the browser were shipped because nobody checked.
+If NEITHER the video/screenshot file exists NOR Ingrid's completion message documented visual verification: **STOP. Do NOT push.** Spawn Lena (Phase 4.75) first. This gate exists because skipping visual verification has caused user-facing bugs in 2 out of 7 sessions (PROJ-1701, PROJ-1562). Runtime errors visible in the browser were shipped because nobody checked.
 
 Once PR review is approved (or all MUST FIX items are resolved), **run drift detection before pushing**:
 
@@ -1526,36 +1531,51 @@ next_phase_needs: [what should happen next]
 ### Avoid message storms
 Batch your updates. A good cadence: (1) when you start your main task, (2) when you hit a meaningful milestone or blocker, (3) when you finish. Three messages total is the target, not ten.
 
-## Chrome Browser Queue
+## Browser Automation — Playwright CLI
 
-Only **one workspace** can use the Chrome Claude extension at a time. Multiple Dream Team sessions may be running concurrently, so agents must coordinate Chrome access via a shared queue file.
+All browser verification and testing uses **Playwright CLI** (`playwright-cli`). Do NOT use Puppeteer MCP tools (`mcp__puppeteer-mcp-server__*`) or the Chrome Browser Queue — those are deprecated.
 
-### How it works
-- The queue is at `~/.claude/chrome/queue.txt` — shared across all workspaces
-- Agents join the queue, wait for their turn, use Chrome, then leave
-- The holder must **heartbeat** every ~2 minutes or they get auto-skipped after 3 minutes (protects against crashed sessions)
-- If you can't get Chrome, **gracefully degrade** — work from text specs or skip visual verification
+### Why Playwright CLI
+- **Named sessions** (`-s=<agent-name>`) — each agent gets an isolated browser, no queue needed
+- **Headless by default** — use `--headed` when visual inspection is needed
+- **Video recording** built-in — `video-start` / `video-stop`
+- **DOM snapshots as YAML** — richer than screenshots alone, uses element refs for interaction
+- **No Chrome extension required** — works standalone
 
-### Commands
+### Quick reference
 ```bash
-~/.claude/scripts/chrome-queue.sh join <TICKET_ID> <AGENT_NAME>    # Join the queue
-~/.claude/scripts/chrome-queue.sh my-turn <TICKET_ID>               # Am I first? (exit 0=yes, 1=no)
-~/.claude/scripts/chrome-queue.sh heartbeat <TICKET_ID>             # Keep your slot alive
-~/.claude/scripts/chrome-queue.sh done <TICKET_ID>                  # Leave when finished
-~/.claude/scripts/chrome-queue.sh status                            # See the queue
+# Open browser with named session
+playwright-cli -s=ingrid open http://localhost:3001/some/path --headed
+
+# Get element refs via snapshot
+playwright-cli -s=ingrid snapshot
+
+# Interact using refs
+playwright-cli -s=ingrid click e5
+playwright-cli -s=ingrid fill e3 "test@example.com"
+
+# Screenshots
+playwright-cli -s=ingrid screenshot --filename=<TICKET_ID>-after.png
+
+# Video recording
+playwright-cli -s=ingrid video-start
+# ... do interactions ...
+playwright-cli -s=ingrid video-stop <TICKET_ID>-after.webm
+
+# Close session when done
+playwright-cli -s=ingrid close
+
+# Monitor all active sessions
+playwright-cli list
 ```
 
-### Usage pattern for agents
-1. **Before using Chrome**: Run `join` then check `my-turn`. If exit 0, proceed. If exit 1, wait and retry after 30 seconds, or skip Chrome.
-2. **While using Chrome**: Heartbeat every ~2 minutes. If you're busy (e.g., iterating on visual verification), **ask a teammate** to run `heartbeat <TICKET_ID>` for you — any team member can do it.
-3. **After using Chrome**: Run `done` immediately. Don't hold the slot while doing non-Chrome work.
+### Agent session naming
+Each agent uses their own named session to avoid conflicts:
+- Amara: `-s=amara` (Jira browsing)
+- Ingrid: `-s=ingrid` (visual verification)
+- Elsa: `-s=elsa` (visual verification)
+- Lena: `-s=lena` (before/after recording)
+- Suki: `-s=suki` (functional testing)
 
-### Graceful degradation
-- **Amara** (Jira images): If Chrome is busy, work from the text description in the ticket. Note "Chrome was in use — worked from text specs" in your report.
-- **Ingrid/Elsa** (visual verification): If Chrome is busy, skip visual verification. Note "Visual verification skipped — Chrome in use by another workspace" in completion message.
-
-### Heartbeat delegation
-If you're actively using Chrome and can't heartbeat yourself (e.g., waiting for a page to load, comparing designs), message a teammate:
-> "I'm using Chrome for visual verification. Can you run `bash ~/.claude/scripts/chrome-queue.sh heartbeat <TICKET_ID>` every 2 minutes until I say done?"
-
-This is a lightweight ask — the teammate just runs one command periodically. It keeps your slot alive and prevents stale-skip.
+### Full documentation
+See `~/.claude/skills/playwright-cli/SKILL.md` for the complete command reference, including storage management, network mocking, tracing, and multi-tab workflows.

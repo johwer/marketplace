@@ -104,6 +104,34 @@ Download and review any attachments (screenshots, mockups, PDFs):
 bash ~/.claude/scripts/jira-download-attachments.sh <TICKET_ID>
 ```
 
+### Step 1a — Check ticket author profile (ALL depths)
+
+Read `~/.claude/team-profiles.json` to look up the reporter. This file contains per-author pushback calibration learned from historical ticket analysis.
+
+**How to use author profiles:**
+
+1. Match the ticket reporter against `author_profiles` keys (case-insensitive)
+2. Read their `pushback_level`: `high`, `medium`, `light`, or `n/a`
+3. Read their `known_patterns`, `strengths`, and `gaps` to know what to check
+4. Check if any `tech_leads` from the config have commented on this ticket
+
+**Pushback calibration by level:**
+- **high**: Push back HARD — ask for ACs, expected behavior, affected roles, error states. Verify title matches description. These authors are known for thin/incomplete tickets.
+- **medium**: Trust the product spec but probe for technical gaps — API contracts, migrations, permission implications, cross-service impacts. Check the author's specific `gaps` list.
+- **light**: Trust the intent. Push back only on missing specifics, not missing intent. If this author commented on someone else's ticket, treat it as partially validated.
+- **unknown/not in config**: Default to medium pushback.
+
+**Tech lead weight** — if a tech lead has commented with specific direction, treat their input as higher-weight than AI reviewer (Solomon) analysis. Tech lead one-liners often contain more actionable context than full AI reviews. (Learned: Dennis's single-line comment on PROJ-1745 was more valuable than Solomon's entire review.)
+
+**High-risk flag** — if the reporter has `pushback_level: "high"` AND no tech lead from the config has commented:
+```
+NOTE: This ticket is from [author] (known pattern: [known_patterns]).
+No tech lead input found in comments.
+Pushing back more aggressively on completeness.
+```
+
+If `team-profiles.json` doesn't exist, skip this step and use default medium pushback for all authors.
+
 ### Step 1b — Check sign-off (ALL depths)
 
 Determine who created/owns the ticket and whether the right people have signed off:
@@ -131,9 +159,10 @@ Read all downloaded files with the Read tool to understand visual context.
 
 Cross-reference ALL parts of the ticket against each other. Flag any conflicts:
 
-**Title vs Description:**
+**Title vs Description (CRITICAL — Solomon misses this 100% of the time):**
 - Does the title accurately reflect what the description asks for?
 - Is the scope in the title narrower/broader than the description?
+- Does the title mention a concept (e.g., "Permission") that the description never addresses?
 
 **Description vs Acceptance Criteria:**
 - Do the ACs cover everything described?
@@ -161,6 +190,20 @@ Check for missing information the AI team needs:
 - [ ] Has API contract if backend-related
 - [ ] Specifies affected user roles
 - [ ] Mentions edge cases and error states
+
+**Empty section headers check (learned from Solomon analysis):**
+If the ticket or AI reviewer comments have section headers (e.g., "Open Questions", "Acceptance Criteria") with NO content underneath, flag explicitly:
+> "Section '[header]' is present but empty — this is worse than having no section at all because it gives a false impression of coverage. Either fill it with concrete items or remove it."
+Solomon's Jira reviews had empty section headers in 69% of tickets — don't let this pass silently.
+
+**Mandatory edge case checklist:**
+For every ticket at depth 2+, verify these are addressed (or explicitly N/A):
+- [ ] Error states — what happens when the API call fails?
+- [ ] Null/empty data — what renders when there's no data?
+- [ ] Permission boundaries — who can/can't see or do this?
+- [ ] Concurrent modification — what if two users act simultaneously?
+- [ ] Max/min values — character limits, date ranges, numeric bounds?
+- [ ] Loading states — what shows while data is fetching?
 
 **Common gaps to flag:**
 - No mention of i18n/translations for new UI text
@@ -224,6 +267,7 @@ Categorize all findings into:
 - Missing information that blocks implementation decisions
 - Contradictions that make the requirement ambiguous
 - Domain model changes that need architect/PO sign-off
+- **Thin tickets**: If description is <100 chars AND has no ACs, always flag as BLOCKER: "BLOCKER: Description insufficient for implementation. Need: [specific missing items]." Do NOT use polite prompts — state it clearly. (Learned: Solomon's gentle pushback resulted in 0% ticket improvement across 13 tickets.)
 
 **QUESTION** — Need clarity but could start with assumptions:
 - Unclear edge cases

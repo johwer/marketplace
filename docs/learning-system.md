@@ -51,6 +51,28 @@ Session retro → dream-team-learnings.md → /retro-proposals → destination f
 GitHub PR reviews → /scrape-pr-history → pr-learnings.json → /pr-insights → destination files
 ```
 
+### Path 3: Jira Pushback Mining (Ticket Review Learnings)
+
+**What it captures:** How the AI ticket reviewer (Solomon) pushes back on tickets — what it catches, what it misses, how the team responds, and what patterns emerge.
+
+**How it works:**
+
+1. **Run `/scrape-jira-pushback`** to extract structured findings from Solomon's Jira comments. This launches parallel agents (waves of 10) that analyze each ticket's comments, scoring pushback quality across specificity, accuracy, completeness, and actionability.
+
+2. **Findings accumulate** in `jira-pushback-learnings.json` (per-project memory). Each ticket gets a structured object with scored comments, coverage gaps, team responses, and notable catches/misses.
+
+3. **The scrape command itself** analyzes patterns and proposes improvements to both Solomon's review template and `/ticket-refine`. Proposals feed into the Learning Router via `/retro-proposals`.
+
+**Commands:**
+| Command | Purpose |
+|---------|---------|
+| `/scrape-jira-pushback` | Collects and analyzes AI reviewer comment quality |
+
+**Data flow:**
+```
+Jira AI reviewer comments → /scrape-jira-pushback → jira-pushback-learnings.json → /retro-proposals → destination files
+```
+
 ## How Scraping Works: Waves and Agents
 
 `/scrape-pr-history` processes PRs in parallel **waves** to maximize throughput while staying within context limits:
@@ -142,10 +164,13 @@ The learning system stores reviewer names (GitHub logins) in `pr-learnings.json`
 # 2. Analyze PR patterns
 /pr-insights
 
-# 3. After several Dream Team sessions, analyze retro learnings
+# 3. Scrape Jira AI reviewer history
+/scrape-jira-pushback
+
+# 4. After several Dream Team sessions, analyze retro learnings
 /retro-proposals
 
-# 4. Both commands route improvements to the same destination files
+# 5. All commands route improvements to the same destination files
 ```
 
 ## Tips
