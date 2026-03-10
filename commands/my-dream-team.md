@@ -329,11 +329,10 @@ Immediately after creating the draft PR, spawn Lena to record the current (broke
     2. Start video recording: `playwright-cli -s=lena video-start`
     3. Take a snapshot: `playwright-cli -s=lena snapshot`
     4. Walk through the reproduction steps using `playwright-cli` commands (click, fill, etc.)
-    5. Stop recording: `playwright-cli -s=lena video-stop`
-    6. Take a screenshot: `playwright-cli -s=lena screenshot --filename=<TICKET_ID>-before.png`
-    7. Copy artifacts to repo: `mkdir -p docs/verification/<TICKET_ID> && cp .playwright-cli/*.webm docs/verification/<TICKET_ID>/<TICKET_ID>-before.webm && cp <TICKET_ID>-before.png docs/verification/<TICKET_ID>/`
+    5. Stop recording: `playwright-cli -s=lena video-stop --filename=~/Downloads/<TICKET_ID>-before.webm`
+    6. Take a screenshot: `mkdir -p docs/verification/<TICKET_ID> && playwright-cli -s=lena screenshot --filename=docs/verification/<TICKET_ID>/<TICKET_ID>-before.png`
   - **Close session**: Run `playwright-cli -s=lena close`
-  - **Report to team lead**: Send a message with the filenames in `docs/verification/<TICKET_ID>/` and a brief description of what the bug looks like visually.
+  - **Report to team lead**: Send a message with screenshot path (`docs/verification/<TICKET_ID>/`) and video path (`~/Downloads/`), plus a brief description of what the bug looks like visually.
   - **IMPORTANT**: Do NOT edit any files. Do NOT run git commit. You are read-only.
 
 **Don't wait for Lena to finish** — proceed to Phase 2 immediately. Lena runs in parallel with dev agent spawning. When Lena reports back, include the visual reference in a message to Ingrid so she knows what the bug looks like.
@@ -433,9 +432,8 @@ Based on the tech-architect's scope assessment, spawn the needed agents. **Use t
        - Start video recording: `playwright-cli -s=ingrid video-start`
        - Use `playwright-cli snapshot` to get element refs, then interact with `click`, `fill`, etc.
        - Walk through the user flow from the ticket's verification steps, showing the fix works
-       - Stop recording: `playwright-cli -s=ingrid video-stop`
-       - Take a screenshot: `playwright-cli -s=ingrid screenshot --filename=<TICKET_ID>-after.png`
-       - Copy to repo: `mkdir -p docs/verification/<TICKET_ID> && cp .playwright-cli/*.webm docs/verification/<TICKET_ID>/<TICKET_ID>-after.webm && cp <TICKET_ID>-after.png docs/verification/<TICKET_ID>/`
+       - Stop recording: `playwright-cli -s=ingrid video-stop --filename=~/Downloads/<TICKET_ID>-after.webm`
+       - Take a screenshot: `mkdir -p docs/verification/<TICKET_ID> && playwright-cli -s=ingrid screenshot --filename=docs/verification/<TICKET_ID>/<TICKET_ID>-after.png`
        - (Note: the "BEFORE" video was already recorded by Lena before you started. You only need to record "after".)
     5. **Compare against the design**: If the ticket has a Figma link or Jira image attachment, take a screenshot of both side by side. Compare layout, colors, spacing, and typography against the design reference.
     6. **Check acceptance criteria**: Walk through the ticket's verification steps. If the fix doesn't match expectations, fix your code immediately and re-verify. Don't report completion until it passes.
@@ -710,20 +708,18 @@ After Maya's code review is approved (all MUST FIX items resolved), spawn:
     3. Start video: `playwright-cli -s=lena video-start`
     4. Take a snapshot: `playwright-cli -s=lena snapshot`
     5. Walk through the reproduction steps using playwright-cli commands
-    6. Stop video: `playwright-cli -s=lena video-stop`
-    7. Screenshot: `playwright-cli -s=lena screenshot --filename=<TICKET_ID>-before.png`
-    8. Copy to repo: `mkdir -p docs/verification/<TICKET_ID> && cp .playwright-cli/*.webm docs/verification/<TICKET_ID>/<TICKET_ID>-before.webm && cp <TICKET_ID>-before.png docs/verification/<TICKET_ID>/`
+    6. Stop video: `playwright-cli -s=lena video-stop --filename=~/Downloads/<TICKET_ID>-before.webm`
+    7. Screenshot: `mkdir -p docs/verification/<TICKET_ID> && playwright-cli -s=lena screenshot --filename=docs/verification/<TICKET_ID>/<TICKET_ID>-before.png`
   - **Step 2 — Record AFTER video**:
     1. If you stashed changes, run `git stash pop` to restore the fix. Otherwise the fix should already be in the working tree.
     2. Wait for Vite hot reload (2-3 seconds), then reload: `playwright-cli -s=lena reload`
     3. Start video: `playwright-cli -s=lena video-start`
     4. Take a snapshot: `playwright-cli -s=lena snapshot`
     5. Walk through the same steps, showing the fix works
-    6. Stop video: `playwright-cli -s=lena video-stop`
-    7. Screenshot: `playwright-cli -s=lena screenshot --filename=<TICKET_ID>-after.png`
-    8. Copy to repo: `cp .playwright-cli/*.webm docs/verification/<TICKET_ID>/<TICKET_ID>-after.webm && cp <TICKET_ID>-after.png docs/verification/<TICKET_ID>/`
+    6. Stop video: `playwright-cli -s=lena video-stop --filename=~/Downloads/<TICKET_ID>-after.webm`
+    7. Screenshot: `playwright-cli -s=lena screenshot --filename=docs/verification/<TICKET_ID>/<TICKET_ID>-after.png`
   - **Close session**: Run `playwright-cli -s=lena close`
-  - **Report to team lead**: Send a message with files in `docs/verification/<TICKET_ID>/` and a brief description of what each shows. Note any issues or deviations.
+  - **Report to team lead**: Send a message with screenshot path (`docs/verification/<TICKET_ID>/`) and video path (`~/Downloads/`). Describe what each shows. Note any issues or deviations.
   - **IMPORTANT**: Do NOT edit any files. Do NOT run git commit. You are read-only.
 
 **Note for team lead**: The "before" state can be tricky since the fix is already committed. Options:
@@ -1568,18 +1564,14 @@ playwright-cli -s=ingrid snapshot
 playwright-cli -s=ingrid click e5
 playwright-cli -s=ingrid fill e3 "test@example.com"
 
-# Screenshots
-playwright-cli -s=ingrid screenshot --filename=<TICKET_ID>-after.png
+# Screenshots — save directly to repo verification folder
+mkdir -p docs/verification/<TICKET_ID>
+playwright-cli -s=ingrid screenshot --filename=docs/verification/<TICKET_ID>/<TICKET_ID>-after.png
 
-# Video recording
+# Video recording — save to Downloads (too large to commit)
 playwright-cli -s=ingrid video-start
 # ... do interactions ...
-playwright-cli -s=ingrid video-stop
-
-# Copy artifacts to repo verification folder
-mkdir -p docs/verification/<TICKET_ID>
-cp .playwright-cli/*.webm docs/verification/<TICKET_ID>/<TICKET_ID>-after.webm
-cp <TICKET_ID>-after.png docs/verification/<TICKET_ID>/
+playwright-cli -s=ingrid video-stop --filename=~/Downloads/<TICKET_ID>-after.webm
 
 # Close session when done
 playwright-cli -s=ingrid close
