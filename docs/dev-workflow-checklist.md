@@ -22,13 +22,14 @@ Applies to all tickets with UI changes. Skip for backend-only/infra-only tickets
 
 - **Before** and **after** videos/screenshots MUST exist as files on disk
 - File naming: `<TICKET_ID>-before.webm`, `<TICKET_ID>-after.webm` (video) or `.png` (screenshot)
-- Storage location: `.playwright-cli/` in the worktree (video) or worktree root (screenshot)
+- Storage location: `docs/verification/<TICKET_ID>/` in the repo (committed with the PR)
+- Videos (.webm) are also saved to `.playwright-cli/` by the tool — copy to `docs/verification/<TICKET_ID>/` or attach to the PR comment if too large (>5MB)
 
 ### Verification
 
 ```bash
 # This MUST succeed before pushing
-ls .playwright-cli/<TICKET_ID>-after.webm <TICKET_ID>-after.png 2>/dev/null
+ls docs/verification/<TICKET_ID>/<TICKET_ID>-after.png 2>/dev/null
 ```
 
 If no file exists on disk:
@@ -56,8 +57,13 @@ playwright-cli -s=<agent-name> fill e3 "value"
 playwright-cli -s=<agent-name> video-stop
 playwright-cli -s=<agent-name> screenshot --filename=<TICKET_ID>-after.png
 
-# 5. Verify files exist
-ls .playwright-cli/*.webm <TICKET_ID>-after.png
+# 5. Copy artifacts to repo verification folder
+mkdir -p docs/verification/<TICKET_ID>
+cp .playwright-cli/*.webm docs/verification/<TICKET_ID>/<TICKET_ID>-after.webm 2>/dev/null || true
+cp <TICKET_ID>-after.png docs/verification/<TICKET_ID>/
+
+# 6. Verify files exist
+ls docs/verification/<TICKET_ID>/<TICKET_ID>-after.png
 
 # 6. Close session
 playwright-cli -s=<agent-name> close
@@ -287,11 +293,21 @@ Run the applicable categories based on changed file types:
 
 ## Section 8: File Management
 
-### Download Location
+### Verification Artifacts — Storage
 
-- macOS path: `~/Downloads/`
-- On Swedish macOS, Finder shows this as **"Hämtade filer"** but the filesystem path is still `~/Downloads/`
-- All screenshots, GIFs, and downloaded attachments go here
+All visual verification files go in **`docs/verification/<TICKET_ID>/`** in the repo, committed with the PR:
+
+```
+docs/verification/
+  PROJ-1939/
+    PROJ-1939-before.webm
+    PROJ-1939-after.webm
+    PROJ-1939-after.png
+```
+
+This keeps verification evidence alongside the code, reviewable in the PR diff.
+
+**Playwright CLI saves files to `.playwright-cli/` by default** — always copy them to `docs/verification/<TICKET_ID>/` before committing. Videos >5MB can alternatively be attached as PR comments instead of committed.
 
 ### File Naming
 
@@ -301,6 +317,12 @@ Run the applicable categories based on changed file types:
 | After video | `<TICKET_ID>-after.webm` | `PROJ-1831-after.webm` |
 | Screenshot | `<TICKET_ID>-after.png` | `PROJ-1831-after.png` |
 | Jira attachments | Original filename from Jira | `image-20260227-140735.png` |
+
+### Download Location (Jira only)
+
+- macOS path: `~/Downloads/`
+- On Swedish macOS, Finder shows this as **"Hämtade filer"** but the filesystem path is still `~/Downloads/`
+- Jira attachments download here before being moved to the appropriate location
 
 ### Jira Attachments
 
@@ -319,7 +341,7 @@ Before transitioning a ticket to Done (Phase 7), **every item below must be conf
 | # | Item | How to verify |
 |---|------|---------------|
 | 1 | **All PR review comments resolved** | `gh api graphql` query returns 0 unresolved threads (see Section 3) |
-| 2 | **Video/screenshots on disk** (if UI changes) | `ls .playwright-cli/<TICKET_ID>-after.webm` or `<TICKET_ID>-after.png` succeeds (see Section 1) |
+| 2 | **Video/screenshots committed** (if UI changes) | `ls docs/verification/<TICKET_ID>/<TICKET_ID>-after.png` succeeds (see Section 1) |
 | 3 | **Retrospective completed** | Phase 6.75 ran, learnings saved to `.dream-team/journal/` and memory |
 | 4 | **Jira completion comment posted** | `acli jira workitem comment create` succeeded with PR link + summary |
 | 5 | **CI is green** | Last push has all checks passing |
