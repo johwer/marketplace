@@ -267,6 +267,35 @@ Response: <shape>
 
 ## Attachment Notes
 <Summary of what was seen in any downloaded attachments, or "No attachments">
+
+## Visual Verification — Playwright CLI (include for frontend-only or full-stack tickets)
+Use the `playwright-cli` skill for ALL browser verification. Do NOT use Puppeteer MCP tools — those are deprecated.
+
+\```bash
+# Open browser with named session
+playwright-cli -s=lena open http://localhost:<port>/<path> --headed
+
+# Take snapshot to get element refs
+playwright-cli -s=lena snapshot
+
+# Interact
+playwright-cli -s=lena click <ref>
+playwright-cli -s=lena fill <ref> "value"
+
+# Screenshot
+playwright-cli -s=lena screenshot --filename=<TICKET_ID>-after.png
+
+# Video recording
+playwright-cli -s=lena video-start
+# ... do interactions ...
+playwright-cli -s=lena video-stop <TICKET_ID>-after.webm
+
+# Close when done
+playwright-cli -s=lena close
+\```
+
+Login sequence: click "More login options" → "Username and password" → fill username (gunner/anna) → fill password (tolvan) → submit.
+Screenshots go to `~/Downloads/<TICKET_ID>-*.png`. This is NOT optional for UI changes.
 ```
 
 #### Step 9: Launch Based on User's Choice (from Step 5)
