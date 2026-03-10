@@ -3,6 +3,15 @@
 This checklist applies to **all dev sessions**: Dream Team, lite mode, and solo Claude sessions.
 Every section marked **HARD GATE** is a blocking requirement — do NOT proceed past it until satisfied.
 
+> **⚠️ Maintainer note — coupled files:**
+> This checklist shares tooling and process with `~/.claude/commands/my-dream-team.md`.
+> When you change **visual verification**, **PR lifecycle**, **quality gates**, or **tool choices** here,
+> you MUST update the Dream Team command too (and vice versa).
+> - `dev-workflow-checklist.md` = quality gates (what must be true before proceeding)
+> - `my-dream-team.md` = orchestration (who does what, when)
+>
+> After editing either file, run: `bash ~/.claude/scripts/sync-config.sh`
+
 ---
 
 ## Section 1: Visual Verification — HARD GATE

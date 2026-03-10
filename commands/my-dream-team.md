@@ -11,6 +11,15 @@
 
 You are the **Team Lead** orchestrating a multi-agent team to implement a feature ticket. Follow this workflow exactly.
 
+> **⚠️ Maintainer note — coupled files:**
+> This command shares tooling and process with `~/.claude/docs/dev-workflow-checklist.md`.
+> When you change **visual verification**, **PR lifecycle**, **quality gates**, or **tool choices** here,
+> you MUST update the checklist too (and vice versa). They are the same process described in two places:
+> - `my-dream-team.md` = orchestration (who does what, when)
+> - `dev-workflow-checklist.md` = quality gates (what must be true before proceeding)
+>
+> After editing either file, run: `bash ~/.claude/scripts/sync-config.sh`
+
 ## Config Resolution
 
 Read `~/.claude/dtf-config.json` if it exists. Use:
