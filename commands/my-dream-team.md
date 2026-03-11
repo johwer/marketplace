@@ -800,7 +800,7 @@ Then **commit, push, and generate the initial PR summary**:
 2. **Push the branch** with `git push`
 3. **Spawn Tane for initial summary** (see Tane's prompt below) — this summary helps GitHub AI reviewers and human reviewers understand the changes
 4. **Update the draft PR description** with Tane's summary using `gh pr edit <PR_NUMBER> --body "..."`. Include the summary, architecture section, progress checkboxes, and the **"How to Test" section** with concrete steps. The "How to Test" section must include:
-   - The exact URL path (e.g., `http://localhost:3000/<customerId>/employees/<employeeId>`)
+   - The exact URL path (e.g., `http://localhost:<VITE_DEV_PORT>/<customerId>/employees/<employeeId>`)
    - Step-by-step user actions to verify the change
    - What to look for (expected results as a checklist)
    - Any prerequisites (test user, seed data, specific state needed)
@@ -1391,6 +1391,10 @@ cd apps/web && npm start
 
 Multiple worktrees can each run their own frontend and backend independently.
 
+**S3 translations work on all worktree ports.** The S3 CORS policy uses `http://localhost:3*` — any port starting with 3 (3000-3999) can fetch translations. Since `allocate-ports.sh` assigns Vite ports in the 3100-3199 range, every worktree gets full translation support out of the box. No need to fight for port 3000.
+
+This means **multiple worktrees can run Playwright verification simultaneously**, each on its own port with working translations. Agents in different worktrees can open separate Playwright sessions and test independently — no coordination or queuing needed.
+
 **Vite lifecycle rules — agents MUST follow:**
 - **Before starting Vite**: Check if one is already running in this worktree: `lsof -i -P | grep node | grep LISTEN`. If a Vite dev server is already on the worktree's port, reuse it — do NOT start a second one.
 - **Only one Vite per worktree**: Never spawn multiple Vite instances. If you need to restart, kill the old one first: `kill <PID>` then start fresh.
@@ -1554,6 +1558,7 @@ All browser verification and testing uses **Playwright CLI** (`playwright-cli`).
 
 ### Why Playwright CLI
 - **Named sessions** (`-s=<agent-name>`) — each agent gets an isolated browser, no queue needed
+- **Multi-worktree parallel testing** — each worktree runs on its own port (3100-3199) with full S3 translation support (CORS: `http://localhost:3*`). Multiple worktrees can run Playwright simultaneously without conflicts.
 - **Headless by default** — use `--headed` when visual inspection is needed
 - **DOM snapshots as YAML** — richer than screenshots alone, uses element refs for interaction
 - **No Chrome extension required** — works standalone

@@ -96,7 +96,7 @@ test("WITH permission — shows element", async ({ page }) => {
 Use `playwright-cli` for ad-hoc exploration BEFORE writing the test. Not a replacement for the test.
 
 ```bash
-# 1. Open browser with named session
+# 1. Open browser with named session (use the worktree's VITE_DEV_PORT)
 playwright-cli -s=<agent-name> open http://localhost:<port>/<path> --headed
 
 # 2. Explore the UI
@@ -108,6 +108,9 @@ playwright-cli -s=<agent-name> close
 ```
 
 Each agent uses their own named session (`-s=ingrid`, `-s=lena`, etc.) — no queue needed.
+
+**Multi-worktree parallel testing**: S3 translations work on all 3xxx ports (CORS: `http://localhost:3*`). Each worktree's Vite port (3100-3199 from `allocate-ports.sh`) gets full translation support — multiple worktrees can run Playwright simultaneously without port conflicts or missing translations.
+
 Full docs: `~/.claude/skills/playwright-cli/SKILL.md`
 
 ---

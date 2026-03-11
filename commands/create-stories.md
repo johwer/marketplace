@@ -268,12 +268,17 @@ Response: <shape>
 ## Attachment Notes
 <Summary of what was seen in any downloaded attachments, or "No attachments">
 
+## Worktree Port & Translations
+This worktree's Vite dev server port: `<VITE_DEV_PORT from .env.local>` (e.g., http://localhost:31XX)
+S3 translations work on all 3xxx ports (CORS: `http://localhost:3*`) — no need for port 3000.
+Multiple worktrees can run Playwright verification simultaneously on different ports.
+
 ## Visual Verification — Playwright CLI (include for frontend-only or full-stack tickets)
 Use the `playwright-cli` skill for ALL browser verification. Do NOT use Puppeteer MCP tools — those are deprecated.
 
 \```bash
-# Open browser with named session
-playwright-cli -s=lena open http://localhost:<port>/<path> --headed
+# Open browser with named session (use the worktree's port from .env.local)
+playwright-cli -s=lena open http://localhost:<VITE_DEV_PORT>/<path> --headed
 
 # Take snapshot to get element refs
 playwright-cli -s=lena snapshot
@@ -404,6 +409,11 @@ When the user indicates a story is done or merged (e.g., "PROJ-1234 is merged", 
    ```bash
    # Safety: check PR status first
    cd ~/Documents/Repo && gh pr list --head <TICKET_ID> --state all --json number,state,mergedAt,title
+
+   # Kill Vite/Node dev servers for this worktree (prevents orphan processes holding ports)
+   PIDS=$(pgrep -f "node.*<TICKET_ID>" 2>/dev/null || true)
+   [ -z "$PIDS" ] && PIDS=$(lsof -i -P 2>/dev/null | grep node | grep LISTEN | grep "<TICKET_ID>" | awk '{print $2}' | sort -u || true)
+   [ -n "$PIDS" ] && echo "$PIDS" | xargs kill 2>/dev/null || true
 
    # Kill tmux session if running
    tmux kill-session -t <TICKET_ID> 2>/dev/null || true

@@ -265,7 +265,9 @@ Set to `"applescript"` to use the legacy AppleScript + screencapture workflow in
 
 ```bash
 # Open browser and navigate
-playwright-cli open http://localhost:3000/some/route --headed
+playwright-cli open http://localhost:<PORT>/some/route --headed
+# PORT = VITE_DEV_PORT from .env.local (worktrees: 3100-3199, main: 3000)
+# S3 translations work on all 3xxx ports (CORS: http://localhost:3*)
 
 # Interact using element refs from snapshots
 playwright-cli snapshot                    # get element refs
@@ -273,8 +275,8 @@ playwright-cli click e5                    # click by ref
 playwright-cli fill e3 "test@example.com"  # fill input
 playwright-cli screenshot --filename=verify.png
 
-# Named sessions (multi-agent)
-playwright-cli -s=frontend open http://localhost:3000 --headed
+# Named sessions (multi-agent, multi-worktree — each on its own port)
+playwright-cli -s=frontend open http://localhost:<PORT> --headed
 playwright-cli -s=frontend click e12
 
 # Video recording
