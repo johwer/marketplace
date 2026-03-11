@@ -15,6 +15,7 @@ Key conventions:
 - Read the relevant service-specific `AGENTS.md` (e.g., `services/ServiceB/AGENTS.md`)
 - Use async/await throughout, proper EF Core includes
 - Follow the project's API conventions from `docs/API_CONVENTIONS.md`
+- **Message handlers must be idempotent**: All `IHandleMessages<T>` handlers (Rebus/RabbitMQ) receive duplicates. Use atomic DB upserts, never sync-call other services from handlers, never swallow exceptions. See `docs/CODING_STYLE_BACKEND.md` → "Message Reliability Patterns".
 - Format with CSharpier: `dotnet csharpier .` before committing
 - Build check: `dotnet build services/<ServiceName>/<ServiceName>.sln`
 
