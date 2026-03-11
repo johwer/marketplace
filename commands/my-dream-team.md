@@ -431,10 +431,18 @@ Based on the tech-architect's scope assessment, spawn the needed agents. **Use t
        - Define `SEED` constants at the top of the file with IDs matching seed SQL files
        - Navigate directly via URL using seed IDs: `page.goto(\`/\${SEED.customerId}/employees/\${SEED.userId}/case\`)`
        - For **permission/access control tests**: Use `page.route("**/api/service-c/**", ...)` to intercept ServiceC responses and inject/remove permissions. This is more reliable than depending on seed data having exact permissions configured
-       - Each test scenario should take a screenshot: `page.screenshot({ path: \`<component-dir>/__screenshots__/<ComponentName>-<state>.png\` })`
+       - Each test scenario saves a screenshot AND asserts visual regression:
+         ```typescript
+         // Save for PR evidence
+         await page.screenshot({ path: `${SCREENSHOT_DIR}/Component-state.png` });
+         // Visual regression — fails if UI changes unexpectedly
+         await expect(page).toHaveScreenshot("Component-state.png", { maxDiffPixelRatio: 0.01 });
+         ```
        - **Screenshot paths**: Co-locate with the component — `<component-dir>/__screenshots__/<ComponentName>-<state>.png`
+       - `toHaveScreenshot()` baselines are stored in `__snapshots__/` next to the test file (managed by Playwright)
+       - On first run, use `--update-snapshots` to generate baselines. Future runs compare pixel-by-pixel.
        - Test both positive and negative cases (e.g., with permission → tab visible, without permission → tab hidden)
-       - The test file is the reproducible proof — anyone can re-run it to regenerate screenshots
+       - The test file is the reproducible proof — anyone can re-run it to regenerate and verify screenshots
     4. **Run the tests**: `npx playwright test tests/e2e/<feature-area>/ --headed` to verify they pass and screenshots are generated
     5. **Manual exploration** (optional, for complex UI): Open Playwright CLI for additional manual checking: `playwright-cli -s=ingrid open http://localhost:<port>/<path> --headed`
     6. **Compare against the design**: If the ticket has a Figma link or Jira image attachment, compare layout, colors, spacing, and typography against the design reference.
