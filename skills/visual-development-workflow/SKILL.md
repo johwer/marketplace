@@ -57,8 +57,12 @@ Always verify changes visually based on the chosen platform(s):
 Playwright CLI is the default verification method. It's headless, token-efficient, and auto-generates test code from interactions. Check `dtf-config.json` `verification` field — if set to `"applescript"`, use Option B instead.
 
 ```bash
+# Detect the dev server port (worktrees use VITE_DEV_PORT from .env.local, main uses 3000)
+# S3 translations work on all 3xxx ports (CORS: http://localhost:3*)
+PORT=$(grep VITE_DEV_PORT apps/web/.env.local 2>/dev/null | cut -d= -f2 || echo 3000)
+
 # Open browser and navigate (use --headed to watch)
-playwright-cli open http://localhost:3000/[relevant-path]
+playwright-cli open http://localhost:$PORT/[relevant-path]
 
 # Take a DOM snapshot to get element refs
 playwright-cli snapshot
@@ -80,7 +84,7 @@ playwright-cli close
 
 **Multi-agent sessions** — use named sessions to avoid conflicts:
 ```bash
-playwright-cli -s=frontend open http://localhost:3000 --headed
+playwright-cli -s=frontend open http://localhost:$PORT --headed
 playwright-cli -s=frontend snapshot
 playwright-cli -s=frontend screenshot
 ```
@@ -105,7 +109,7 @@ Use this if Playwright CLI is not installed or `dtf-config.json` has `"verificat
 
 ```bash
 # Navigate via Chrome
-osascript -e 'tell application "Google Chrome" to set URL of active tab of first window to "http://localhost:3000/..."'
+osascript -e 'tell application "Google Chrome" to set URL of active tab of first window to "http://localhost:<PORT>/..."'
 
 # Wait + capture
 sleep 4 && osascript -e 'tell application "Google Chrome" to activate' && sleep 0.5 && screencapture -x ~/Downloads/screenshot.png
@@ -238,7 +242,7 @@ Claude:
 ### Web Testing (AppleScript — Legacy Fallback)
 
 - **Google Chrome**: Must be open with a tab on localhost
-- **Development Server**: Must be running on port 3000
+- **Development Server**: Must be running (port from `VITE_DEV_PORT` in `.env.local`, defaults to 3000)
 - **screencapture**: macOS built-in
 
 ### iOS Testing (macOS only)
@@ -326,7 +330,7 @@ Use this step-by-step pattern for iOS Safari form automation:
 // Good example of iOS Safari login automation
 // Navigate to login page
 ui_tap(address_bar)
-ui_type("http://localhost:3000/login/userAndPass")
+ui_type("http://localhost:<PORT>/login/userAndPass")
 // Tap suggestion instead of typing \n
 ui_tap(first_suggestion)
 sleep(3)

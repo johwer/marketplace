@@ -57,9 +57,21 @@ If the worktree has a `docker-compose.worktree.yml`, stop any running worktree c
 cd ~/Documents/<TICKET_ID> && docker compose -f docker-compose.worktree.yml down 2>/dev/null || true
 ```
 
-### Step 4: Kill tmux Session (if running)
+### Step 4: Kill Vite Dev Server & tmux Session
+
+Stop any Vite/Node dev servers running in this worktree before removing it. If Vite was started as a background process, it can survive tmux kill and keep the port locked as an orphan.
 
 ```bash
+# Kill Vite/Node dev servers for this worktree
+PIDS=$(pgrep -f "node.*~/Documents/<TICKET_ID>" 2>/dev/null || true)
+if [ -z "$PIDS" ]; then
+  PIDS=$(lsof -i -P 2>/dev/null | grep node | grep LISTEN | grep "<TICKET_ID>" | awk '{print $2}' | sort -u || true)
+fi
+if [ -n "$PIDS" ]; then
+  echo "$PIDS" | xargs kill 2>/dev/null || true
+fi
+
+# Kill tmux session
 tmux kill-session -t <TICKET_ID> 2>/dev/null || true
 ```
 
