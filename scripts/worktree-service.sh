@@ -17,7 +17,7 @@
 #   2. <TICKET_ID> as last arg   Resolves via dtf-config or ~/Documents/<ID>
 #   3. CWD auto-detect           If CWD is inside a worktree
 #
-# Available services:
+# Available services (API only — workers/sync not yet supported):
 #   service-b-api, service-a-api, service-e-api, service-d-api, service-c-api
 #
 # Examples:
@@ -148,6 +148,13 @@ case "${1:-help}" in
         if ! echo "$SERVICES" | grep -qw "$SERVICE"; then
             echo "Unknown service: $SERVICE"
             echo "Available: $SERVICES"
+            if [[ "$SERVICE" == *worker* || "$SERVICE" == *sync* || "$SERVICE" == *Worker* || "$SERVICE" == *Sync* ]]; then
+                echo ""
+                echo "Note: Workers and sync services are not yet supported in worktree mode."
+                echo "They run from the main stack. To add support, edit:"
+                echo "  ~/.claude/templates/docker-compose.worktree.yml"
+                echo "  ~/.claude/scripts/worktree-service.sh (SERVICES list)"
+            fi
             exit 1
         fi
         check_main_network

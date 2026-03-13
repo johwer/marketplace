@@ -12,6 +12,17 @@
 # cause the main stack's nginx and inter-service calls to randomly hit worktree
 # containers — breaking production-like behavior for non-worktree users.
 #
+# NOT included (yet): Workers and Sync services
+#   These run from the main stack. If you need one in a worktree, add it here
+#   and to worktree-service.sh SERVICES list.
+#   - Data erasure workers (ServiceA, ServiceB, ServiceC) — GDPR nightly cron jobs
+#   - ServiceA.Worker.Deviant — deviation monitoring, reminders (5 Quartz cron jobs)
+#   - ServiceA.Worker.SocialInsurance — sends reports to Swedish FK nightly
+#   - ServiceA.Worker.ServiceAExport — event-driven export to external health systems
+#   - ServiceB.Worker — health case lifecycle: reminders, auto-close rules
+#   - ServiceA.Sync.API, ServiceC.Sync.API — external sync REST APIs
+#   - ServiceC.Sync.Worker.TransactionProcessing — continuous transaction polling
+#
 # Prerequisites:
 #   - Main stack running: cd ~/Documents/Repo && docker compose up -d
 #
