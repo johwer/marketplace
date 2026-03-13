@@ -1446,6 +1446,13 @@ Include this block in every dev/infra agent prompt. It covers the universal rule
 - **Ambiguous requirements**: If something is unclear, message the team lead. Do NOT guess — wrong guesses waste more context than asking.
 - **Completion protocol**: When done, use the **Completion → Team Lead** template from the Communication Protocol. Always include `git diff --name-only` output in your `files_touched`.
 
+### Context Recovery
+If you lose track of what you're working on:
+1. **Ticket ID** — always matches your directory name: run `basename "$PWD"`
+2. **Pre-hydrated analysis** — read `.dream-team/context.md` for the full ticket breakdown, key files, conventions, and API contracts
+3. **Original Jira ticket** — run `acli jira workitem view $(basename "$PWD")` to fetch the full ticket (summary, description, acceptance criteria)
+4. **Your notes** — check `.dream-team/notes/<your-name>.md` for decisions and progress you already logged
+
 ### Scope & Tasks
 - Only work on what the architect assigned you. Do not refactor unrelated code.
 - Include the specific tasks from the architect's analysis and key files to modify.
