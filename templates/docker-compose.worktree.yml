@@ -115,8 +115,16 @@ services:
       AwsConfig__OverridePublicEndpoint: http://localhost:${LOCALSTACK_PORT:-4566}
       ProviderConfiguration__MockEmail: true
       ProviderConfiguration__DefaultFromEmailAddress: no-reply@polaris-accept.repo.se
-      RetailerFromEmailAddresses__0__RetailerType: Terveystalo
-      RetailerFromEmailAddresses__0__Email: no-reply@leo-stg.terveystalo.com
+      ProviderConfiguration__RetailerFromEmailAddresses__0__RetailerType: Terveystalo
+      ProviderConfiguration__RetailerFromEmailAddresses__0__Email: no-reply@leo-stg.terveystalo.com
+      ProviderConfiguration__CountryProviders__0__Country: SE
+      ProviderConfiguration__CountryProviders__0__Channel: Mail
+      ProviderConfiguration__CountryProviders__0__Providers__0__Order: 1
+      ProviderConfiguration__CountryProviders__0__Providers__0__Provider: AwsSimpleEmail
+      ProviderConfiguration__CountryProviders__1__Country: FI
+      ProviderConfiguration__CountryProviders__1__Channel: Mail
+      ProviderConfiguration__CountryProviders__1__Providers__0__Order: 1
+      ProviderConfiguration__CountryProviders__1__Providers__0__Provider: AwsSimpleEmail
     networks:
       - main-network
 
@@ -151,6 +159,10 @@ services:
       RateLimiting__Policies__passwordReset__WindowSeconds: 60
       RateLimiting__Policies__bankid__PermitLimit: 20
       RateLimiting__Policies__bankid__WindowSeconds: 60
+      RateLimiting__Policies__refreshToken__PermitLimit: 30
+      RateLimiting__Policies__refreshToken__WindowSeconds: 60
+      RateLimiting__Policies__serviceAuth__PermitLimit: 30
+      RateLimiting__Policies__serviceAuth__WindowSeconds: 60
     networks:
       - main-network
 
