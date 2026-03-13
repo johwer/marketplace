@@ -85,8 +85,7 @@ Check if the arguments contain `--lite`. If present:
   - **Phase 6**: User review loop — ask user for feedback, route fixes, iterate until "ship it"
   - **Phase 6.5**: Summary (write it yourself instead of spawning Tane)
   - **Phase 4.75 (Visual verification)**: **Write Playwright e2e tests that generate reproducible screenshots** — the test IS the verification. Create spec files at `apps/web/tests/e2e/<feature-area>/` using seed data IDs from `scripts/database-init/` for deterministic navigation. For permission tests, use `page.route()` to mock ServiceC responses. Each test takes screenshots co-located with the component: `<component-dir>/__screenshots__/<ComponentName>-<state>.png`. Run tests with `npx playwright test`. Use Playwright CLI (`playwright-cli -s=<agent>`) for manual exploration only. See `~/.claude/skills/playwright-cli/SKILL.md` for CLI reference.
-  - **Phase 6.75**: Retrospective — write your own retro learnings using the same 4 categories with destination hints: instruction improvements (`dream-team`/`agent:<name>`/`skill:<name>`), convention discoveries (`project-claude`/`agents-md:<path>`/`repo-docs`), doc gaps (`repo-docs`/`agents-md:<path>`), process improvements (`dream-team`/`memory`). Tag each item with a suggested destination so [`/retro-proposals`](commands.md#team-review) can route it later.
-  - **Phase 7**: Cleanup — runs the **Completion Gate** first (see `dev-workflow-checklist.md` Section 7): all PR comments resolved, screenshots in `__screenshots__/` next to components, retro done, CI green, PR description complete. Then posts a **Jira completion comment** with PR link + summary, @mentioning the ticket creator if different from assignee. Then transitions ticket to Klart.
+  - **Phase 7**: Retrospective & wrap-up — write your own retro learnings using the same 4 categories with destination hints. Run the Completion Gate (`dev-workflow-checklist.md` Section 7). Post Jira completion comment with PR link. Write workspace status file. Transition ticket to Klart. Workspace cleanup is handled by the orchestrator (`/create-stories`) — NOT by this session.
 - The key principle: minimize agent overhead for small/medium tasks while keeping all quality gates, feedback loops, and process steps intact.
 - **Shared quality gates**: Before reporting completion or pushing, follow ALL sections in `~/.claude/docs/dev-workflow-checklist.md`. These gates apply in both Dream Team and lite mode.
 
@@ -973,11 +972,11 @@ _Step-by-step instructions for manually verifying this change._
 
 After receiving Tane's summary, **update the PR description using the read-then-edit approach** (see Important Rules). Merge Tane's content into the existing PR body — update the `## Summary`, `## How to Test`, etc. sections but **preserve** any user-added images, screenshots, and the `## Progress` checkboxes.
 
-### Phase 6.75: Agent Retrospectives & Self-Improvement
+### Phase 7: Retrospective, Wrap-up & Session End
 
-> ⚠️ **CRITICAL ORDER**: This phase MUST run BEFORE Phase 7 (agent shutdown). If context is running low, deprioritize Phase 5.5/6 completion tasks and run this first — once agents shut down and `.dream-team/` files are gone, retrospective data is lost forever. This has happened twice (PROJ-1693, PROJ-1359) and was the single biggest data loss in Dream Team history.
+> ⚠️ **This is the FINAL phase** — it combines the retrospective, completion gate, and session handoff. Retros were previously a sub-phase that got skipped when context ran low. Now it's the main event. If context IS running low, deprioritize Phase 5.5/6 and run this first — once agents shut down, retrospective data is lost forever (this happened twice: PROJ-1693, PROJ-1359).
 
-Before shutting down the team, run a retrospective to capture learnings that improve future sessions.
+**Part A: Retrospective** — Capture learnings that improve future sessions.
 
 1. **Send a retrospective prompt to each active work agent** (Amara, Kenji, Ingrid, Ravi, Elsa, Diego, Suki — whichever were spawned). Message each one with:
 
@@ -1123,83 +1122,47 @@ Before shutting down the team, run a retrospective to capture learnings that imp
 
 **Important:** Keep retrospective changes surgical — only modify agent prompt sections, never restructure the overall workflow phases unless the user explicitly asks.
 
-### Phase 7: Cleanup & Workspace Teardown
+**Part B: Completion Gate & Wrap-up** — Only after the retrospective is done.
 
-Only triggered when the user confirms they are done:
+11. **Run the Completion Checklist** — See `~/.claude/docs/dev-workflow-checklist.md` Section 7 (Completion Gate). This is a **HARD GATE** — every item must be confirmed before proceeding. The checklist covers: PR review comments resolved, screenshots on disk, retro completed, Jira comment posted.
 
-**IMPORTANT:** Run Phase 6.75 (retrospective) BEFORE this phase. The retrospective needs `.dream-team/` files (journals, notes) which get deleted here.
-
-1. **Run the Completion Checklist** — See `~/.claude/docs/dev-workflow-checklist.md` Section 7 (Completion Gate). This is a **HARD GATE** — every item must be confirmed before proceeding. The checklist covers: PR review comments resolved, screenshots on disk, retro completed, Jira comment posted.
-
-2. **Move ticket to Done** in Jira:
+12. **Move ticket to Done** in Jira:
    ```bash
    acli jira workitem transition --key "<TICKET_ID>" --status "Klart"
    ```
 
-3. **Post a completion comment to Jira** — Summarize what was done and link the PR. Tag the ticket creator if they're different from the assignee:
+13. **Post a completion comment to Jira** — Summarize what was done and link the PR. Tag the ticket creator if they're different from the assignee:
    ```bash
-   # Get ticket creator
-   CREATOR=$(acli jira workitem view "<TICKET_ID>" --json --fields "creator" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin)['fields']['creator']['displayName'])" 2>/dev/null || echo "")
    CREATOR_ID=$(acli jira workitem view "<TICKET_ID>" --json --fields "creator" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin)['fields']['creator']['accountId'])" 2>/dev/null || echo "")
-
-   # Build the comment body — include PR link, brief summary, and @mention creator
-   # Use Atlassian mention format: [~accountId:ACCOUNT_ID]
    acli jira workitem comment create --key "<TICKET_ID>" --body "Implementation complete. PR: <PR_URL>
 
    Summary: <1-2 sentence description of what was implemented>
 
    [~accountId:$CREATOR_ID] — ready for your review."
    ```
+   Rules: Always include PR URL. Keep summary to 1-2 sentences. Only @mention creator if different from assignee. Don't block if acli fails.
 
-   **Rules:**
-   - Always include the PR URL
-   - Keep the summary to 1-2 sentences (what was done, not how)
-   - Only @mention the creator if they are NOT the same as the assignee (avoid self-pinging)
-   - If acli comment fails, note it in your completion message but don't block on it
+14. **Write a workspace status file** so the orchestrator knows this workspace is done:
+   ```bash
+   TICKET_ID=$(basename "$PWD")
+   PR_URL=$(cd ~/Documents/Repo && gh pr list --head "$TICKET_ID" --json url --jq '.[0].url' 2>/dev/null || echo "unknown")
+   cat > ~/.claude/workspace-status/$TICKET_ID.json << EOF
+   {
+     "ticketId": "$TICKET_ID",
+     "status": "done",
+     "prUrl": "$PR_URL",
+     "completedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+     "worktree": "$HOME/Documents/$TICKET_ID",
+     "branch": "$TICKET_ID"
+   }
+   EOF
+   ```
 
-4. **Present the final summary** to the user
-5. **Shut down all agents** gracefully using shutdown_request messages
-6. **Delete the team** (`dream-team-<TICKET_ID>`) with TeamDelete
-7. **Determine the ticket ID** from the current working directory (the folder name under `~/Documents/`, e.g., `PROJ-1657`)
-8. **Self-cleanup** — clean up dream-team working files, then tell the user the session is complete. Do NOT merge the PR or delete branches — the user handles merging manually.
+15. **Shut down agents and team** — graceful shutdown messages, then TeamDelete (`dream-team-<TICKET_ID>`).
 
-```bash
-# Get ticket ID from current directory
-TICKET_ID=$(basename "$PWD")
+16. **Tell the user** the implementation is done and the PR is ready for review. Remind them the orchestrator handles worktree cleanup when they say "it's merged" or "clean up <TICKET_ID>".
 
-# NOTE: Do NOT delete .dream-team/ here — it's needed for resume and is cleaned up
-# by /workspace-cleanup when the worktree is removed. Keep notes/journals intact.
-```
-
-9. **Write a workspace status file** so the orchestrator session knows this workspace is done and ready for cleanup after merge:
-
-```bash
-TICKET_ID=$(basename "$PWD")
-PR_URL=$(cd ~/Documents/Repo && gh pr list --head "$TICKET_ID" --json url --jq '.[0].url' 2>/dev/null || echo "unknown")
-cat > ~/.claude/workspace-status/$TICKET_ID.json << EOF
-{
-  "ticketId": "$TICKET_ID",
-  "status": "done",
-  "prUrl": "$PR_URL",
-  "completedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-  "worktree": "$HOME/Documents/$TICKET_ID",
-  "branch": "$TICKET_ID"
-}
-EOF
-```
-
-10. **Tell the user** the implementation is done and the PR is ready for their manual review and merge. Remind them that the orchestrator session will handle worktree/branch cleanup when they say "it's merged" or "clean up <TICKET_ID>".
-
-**IMPORTANT:** Do NOT run [`/workspace-cleanup`](commands.md#workspace-cleanup) or remove the worktree/branch. The workspace cannot clean itself up because it's running inside its own worktree. The orchestrator session (from [`/create-stories`](commands.md#create-stories)) handles all cleanup.
-
-<!-- DISABLED: Worktree/branch cleanup is now manual. User merges PRs themselves.
-# cd ~/Documents/Repo
-# git worktree remove ~/Documents/$TICKET_ID --force 2>/dev/null || true
-# rm -rf ~/Documents/$TICKET_ID
-# git branch -D $TICKET_ID 2>/dev/null || true
-# git worktree prune
-# tmux kill-session -t $TICKET_ID 2>/dev/null || true
--->
+**IMPORTANT:** Do NOT remove the worktree, branch, or `.dream-team/` files. This session runs inside its own worktree — it cannot clean itself up. The orchestrator (`/create-stories`) handles all cleanup.
 
 ## Domain Model Changes
 
@@ -1366,7 +1329,7 @@ This means **multiple worktrees can run Playwright verification simultaneously**
 **Vite lifecycle rules — agents MUST follow:**
 - **Before starting Vite**: Check if one is already running in this worktree: `lsof -i -P | grep node | grep LISTEN`. If a Vite dev server is already on the worktree's port, reuse it — do NOT start a second one.
 - **Only one Vite per worktree**: Never spawn multiple Vite instances. If you need to restart, kill the old one first: `kill <PID>` then start fresh.
-- **Don't leave Vite running after you're done**: When your work is complete (Phase 7 cleanup or agent completion), stop Vite if you started it: `kill $(lsof -t -i:<VITE_DEV_PORT>) 2>/dev/null || true`. Exception: if the user is actively testing on that port, leave it running.
+- **Don't leave Vite running after you're done**: When your work is complete (Phase 7 wrap-up or agent completion), stop Vite if you started it: `kill $(lsof -t -i:<VITE_DEV_PORT>) 2>/dev/null || true`. Exception: if the user is actively testing on that port, leave it running.
 
 ## Error Recovery
 
@@ -1384,7 +1347,7 @@ If an agent crashes, becomes unresponsive, or hits context limits:
 5. **Notify the user** that an agent was respawned and why
 6. If the same agent crashes twice, **escalate to the user** — don't keep retrying
 
-If the **team lead itself** is running low on context, use Phase 6.75 (retrospective) early to capture learnings, then inform the user to restart with [`/my-dream-team`](commands.md#my-dream-team) and reference the existing branch and PR.
+If the **team lead itself** is running low on context, run Phase 7 (retrospective) early to capture learnings, then inform the user to restart with [`/my-dream-team`](commands.md#my-dream-team) and reference the existing branch and PR.
 
 ## Important Rules
 
