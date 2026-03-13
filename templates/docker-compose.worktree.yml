@@ -33,14 +33,16 @@ x-common-api-environment: &common-api-environment
   ForwardedHeaders__ForwardLimit: "1"
   JWT__Audience: Repo.Platform
 
-# JWT config points to the MAIN stack's service-c-api (running on internal port 5001).
-# IMPORTANT: IssuerUrl MUST be 5001 (main ServiceC port) — not the worktree ServiceC port.
-# Tokens are issued by main ServiceC with iss=http://localhost:5001/..., so validating
-# services must use the same URL or JWT validation will fail with issuer mismatch.
+# JWT config: IssuerUrl MUST match the token issuer (main ServiceC at port 5001).
+# OpenIdConfiguration: uses main ServiceC for JWT key validation.
+# Services__ServiceC__BaseUrl: points to ServiceC_SERVICE_HOST which defaults to main stack's
+# service-c-api, but is overridden to service-c-api-wt when worktree-service.sh starts service-c-api.
+# This ensures authorization calls (ListUsersByActions etc.) hit the worktree ServiceC
+# code, while JWT validation still uses the main ServiceC that issued the token.
 x-jwt-client-config: &jwt-client-config
   JWT__IssuerUrl: http://localhost:5001/api/service-c/v1/
   JWT__OpenIdConfigurationEndpoint: http://service-c-api:5001/api/service-c/v1/.well-known/openid-configuration
-  Services__ServiceC__BaseUrl: http://service-c-api:5001
+  Services__ServiceC__BaseUrl: http://${ServiceC_SERVICE_HOST:-service-c-api}:5001
 
 services:
   service-b-api-wt:
@@ -129,7 +131,8 @@ services:
       ASPNETCORE_URLS: http://+:5001
       ConnectionStrings__DefaultConnection: Host=postgres;Database=repo_service-c;Username=postgres;Password=postgres
       ConnectionStrings__Redis: redis:6379
-      JWT__IssuerUrl: http://localhost:${ServiceC_API_PORT:-6001}/api/service-c/v1/
+      # MUST match main ServiceC issuer so tokens issued by main ServiceC are accepted
+      JWT__IssuerUrl: http://localhost:5001/api/service-c/v1/
       JWT__AccessExpiryMinutes: 60
       JWT__PartialExpiryMinutes: 15
       JWT__RefreshExpiryDays: 7
@@ -137,6 +140,17 @@ services:
       JWT__SecondaryCertificatePath: certs/jwt-dev-b.pfx
       OpenTelemetry__ServiceName: ServiceC-API-Worktree
       Microsoft__AppId: ee85bc57-6040-42c9-a58f-46bff132c327
+      PasswordReset__ExpiryMinutes: 20
+      PasswordReset__MaxActiveSessions: 3
+      PasswordReset__PasswordResetUrl: "http://localhost:3000/reset-password?Id={ID}&Token={TOKEN}"
+      RateLimiting__Policies__login__PermitLimit: 10
+      RateLimiting__Policies__login__WindowSeconds: 60
+      RateLimiting__Policies__ssoLogin__PermitLimit: 30
+      RateLimiting__Policies__ssoLogin__WindowSeconds: 60
+      RateLimiting__Policies__passwordReset__PermitLimit: 5
+      RateLimiting__Policies__passwordReset__WindowSeconds: 60
+      RateLimiting__Policies__bankid__PermitLimit: 20
+      RateLimiting__Policies__bankid__WindowSeconds: 60
     networks:
       - main-network
 
