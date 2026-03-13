@@ -2,6 +2,8 @@
 
 Reference for all Claude Code integrations — what's active, what needs setup, and prerequisites.
 
+> **See also:** [Instruction Delivery Mechanisms](instruction-delivery.md) — how CLAUDE.md, skills, commands, agents, hooks, memory, and plugins work together. Covers when to use each and the architecture decision for avoiding duplication.
+
 ## Team Setup — DTF CLI
 
 **Status:** Active
