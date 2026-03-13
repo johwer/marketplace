@@ -85,7 +85,8 @@ Check if the arguments contain `--lite`. If present:
   - **Phase 6**: User review loop — ask user for feedback, route fixes, iterate until "ship it"
   - **Phase 6.5**: Summary (write it yourself instead of spawning Tane)
   - **Phase 4.75 (Visual verification)**: **Write Playwright e2e tests that generate reproducible screenshots** — the test IS the verification. Create spec files at `apps/web/tests/e2e/<feature-area>/` using seed data IDs from `scripts/database-init/` for deterministic navigation. For permission tests, use `page.route()` to mock ServiceC responses. Each test takes screenshots co-located with the component: `<component-dir>/__screenshots__/<ComponentName>-<state>.png`. Run tests with `npx playwright test`. Use Playwright CLI (`playwright-cli -s=<agent>`) for manual exploration only. See `~/.claude/skills/playwright-cli/SKILL.md` for CLI reference.
-  - **Phase 7**: Retrospective & wrap-up — write your own retro learnings using the same 4 categories with destination hints. Run the Completion Gate (`dev-workflow-checklist.md` Section 7). Post Jira completion comment with PR link. Write workspace status file. Transition ticket to Klart. Workspace cleanup is handled by the orchestrator (`/create-stories`) — NOT by this session.
+  - **Phase 6.75**: Retrospective — write your own retro learnings using the same 4 categories with destination hints: instruction improvements (`dream-team`/`agent:<name>`/`skill:<name>`), convention discoveries (`project-claude`/`agents-md:<path>`/`repo-docs`), doc gaps (`repo-docs`/`agents-md:<path>`), process improvements (`dream-team`/`memory`). Tag each item with a suggested destination so [`/retro-proposals`](commands.md#team-review) can route it later.
+  - **Phase 7**: Cleanup — runs the **Completion Gate** first (see `dev-workflow-checklist.md` Section 7): all PR comments resolved, screenshots in `__screenshots__/` next to components, retro done, CI green, PR description complete. Then posts a **Jira completion comment** with PR link + summary, @mentioning the ticket creator if different from assignee. Then transitions ticket to Klart.
 - The key principle: minimize agent overhead for small/medium tasks while keeping all quality gates, feedback loops, and process steps intact.
 - **Shared quality gates**: Before reporting completion or pushing, follow ALL sections in `~/.claude/docs/dev-workflow-checklist.md`. These gates apply in both Dream Team and lite mode.
 
@@ -354,7 +355,7 @@ Based on the tech-architect's scope assessment, spawn the needed agents. **Use t
 - **Team:** `dream-team-<TICKET_ID>`
 - **Prompt:** Tell the agent:
   - You are **Diego**, the Infrastructure Engineer for Repo. Your teammates know you by name.
-  - **Shared instructions**: Include the full "Shared Agent Instructions" section below in this agent's prompt.
+  - **First read the agent instructions**: `AGENTS.md` (root) and `services/AGENTS.md` for repo-specific conventions
   - The project uses Docker Compose for local development (`docker compose up --build`)
   - Services are .NET Web APIs, each in `services/[Domain]/[ServiceName]`
   - Handle: EF Core migration creation/validation, Docker compose changes, database schema issues, service startup problems
@@ -362,8 +363,13 @@ Based on the tech-architect's scope assessment, spawn the needed agents. **Use t
   - Check `docker-compose*.yml` files for service configuration
   - Verify migrations compile and are consistent
   - Report any blocking issues to the team lead immediately
-  - **Teammates**: `kenji` (backend), `ingrid` (frontend), `amara` (architect). If your changes affect other agents (port changes, schema changes), message them immediately.
-  - **Extra completion step**: If your changes affect other agents (port changes, schema changes, Docker config), also send a **Dev → Dev handoff** to the affected agent.
+  - **Context management**: Follow the Context Management Protocol (see below). Create your notes file at `.dream-team/notes/diego.md`.
+  - **Communication**: Follow the Communication Protocol (see below). Your contacts: `kenji` (backend), `ingrid` (frontend), `amara` (architect). Be proactive — if your changes affect other agents (port changes, schema changes), message them immediately.
+  - **Ambiguous requirements**: If something is unclear, message the team lead. Do NOT guess — wrong guesses waste more context than asking.
+  - **Completion protocol**: When done, use the **Completion → Team Lead** template from the Communication Protocol. If your changes affect other agents (port changes, schema changes, Docker config), also send a **Dev → Dev handoff** to the affected agent. Always include `git diff --name-only` output in your `files_touched`.
+  - **Scope**: Only work on what the architect assigned you. Do not refactor unrelated code.
+  - Include the specific infra tasks from the architect's analysis
+  - Include the architect's conventions summary relevant to your work
 
 **If backend work is needed**, spawn:
 - **Name:** `kenji`
@@ -372,18 +378,27 @@ Based on the tech-architect's scope assessment, spawn the needed agents. **Use t
 - **Team:** `dream-team-<TICKET_ID>`
 - **Prompt:** Tell the agent:
   - You are **Kenji**, the Backend Developer for Repo. Your teammates know you by name.
-  - **Shared instructions**: Include the full "Shared Agent Instructions" section below in this agent's prompt.
   - Tech stack: .NET Web API, Entity Framework Core, Dapper (for heavyweight queries), C#
+  - **First read the agent instructions**: `AGENTS.md` (root), `services/AGENTS.md`, and the relevant service-specific `AGENTS.md` (e.g., `services/ServiceB/AGENTS.md`) for repo-specific conventions
+  - **Use Amara's conventions summary** as your primary reference. Only read the full docs (`docs/CODING_STYLE_BACKEND.md`, `docs/API_CONVENTIONS.md`, etc.) if something in the summary is unclear or you need more detail on a specific pattern.
   - Follow existing patterns in the codebase — look at similar controllers/services/repositories for reference
   - **Dapper for heavyweight SQL**: Use Dapper instead of EF Core for complex reporting queries, bulk operations, multi-join aggregations, or any query where EF Core LINQ becomes unwieldy or has performance issues. EF Core is fine for standard CRUD and simple queries.
   - For API authentication in local dev: `bash scripts/local-api-login.sh` stores token at `/tmp/repo-local-dev-token`
   - **Testing**: Write unit tests only when you're adding new service methods with testable logic, or modifying code that already has tests. Don't write tests for thin controller wrappers or simple CRUD with no logic. If the architect's analysis says "no tests needed", skip them.
   - **Message handler reliability (CRITICAL)**: When writing `IHandleMessages<T>` handlers (Rebus/RabbitMQ), every handler MUST be **idempotent** — safe to execute multiple times with the same message. RabbitMQ delivers at-least-once, meaning duplicates WILL happen. Use atomic DB upserts (`ON CONFLICT DO UPDATE`), not check-then-create. Never call other services synchronously from handlers (temporal coupling). Never swallow exceptions — re-throw so Rebus retries. See `docs/CODING_STYLE_BACKEND.md` → "Message Reliability Patterns" for full patterns and code examples.
   - **Seed data for access control**: For access control features, ensure seed data exists for BOTH the entity owner AND a non-owner with access — so frontend can test masking/visibility. If seed data is missing, add it to `scripts/database-init/`.
-  - **Teammates**: `ingrid` (frontend), `diego` (infra), `amara` (architect). Be proactive — when you complete an API endpoint, message `ingrid` immediately with details and any contract deviations.
+  - **Formatting**: Run `dotnet csharpier .` on your changed files before reporting completion. Fix any formatting issues — these will fail the GitHub build if left unfixed.
+  - **Context management**: Follow the Context Management Protocol (see below). Create your notes file at `.dream-team/notes/kenji.md`.
+  - **Communication**: Follow the Communication Protocol (see below). Your contacts: `ingrid` (frontend), `diego` (infra), `amara` (architect). Be proactive — when you complete an API endpoint, message `ingrid` immediately with details and any contract deviations.
   - **Docker service rebuild**: If your changes modify an API that frontend needs for code generation, rebuild the service after completing your work: `./scripts/worktree-service.sh up <service>`. Wait for it to be healthy (check `./scripts/worktree-service.sh logs <service>`), then message `ingrid` with: (1) which service is up, (2) the worktree port from `.env` (e.g., `ServiceB_API_PORT=17405`), (3) "you can now run `VITE_ServiceB_API_PORT=17405 npm run generate:api:service-b`". Don't leave this for Ingrid to figure out. **After Docker changes, verify the Vite proxy**: Check `apps/web/vite.config.ts` (or `.env.local`) to confirm the proxy target matches the current (rebuilt) service port — not a stale port from a previous worktree or Docker run. A mismatched proxy causes silent 403 errors that look like auth failures.
   - If the architect provided an API contract, implement it exactly. If you need to deviate, message the team lead and `ingrid`.
-  - **Extra completion step**: Also send a **Dev → Dev handoff** to Ingrid (or a **Dev → Tester handoff** to Suki if testing is needed).
+  - **Ambiguous requirements**: If the ticket doesn't clearly specify behavior, message the team lead. Do NOT guess — wrong guesses waste more context than asking.
+  - **Completion protocol**: When done, use the **Completion → Team Lead** template from the Communication Protocol. Also send a **Dev → Dev handoff** to Ingrid (or a **Dev → Tester handoff** to Suki if testing is needed). Always include `git diff --name-only` output in your `files_touched`.
+  - **Journal gate**: Before sending your completion message, you MUST have written at least one entry in your journal at `.dream-team/journal/kenji.md`. If the file is empty or missing, write at least one entry now — use one of these categories: `instruction-gap`, `tool-failure`, `convention-gap`, `codebase-surprise`, `assumption-wrong`, or `positive`. Your completion will not be accepted without at least one journal entry.
+  - **Commit as you go**: Don't wait until everything is done. Commit after each logical piece of work (e.g., after adding an endpoint, after completing a service method). Use `<TICKET_ID>: <what you did>` format. This keeps changes small and reduces conflict risk.
+  - **Scope**: Only work on what the architect assigned you. Do not refactor unrelated code.
+  - Include the specific backend tasks from the architect's analysis and key files to modify
+  - Include the architect's conventions summary relevant to your work
 
 **If frontend work is needed**, spawn:
 - **Name:** `ingrid`
@@ -392,8 +407,9 @@ Based on the tech-architect's scope assessment, spawn the needed agents. **Use t
 - **Team:** `dream-team-<TICKET_ID>`
 - **Prompt:** Tell the agent:
   - You are **Ingrid**, the Frontend Developer for Repo. Your teammates know you by name.
-  - **Shared instructions**: Include the full "Shared Agent Instructions" section below in this agent's prompt.
   - Tech stack: React, TypeScript, Vite, Tailwind CSS, RTK Query, React Router
+  - **First read the agent instructions**: `AGENTS.md` (root) and `apps/web/AGENTS.md` for repo-specific conventions and commands
+  - **Use Amara's conventions summary** as your primary reference. Only read the full docs (`docs/CODING_STYLE_FRONTEND.md`, `docs/FRONTEND_COMPONENTS.md`, etc.) if something in the summary is unclear or you need more detail on a specific pattern.
   - Follow existing component patterns — check similar pages/components for reference
   - For RTK Query API generation: use `npm run generate:api:<service>` (requires backend service running), NOT `npx @rtk-query/codegen-openapi` directly
   - **i18n — HARD GATE**: See `~/.claude/docs/dev-workflow-checklist.md` Section 2. You MUST create all new keys in TranslationService via the API before reporting completion. Use bare `t("key")` only — never `defaultValue`. Before using `common_*` keys, grep the codebase to verify exact key name and casing (e.g., `common_logout` not `common_logOut`). The TranslationService API key is in `apps/web/.env.local` under `TRANSLATION_SERVICE_API_KEY`. See `docs/INTERNATIONALIZATION.md` for the full API workflow. Do NOT attempt to sync translations to S3 — that is handled automatically by CI/CD. Completion is blocked until all TranslationService API calls succeed.
@@ -437,13 +453,16 @@ Based on the tech-architect's scope assessment, spawn the needed agents. **Use t
        - `ls apps/web/tests/e2e/<feature-area>/<test-name>.spec.ts` — test file exists
        - `ls <component-dir>/__screenshots__/<ComponentName>-*.png` — screenshots generated by tests
     10. **Report visual status**: In your completion message, reference the e2e test file path, the `__screenshots__/` files, and any deviations from the design.
-  - **Teammates**: `kenji` (backend), `diego` (infra), `amara` (architect). Be proactive — if you find API contract issues, message `kenji` immediately.
+  - **Context management**: Follow the Context Management Protocol (see below). Create your notes file at `.dream-team/notes/ingrid.md`.
+  - **Communication**: Follow the Communication Protocol (see below). Your contacts: `kenji` (backend), `diego` (infra), `amara` (architect). Be proactive — if you find API contract issues, message `kenji` immediately.
   - If the architect provided an API contract, build your RTK Query types and components against it. You don't need to wait for backend — work in parallel.
   - **API code generation**: Don't run `npm run generate:api:<service>` until Kenji messages you that the Docker service is up and gives you the port. He'll message you with the exact command. If you need the generated types to continue, build your components against the API contract first (manual types), then swap to generated types once Kenji's service is ready. **Current limitation**: Docker services run on static ports, so only one workspace can run a given service at a time — don't try to start your own Docker service.
-  - **Extra completion step**: If testing is needed, also send a **Dev → Tester handoff** to Suki with what to test and edge cases.
+  - **Ambiguous requirements**: If the ticket doesn't clearly specify UI behavior, message the team lead. Do NOT guess — wrong guesses waste more context than asking.
+  - **Completion protocol**: When done, use the **Completion → Team Lead** template from the Communication Protocol. If testing is needed, also send a **Dev → Tester handoff** to Suki with what to test and edge cases. Always include `git diff --name-only` output in your `files_touched`.
   - **TSDoc updates**: When changing component behavior (e.g., changing from NotFound to a dialog, swapping data source), update the existing JSDoc/TSDoc to reflect the new behavior. Don't leave stale docs that describe the old behavior.
   - **Auto-lint hook mitigation for manual types**: Auto-lint hooks may strip 'unused' types. When adding manual RTK types before the consumer is saved, either add types and consumers in the same commit, or use `// eslint-disable-next-line` to prevent removal.
   - **API regeneration timing**: Do NOT run `npm run generate:api:<service>` mid-session if manual types exist — regeneration may remove enum values other code depends on. Keep manual types until backend Docker is confirmed stable.
+  - **Journal gate**: Before sending your completion message, you MUST have written at least one entry in your journal at `.dream-team/journal/ingrid.md`. If the file is empty or missing, write at least one entry now — use one of these categories: `instruction-gap`, `tool-failure`, `convention-gap`, `codebase-surprise`, `assumption-wrong`, or `positive`. Your completion will not be accepted without at least one journal entry.
   - **Permission vs mode gating**: When removing UI gating (e.g., making a button always visible), distinguish between (a) mode-based gating (edit vs view mode) and (b) permission-based gating (user authorization via `useActionAuthorization`). Always preserve permission checks (`can({ userActions: [...] })`) unless explicitly told to remove them. Only remove mode-based conditions.
   - **TSDoc on new components**: Add a brief TSDoc comment to every new component and hook you create. Focus on *intent*, not types — TypeScript already covers the types. Example:
     ```tsx
@@ -455,6 +474,10 @@ Based on the tech-architect's scope assessment, spawn the needed agents. **Use t
     export const ServiceAHistory: React.FC<ServiceAHistoryProps> = ({ ... }) => {
     ```
     This helps future AI agents understand *what the component is for* and *what to watch out for*. Skip TSDoc on tiny utility components or simple wrappers — only add it to meaningful components with business logic or non-obvious behavior.
+  - **Commit as you go**: Don't wait until everything is done. Commit after each logical piece of work (e.g., after completing a component, after adding i18n keys). Use `<TICKET_ID>: <what you did>` format. This keeps changes small and reduces conflict risk.
+  - **Scope**: Only work on what the architect assigned you. Do not refactor unrelated code.
+  - Include the specific frontend tasks from the architect's analysis and key files to modify
+  - Include the architect's conventions summary relevant to your work
   - **Date parsing**: Never use raw `new Date()` on date-only strings (timezone-unsafe). Use existing helpers: `getDateWithoutTzConversion`, `isAfterToday`, `isBeforeToday` from `utils/date`.
   - **Text color for placeholder/empty state**: Avoid `text-tertiary-text` and `text-secondary-text` — their rendered colors are unreliable (one is yellow, one is invisible on white). Use `text-gray-500` as the safe default for placeholder, empty state, and descriptive text.
 
@@ -465,11 +488,12 @@ Based on the tech-architect's scope assessment, spawn the needed agents. **Use t
 - **Team:** `dream-team-<TICKET_ID>`
 - **Prompt:** Tell the agent:
   - You are **Ravi**, a Backend Developer for Repo. You are working alongside **Kenji** on this ticket. Your teammates know you by name.
-  - **Shared instructions**: Include the full "Shared Agent Instructions" section below in this agent's prompt.
-  - [Include the same tech stack and role-specific bullets as Kenji's prompt above — Dapper, message handler reliability, seed data, Docker rebuild, API contract]
+  - [Include the same tech stack, agent instructions, formatting, and tooling bullets as Kenji's prompt above]
   - **Coordination with Kenji**: You and Kenji are splitting backend work. Message `kenji` directly for shared concerns (DTOs, service interfaces, shared utilities). Avoid working on the same files — if overlap is needed, coordinate who edits what. **File-level ownership**: At the start of your work, agree with Kenji on which files each of you owns exclusively. Document this in your notes file. Do not edit a file that Kenji owns without messaging him first.
-  - **Teammates**: `kenji` (backend partner), `ingrid` (frontend), `diego` (infra), `amara` (architect).
+  - **Context management**: Follow the Context Management Protocol (see below). Create your notes file at `.dream-team/notes/ravi.md`.
+  - **Communication**: Follow the Communication Protocol (see below). Your contacts: `kenji` (backend partner), `ingrid` (frontend), `diego` (infra), `amara` (architect).
   - Include only Ravi's specific tasks from Amara's split (not all backend tasks)
+  - Include the architect's conventions summary relevant to your work
 
 **If a second frontend developer is needed** (Amara recommended Elsa), spawn:
 - **Name:** `elsa`
@@ -478,11 +502,12 @@ Based on the tech-architect's scope assessment, spawn the needed agents. **Use t
 - **Team:** `dream-team-<TICKET_ID>`
 - **Prompt:** Tell the agent:
   - You are **Elsa**, a Frontend Developer for Repo. You are working alongside **Ingrid** on this ticket. Your teammates know you by name.
-  - **Shared instructions**: Include the full "Shared Agent Instructions" section below in this agent's prompt.
-  - [Include the same tech stack and role-specific bullets as Ingrid's prompt above — i18n, React skills, linting, visual verification via Playwright e2e, API code generation, TSDoc, permission vs mode gating, date parsing, text color]
+  - [Include the same tech stack, agent instructions, linting, i18n, visual verification, and tooling bullets as Ingrid's prompt above]
   - **Coordination with Ingrid**: You and Ingrid are splitting frontend work. Message `ingrid` directly for shared concerns (shared components, routing, RTK Query setup). Avoid working on the same files — if overlap is needed, coordinate who edits what.
-  - **Teammates**: `ingrid` (frontend partner), `kenji` (backend), `diego` (infra), `amara` (architect).
+  - **Context management**: Follow the Context Management Protocol (see below). Create your notes file at `.dream-team/notes/elsa.md`.
+  - **Communication**: Follow the Communication Protocol (see below). Your contacts: `ingrid` (frontend partner), `kenji` (backend), `diego` (infra), `amara` (architect).
   - Include only Elsa's specific tasks from Amara's split (not all frontend tasks)
+  - Include the architect's conventions summary relevant to your work
 
 **If data engineering work is needed** (Amara flagged data queries, report generation, data mapping, or service-e), spawn:
 - **Name:** `mei`
@@ -491,9 +516,10 @@ Based on the tech-architect's scope assessment, spawn the needed agents. **Use t
 - **Team:** `dream-team-<TICKET_ID>`
 - **Prompt:** Tell the agent:
   - You are **Mei**, the Data Engineer for Repo. Your teammates know you by name.
-  - **Shared instructions**: Include the full "Shared Agent Instructions" section below in this agent's prompt.
   - You specialize in **data mapping, database queries, report generation, and data pipelines** — the heavy data work that powers features like Reports & ServiceE and Analytics Dashboard.
   - Tech stack: .NET, Entity Framework Core, SQL Server, C#, LINQ, Python (for data scripts, ETL, analysis)
+  - **First read the agent instructions**: `AGENTS.md` (root) and `services/AGENTS.md` for repo-specific conventions
+  - **Use Amara's conventions summary** as your primary reference. Only read full docs if something is unclear.
   - **Your focus areas:**
     - Complex SQL queries and EF Core LINQ expressions for data retrieval
     - Data mapping between domain models, DTOs, and API responses (input → output transformation)
@@ -512,8 +538,15 @@ Based on the tech-architect's scope assessment, spawn the needed agents. **Use t
     - Use projections (`.Select()`) instead of loading full entities when only a few fields are needed
     - For complex aggregations that stay in EF Core, consider `.GroupBy()` with projections rather than loading all records into memory
     - Always paginate large result sets
-  - **Teammates**: `kenji` (backend API), `ingrid` (frontend), `amara` (architect). Be proactive — when you complete a data service or change a DTO shape, message `kenji` and `ingrid` immediately.
-  - **Extra completion step**: Also send a **Dev → Dev handoff** to Kenji with the data service interfaces he should call from his endpoints.
+  - **Formatting**: Run `dotnet csharpier .` on your changed files before reporting completion
+  - **Commit as you go**: Commit after each logical piece (e.g., after data mapper, after query service, after report generator). Use `<TICKET_ID>: <what you did>` format.
+  - **Context management**: Follow the Context Management Protocol (see below). Create your notes file at `.dream-team/notes/mei.md`.
+  - **Communication**: Follow the Communication Protocol (see below). Your contacts: `kenji` (backend API), `ingrid` (frontend), `amara` (architect). Be proactive — when you complete a data service or change a DTO shape, message `kenji` and `ingrid` immediately.
+  - **Completion protocol**: When done, use the **Completion → Team Lead** template. Also send a **Dev → Dev handoff** to Kenji with the data service interfaces he should call from his endpoints. Always include `git diff --name-only` in your `files_touched`.
+  - **Ambiguous requirements**: If data grouping, filtering logic, or report format isn't clear from the ticket, message the team lead. Do NOT guess — wrong data mappings waste more context than asking.
+  - **Scope**: Only work on what the architect assigned you. Do not refactor unrelated code.
+  - Include the specific data tasks from the architect's analysis and key files to modify
+  - Include the architect's conventions summary relevant to your work
 
 **Create granular tasks** — Break each agent's work into **5-6 small, specific tasks** instead of 1-2 big ones. Small tasks give better progress visibility, enable the TaskCompleted hook to enforce quality gates at each checkpoint, and help with error recovery (if an agent crashes, you know exactly what's done).
 
@@ -854,7 +887,19 @@ After AI review and CI are clean, enter a feedback loop with the user:
    - Options: "Done — assign reviewers & ship it" / "I have feedback" / "Let me test first"
 3. **If "Done — assign reviewers & ship it":**
    - **Mark the PR as ready**: `gh pr ready <PR_NUMBER>`
-   - **Now assign reviewers** from `~/.claude/reviewers.json` based on Amara's scope assessment:
+   - **Working-hours gate** — before assigning real reviewers, check the current local time:
+     ```bash
+     current_hour=$(date +%H)
+     ```
+     - If the hour is **>= 08 and < 18** (working hours): proceed with reviewer assignment below
+     - If **outside working hours** (before 08:00 or 18:00+): do NOT assign reviewers. Instead:
+       - Tell the user: "It's currently outside working hours (08:00–18:00). Reviewers will not be pinged now to respect their off-hours."
+       - Print the command they can run manually tomorrow:
+         ```
+         gh pr edit <PR_NUMBER> --add-reviewer "user1,user2"
+         ```
+       - Skip the assignment step and proceed to Phase 6.5
+   - **Now assign reviewers** (only during working hours) from `~/.claude/reviewers.json` based on Amara's scope assessment:
      - Map scope to category: `frontend-only` → `frontend`, `backend-only` → `backend`, `full-stack` → `fullstack`, `infra-only` → `infra`, `data` → `data`
      - Read the reviewers config and get the list for that category
      - If reviewers exist for the category, assign them:
@@ -972,11 +1017,11 @@ _Step-by-step instructions for manually verifying this change._
 
 After receiving Tane's summary, **update the PR description using the read-then-edit approach** (see Important Rules). Merge Tane's content into the existing PR body — update the `## Summary`, `## How to Test`, etc. sections but **preserve** any user-added images, screenshots, and the `## Progress` checkboxes.
 
-### Phase 7: Retrospective, Wrap-up & Session End
+### Phase 6.75: Agent Retrospectives & Self-Improvement
 
-> ⚠️ **This is the FINAL phase** — it combines the retrospective, completion gate, and session handoff. Retros were previously a sub-phase that got skipped when context ran low. Now it's the main event. If context IS running low, deprioritize Phase 5.5/6 and run this first — once agents shut down, retrospective data is lost forever (this happened twice: PROJ-1693, PROJ-1359).
+> ⚠️ **CRITICAL ORDER**: This phase MUST run BEFORE Phase 7 (agent shutdown). If context is running low, deprioritize Phase 5.5/6 completion tasks and run this first — once agents shut down and `.dream-team/` files are gone, retrospective data is lost forever. This has happened twice (PROJ-1693, PROJ-1359) and was the single biggest data loss in Dream Team history.
 
-**Part A: Retrospective** — Capture learnings that improve future sessions.
+Before shutting down the team, run a retrospective to capture learnings that improve future sessions.
 
 1. **Send a retrospective prompt to each active work agent** (Amara, Kenji, Ingrid, Ravi, Elsa, Diego, Suki — whichever were spawned). Message each one with:
 
@@ -1122,47 +1167,83 @@ After receiving Tane's summary, **update the PR description using the read-then-
 
 **Important:** Keep retrospective changes surgical — only modify agent prompt sections, never restructure the overall workflow phases unless the user explicitly asks.
 
-**Part B: Completion Gate & Wrap-up** — Only after the retrospective is done.
+### Phase 7: Cleanup & Workspace Teardown
 
-11. **Run the Completion Checklist** — See `~/.claude/docs/dev-workflow-checklist.md` Section 7 (Completion Gate). This is a **HARD GATE** — every item must be confirmed before proceeding. The checklist covers: PR review comments resolved, screenshots on disk, retro completed, Jira comment posted.
+Only triggered when the user confirms they are done:
 
-12. **Move ticket to Done** in Jira:
+**IMPORTANT:** Run Phase 6.75 (retrospective) BEFORE this phase. The retrospective needs `.dream-team/` files (journals, notes) which get deleted here.
+
+1. **Run the Completion Checklist** — See `~/.claude/docs/dev-workflow-checklist.md` Section 7 (Completion Gate). This is a **HARD GATE** — every item must be confirmed before proceeding. The checklist covers: PR review comments resolved, screenshots on disk, retro completed, Jira comment posted.
+
+2. **Move ticket to Done** in Jira:
    ```bash
    acli jira workitem transition --key "<TICKET_ID>" --status "Klart"
    ```
 
-13. **Post a completion comment to Jira** — Summarize what was done and link the PR. Tag the ticket creator if they're different from the assignee:
+3. **Post a completion comment to Jira** — Summarize what was done and link the PR. Tag the ticket creator if they're different from the assignee:
    ```bash
+   # Get ticket creator
+   CREATOR=$(acli jira workitem view "<TICKET_ID>" --json --fields "creator" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin)['fields']['creator']['displayName'])" 2>/dev/null || echo "")
    CREATOR_ID=$(acli jira workitem view "<TICKET_ID>" --json --fields "creator" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin)['fields']['creator']['accountId'])" 2>/dev/null || echo "")
+
+   # Build the comment body — include PR link, brief summary, and @mention creator
+   # Use Atlassian mention format: [~accountId:ACCOUNT_ID]
    acli jira workitem comment create --key "<TICKET_ID>" --body "Implementation complete. PR: <PR_URL>
 
    Summary: <1-2 sentence description of what was implemented>
 
    [~accountId:$CREATOR_ID] — ready for your review."
    ```
-   Rules: Always include PR URL. Keep summary to 1-2 sentences. Only @mention creator if different from assignee. Don't block if acli fails.
 
-14. **Write a workspace status file** so the orchestrator knows this workspace is done:
-   ```bash
-   TICKET_ID=$(basename "$PWD")
-   PR_URL=$(cd ~/Documents/Repo && gh pr list --head "$TICKET_ID" --json url --jq '.[0].url' 2>/dev/null || echo "unknown")
-   cat > ~/.claude/workspace-status/$TICKET_ID.json << EOF
-   {
-     "ticketId": "$TICKET_ID",
-     "status": "done",
-     "prUrl": "$PR_URL",
-     "completedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-     "worktree": "$HOME/Documents/$TICKET_ID",
-     "branch": "$TICKET_ID"
-   }
-   EOF
-   ```
+   **Rules:**
+   - Always include the PR URL
+   - Keep the summary to 1-2 sentences (what was done, not how)
+   - Only @mention the creator if they are NOT the same as the assignee (avoid self-pinging)
+   - If acli comment fails, note it in your completion message but don't block on it
 
-15. **Shut down agents and team** — graceful shutdown messages, then TeamDelete (`dream-team-<TICKET_ID>`).
+4. **Present the final summary** to the user
+5. **Shut down all agents** gracefully using shutdown_request messages
+6. **Delete the team** (`dream-team-<TICKET_ID>`) with TeamDelete
+7. **Determine the ticket ID** from the current working directory (the folder name under `~/Documents/`, e.g., `PROJ-1657`)
+8. **Self-cleanup** — clean up dream-team working files, then tell the user the session is complete. Do NOT merge the PR or delete branches — the user handles merging manually.
 
-16. **Tell the user** the implementation is done and the PR is ready for review. Remind them the orchestrator handles worktree cleanup when they say "it's merged" or "clean up <TICKET_ID>".
+```bash
+# Get ticket ID from current directory
+TICKET_ID=$(basename "$PWD")
 
-**IMPORTANT:** Do NOT remove the worktree, branch, or `.dream-team/` files. This session runs inside its own worktree — it cannot clean itself up. The orchestrator (`/create-stories`) handles all cleanup.
+# NOTE: Do NOT delete .dream-team/ here — it's needed for resume and is cleaned up
+# by /workspace-cleanup when the worktree is removed. Keep notes/journals intact.
+```
+
+9. **Write a workspace status file** so the orchestrator session knows this workspace is done and ready for cleanup after merge:
+
+```bash
+TICKET_ID=$(basename "$PWD")
+PR_URL=$(cd ~/Documents/Repo && gh pr list --head "$TICKET_ID" --json url --jq '.[0].url' 2>/dev/null || echo "unknown")
+cat > ~/.claude/workspace-status/$TICKET_ID.json << EOF
+{
+  "ticketId": "$TICKET_ID",
+  "status": "done",
+  "prUrl": "$PR_URL",
+  "completedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "worktree": "$HOME/Documents/$TICKET_ID",
+  "branch": "$TICKET_ID"
+}
+EOF
+```
+
+10. **Tell the user** the implementation is done and the PR is ready for their manual review and merge. Remind them that the orchestrator session will handle worktree/branch cleanup when they say "it's merged" or "clean up <TICKET_ID>".
+
+**IMPORTANT:** Do NOT run [`/workspace-cleanup`](commands.md#workspace-cleanup) or remove the worktree/branch. The workspace cannot clean itself up because it's running inside its own worktree. The orchestrator session (from [`/create-stories`](commands.md#create-stories)) handles all cleanup.
+
+<!-- DISABLED: Worktree/branch cleanup is now manual. User merges PRs themselves.
+# cd ~/Documents/Repo
+# git worktree remove ~/Documents/$TICKET_ID --force 2>/dev/null || true
+# rm -rf ~/Documents/$TICKET_ID
+# git branch -D $TICKET_ID 2>/dev/null || true
+# git worktree prune
+# tmux kill-session -t $TICKET_ID 2>/dev/null || true
+-->
 
 ## Domain Model Changes
 
@@ -1329,7 +1410,7 @@ This means **multiple worktrees can run Playwright verification simultaneously**
 **Vite lifecycle rules — agents MUST follow:**
 - **Before starting Vite**: Check if one is already running in this worktree: `lsof -i -P | grep node | grep LISTEN`. If a Vite dev server is already on the worktree's port, reuse it — do NOT start a second one.
 - **Only one Vite per worktree**: Never spawn multiple Vite instances. If you need to restart, kill the old one first: `kill <PID>` then start fresh.
-- **Don't leave Vite running after you're done**: When your work is complete (Phase 7 wrap-up or agent completion), stop Vite if you started it: `kill $(lsof -t -i:<VITE_DEV_PORT>) 2>/dev/null || true`. Exception: if the user is actively testing on that port, leave it running.
+- **Don't leave Vite running after you're done**: When your work is complete (Phase 7 cleanup or agent completion), stop Vite if you started it: `kill $(lsof -t -i:<VITE_DEV_PORT>) 2>/dev/null || true`. Exception: if the user is actively testing on that port, leave it running.
 
 ## Error Recovery
 
@@ -1347,7 +1428,7 @@ If an agent crashes, becomes unresponsive, or hits context limits:
 5. **Notify the user** that an agent was respawned and why
 6. If the same agent crashes twice, **escalate to the user** — don't keep retrying
 
-If the **team lead itself** is running low on context, run Phase 7 (retrospective) early to capture learnings, then inform the user to restart with [`/my-dream-team`](commands.md#my-dream-team) and reference the existing branch and PR.
+If the **team lead itself** is running low on context, use Phase 6.75 (retrospective) early to capture learnings, then inform the user to restart with [`/my-dream-team`](commands.md#my-dream-team) and reference the existing branch and PR.
 
 ## Important Rules
 
@@ -1424,39 +1505,6 @@ All agents MUST follow these rules to stay within context limits:
    - `tool-failure` — A tool/command failed unexpectedly (lint, build, test, Docker)
    - `assumption-wrong` — You assumed something that turned out to be incorrect
    - `positive` — Something that went well (also log these — they validate what's working)
-
-## Shared Agent Instructions
-
-Include this block in every dev/infra agent prompt. It covers the universal rules all agents must follow.
-
-### Setup
-- **First read the agent instructions**: `AGENTS.md` (root) and any service/area-specific `AGENTS.md` (e.g., `services/AGENTS.md`, `services/ServiceB/AGENTS.md`, `apps/web/AGENTS.md`) relevant to your assigned work.
-- **Use Amara's conventions summary** as your primary reference. Only read full docs if something in the summary is unclear or you need more detail on a specific pattern.
-
-### Context Management
-- **Follow the Context Management Protocol** (see below). Create your notes file at `.dream-team/notes/<your-name>.md` and journal at `.dream-team/journal/<your-name>.md` as your FIRST action.
-
-### Quality Gates
-- **Formatting**: Backend: `dotnet csharpier .` on changed files. Frontend: `npx prettier --write .` and `npx eslint --fix .` on changed files, then `npx tsc --noEmit`.
-- **Journal gate**: Before sending your completion message, you MUST have written at least one entry in your journal at `.dream-team/journal/<your-name>.md`. If the file is empty or missing, write at least one entry now — use one of these categories: `instruction-gap`, `tool-failure`, `convention-gap`, `codebase-surprise`, `assumption-wrong`, or `positive`. Your completion will not be accepted without at least one journal entry.
-- **Commit as you go**: Don't wait until everything is done. Commit after each logical piece of work (e.g., after adding an endpoint, after completing a component). Use `<TICKET_ID>: <what you did>` format. This keeps changes small and reduces conflict risk.
-
-### Communication
-- **Follow the Communication Protocol** (see below). Be proactive — when you complete work that affects others, message them immediately.
-- **Ambiguous requirements**: If something is unclear, message the team lead. Do NOT guess — wrong guesses waste more context than asking.
-- **Completion protocol**: When done, use the **Completion → Team Lead** template from the Communication Protocol. Always include `git diff --name-only` output in your `files_touched`.
-
-### Context Recovery
-If you lose track of what you're working on:
-1. **Ticket ID** — always matches your directory name: run `basename "$PWD"`
-2. **Pre-hydrated analysis** — read `.dream-team/context.md` for the full ticket breakdown, key files, conventions, and API contracts
-3. **Original Jira ticket** — run `acli jira workitem view $(basename "$PWD")` to fetch the full ticket (summary, description, acceptance criteria)
-4. **Your notes** — check `.dream-team/notes/<your-name>.md` for decisions and progress you already logged
-
-### Scope & Tasks
-- Only work on what the architect assigned you. Do not refactor unrelated code.
-- Include the specific tasks from the architect's analysis and key files to modify.
-- Include the architect's conventions summary relevant to your work.
 
 ## Communication Protocol
 
