@@ -1,0 +1,146 @@
+# Worktree API Service Runner
+# ===========================
+# Runs individual API services from a worktree, connected to the main stack's
+# shared infrastructure (postgres, redis, rabbitmq, localstack, jaeger, service-c-api).
+#
+# This template lives in ~/.claude/templates/ and is invoked by worktree-service.sh
+# which sets WORKTREE_BUILD_CONTEXT to the worktree path.
+#
+# IMPORTANT: Service names are suffixed with "-wt" to avoid Docker DNS collisions
+# with the main stack. Without this, Docker round-robins requests between the main
+# and worktree containers when they share a hostname on the same network. This would
+# cause the main stack's nginx and inter-service calls to randomly hit worktree
+# containers — breaking production-like behavior for non-worktree users.
+#
+# Prerequisites:
+#   - Main stack running: cd ~/Documents/Repo && docker compose up -d
+#
+# Usage (via helper script — handles name mapping automatically):
+#   bash ~/.claude/scripts/worktree-service.sh up service-b-api
+#   bash ~/.claude/scripts/worktree-service.sh logs service-b-api
+#   bash ~/.claude/scripts/worktree-service.sh down
+
+x-common-api-environment: &common-api-environment
+  ASPNETCORE_ENVIRONMENT: Development
+  ConnectionStrings__RabbitMQ: amqp://guest:guest@rabbitmq:5672
+  OpenTelemetry__OtlpEndpoint: http://jaeger:4317
+  Logging__LogLevel__Default: Debug
+  Logging__LogLevel__Microsoft: Information
+  Serilog__MinimumLevel__Default: Debug
+  Serilog__MinimumLevel__Override__Microsoft: Warning
+  Serilog__MinimumLevel__Override__System: Warning
+  Serilog__WriteTo__0__Name: Console
+  ForwardedHeaders__ForwardLimit: "1"
+  JWT__Audience: Repo.Platform
+
+# JWT config points to the MAIN stack's service-c-api (running on internal port 5001).
+# IMPORTANT: IssuerUrl MUST be 5001 (main ServiceC port) — not the worktree ServiceC port.
+# Tokens are issued by main ServiceC with iss=http://localhost:5001/..., so validating
+# services must use the same URL or JWT validation will fail with issuer mismatch.
+x-jwt-client-config: &jwt-client-config
+  JWT__IssuerUrl: http://localhost:5001/api/service-c/v1/
+  JWT__OpenIdConfigurationEndpoint: http://service-c-api:5001/api/service-c/v1/.well-known/openid-configuration
+  Services__ServiceC__BaseUrl: http://service-c-api:5001
+
+services:
+  service-b-api-wt:
+    build:
+      context: ${WORKTREE_BUILD_CONTEXT:-.}
+      dockerfile: services/ServiceB/HealthCaseManagement.API/Dockerfile
+    ports:
+      - "${ServiceB_API_PORT:-6005}:5005"
+    environment:
+      <<: [*common-api-environment, *jwt-client-config]
+      ASPNETCORE_URLS: http://+:5005
+      ConnectionStrings__DefaultConnection: Host=postgres;Database=repo_service-b;Username=postgres;Password=postgres
+      OpenTelemetry__ServiceName: HealthCaseManagement-API-Worktree
+      AwsConfig__ServiceUrl: http://localstack:4566
+      AwsConfig__OverridePublicEndpoint: http://localhost:${LOCALSTACK_PORT:-4566}
+      FileServiceConfig__HealthcaseDocumentS3Bucket: repo-service-b-healthcase-documents
+      FileServiceConfig__TemplateDocumentS3Bucket: repo-service-b-template-documents
+      FileServiceConfig__RoutineDocumentS3Bucket: repo-service-b-routine-documents
+      FileServiceConfig__ExcelExportS3Bucket: repo-service-d-inbox-files
+      FileServiceConfig__FileStorage: aws
+    networks:
+      - main-network
+
+  service-a-api-wt:
+    build:
+      context: ${WORKTREE_BUILD_CONTEXT:-.}
+      dockerfile: services/ServiceA/ServiceA.API/Dockerfile
+    ports:
+      - "${ABSENCE_API_PORT:-6002}:5002"
+    environment:
+      <<: [*common-api-environment, *jwt-client-config]
+      ASPNETCORE_URLS: http://+:5002
+      ConnectionStrings__DefaultConnection: Host=postgres;Database=repo_service-a;Username=postgres;Password=postgres
+      OpenTelemetry__ServiceName: ServiceA-API-Worktree
+      AwsConfig__ServiceUrl: http://localstack:4566
+      AwsConfig__OverridePublicEndpoint: http://localhost:${LOCALSTACK_PORT:-4566}
+      FileServiceConfig__MedicalCertificateS3Bucket: repo-medical-certificates
+      FileServiceConfig__ExcelExportS3Bucket: repo-service-d-inbox-files
+      FileServiceConfig__FileStorage: aws
+    networks:
+      - main-network
+
+  service-e-api-wt:
+    build:
+      context: ${WORKTREE_BUILD_CONTEXT:-.}
+      dockerfile: services/ServiceE/ServiceE.API/Dockerfile
+    ports:
+      - "${STATISTICS_API_PORT:-6003}:5003"
+    environment:
+      <<: [*common-api-environment, *jwt-client-config]
+      ASPNETCORE_URLS: http://+:5003
+      ConnectionStrings__DefaultConnection: Host=postgres;Database=repo_service-e;Username=postgres;Password=postgres
+      ConnectionStrings__Redis: redis:6379
+      OpenTelemetry__ServiceName: ServiceE-API-Worktree
+    networks:
+      - main-network
+
+  service-d-api-wt:
+    build:
+      context: ${WORKTREE_BUILD_CONTEXT:-.}
+      dockerfile: services/ServiceD/ServiceD.API/Dockerfile
+    ports:
+      - "${MESSENGER_API_PORT:-6006}:5006"
+    environment:
+      <<: [*common-api-environment, *jwt-client-config]
+      ASPNETCORE_URLS: http://+:5006
+      ConnectionStrings__DefaultConnection: Host=postgres;Database=repo_service-d;Username=postgres;Password=postgres
+      OpenTelemetry__ServiceName: ServiceD-API-Worktree
+      AwsConfig__ServiceUrl: http://localstack:4566
+      AwsConfig__OverridePublicEndpoint: http://localhost:${LOCALSTACK_PORT:-4566}
+      ProviderConfiguration__MockEmail: true
+      ProviderConfiguration__DefaultFromEmailAddress: no-reply@polaris-accept.repo.se
+      RetailerFromEmailAddresses__0__RetailerType: Terveystalo
+      RetailerFromEmailAddresses__0__Email: no-reply@leo-stg.terveystalo.com
+    networks:
+      - main-network
+
+  service-c-api-wt:
+    build:
+      context: ${WORKTREE_BUILD_CONTEXT:-.}
+      dockerfile: services/ServiceC/ServiceC.API/Dockerfile
+    ports:
+      - "${ServiceC_API_PORT:-6001}:5001"
+    environment:
+      <<: *common-api-environment
+      ASPNETCORE_URLS: http://+:5001
+      ConnectionStrings__DefaultConnection: Host=postgres;Database=repo_service-c;Username=postgres;Password=postgres
+      ConnectionStrings__Redis: redis:6379
+      JWT__IssuerUrl: http://localhost:${ServiceC_API_PORT:-6001}/api/service-c/v1/
+      JWT__AccessExpiryMinutes: 60
+      JWT__PartialExpiryMinutes: 15
+      JWT__RefreshExpiryDays: 7
+      JWT__PrimaryCertificatePath: certs/jwt-dev-a.pfx
+      JWT__SecondaryCertificatePath: certs/jwt-dev-b.pfx
+      OpenTelemetry__ServiceName: ServiceC-API-Worktree
+      Microsoft__AppId: ee85bc57-6040-42c9-a58f-46bff132c327
+    networks:
+      - main-network
+
+networks:
+  main-network:
+    external: true
+    name: ${MAIN_NETWORK:-repo_repo-network}

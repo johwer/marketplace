@@ -92,10 +92,10 @@ cd ~/Documents/<TICKET_ID>/apps/web && source ~/.nvm/nvm.sh && nvm use && npm i
 
 ### Step 6: Generate Environment Files
 
-Run the port allocation script from the worktree. It generates both `.env` (root) and `apps/web/.env.local` with unique ports:
+Run the DTF port allocation script. It generates both `.env` (root) and `apps/web/.env.local` with unique ports:
 
 ```bash
-~/Documents/<TICKET_ID>/scripts/allocate-ports.sh <TICKET_ID>
+bash ~/.claude/scripts/allocate-ports.sh <TICKET_ID>
 ```
 
 The script:
@@ -103,6 +103,7 @@ The script:
 - Checks for collisions with other active worktrees and bumps if needed
 - Assigns ports in the 10000+ range (never conflicts with main stack's 500x)
 - Writes both env files
+- Reads worktree parent from `~/.claude/dtf-config.json` if available
 
 Show the user the output — it lists all assigned ports.
 

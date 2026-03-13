@@ -70,7 +70,7 @@ Check if the arguments contain `--local`. If present:
 - Do NOT run retrospective or cleanup phases
 
 Check if the arguments contain `--lite`. If present:
-- **Phase 1 (Architecture)**: YOU do the analysis directly — don't spawn Amara. Read the relevant docs, explore the codebase, determine scope, key files, and conventions. Produce the same architecture report format Amara would.
+- **Phase 1 (Architecture)**: YOU do the analysis directly — don't spawn Amara. **Always read the full Jira ticket description** — the title alone can mislead scope. Read the relevant docs, explore the codebase, determine scope, key files, and conventions. Produce the same architecture report format Amara would.
 - **Phase 2 (Implementation)**: Based on complexity, decide:
   - **Simple** (1-3 files, single area): Implement directly yourself, no agents needed
   - **Medium** (4-8 files, single discipline): Optionally spawn 1 dev agent (Ingrid or Kenji)
@@ -87,6 +87,7 @@ Check if the arguments contain `--lite`. If present:
   - **Phase 4.75 (Visual verification)**: **Write Playwright e2e tests that generate reproducible screenshots** — the test IS the verification. Create spec files at `apps/web/tests/e2e/<feature-area>/` using seed data IDs from `scripts/database-init/` for deterministic navigation. For permission tests, use `page.route()` to mock ServiceC responses. Each test takes screenshots co-located with the component: `<component-dir>/__screenshots__/<ComponentName>-<state>.png`. Run tests with `npx playwright test`. Use Playwright CLI (`playwright-cli -s=<agent>`) for manual exploration only. See `~/.claude/skills/playwright-cli/SKILL.md` for CLI reference.
   - **Phase 6.75**: Retrospective — write your own retro learnings using the same 4 categories with destination hints: instruction improvements (`dream-team`/`agent:<name>`/`skill:<name>`), convention discoveries (`project-claude`/`agents-md:<path>`/`repo-docs`), doc gaps (`repo-docs`/`agents-md:<path>`), process improvements (`dream-team`/`memory`). Tag each item with a suggested destination so [`/retro-proposals`](commands.md#team-review) can route it later.
   - **Phase 7**: Cleanup — runs the **Completion Gate** first (see `dev-workflow-checklist.md` Section 7): all PR comments resolved, screenshots in `__screenshots__/` next to components, retro done, CI green, PR description complete. Then posts a **Jira completion comment** with PR link + summary, @mentioning the ticket creator if different from assignee. Then transitions ticket to Klart.
+- **Visual verification applies in lite mode too.** The same Phase 4.75 hard gate (Playwright e2e test file + screenshots must exist before push) applies whether you're in full Dream Team or lite mode. Don't skip it just because you're working solo.
 - The key principle: minimize agent overhead for small/medium tasks while keeping all quality gates, feedback loops, and process steps intact.
 - **Shared quality gates**: Before reporting completion or pushing, follow ALL sections in `~/.claude/docs/dev-workflow-checklist.md`. These gates apply in both Dream Team and lite mode.
 
@@ -193,6 +194,7 @@ This phase runs instead of the normal Phase 1-7 workflow when `--resume` is dete
      - **First-visit / empty-state checkpoint**: For every affected page, verify what renders when there's no data (empty lists, null values, new users). Include this in the architecture report so Ingrid can verify it visually.
      - **Visual test plan for access control tickets**: When the ticket involves permissions/access control, include: (a) which test user to log in as per scenario, (b) expected UI per user/role, (c) whether seed data supports those users, (d) **seed data IDs** (customerId, userId, etc.) from `scripts/database-init/` for direct URL navigation in Playwright e2e tests — every verified flow must have a reproducible test. Pass this to Ingrid and Suki.
      - **E2e test plan for all UI tickets**: For every UI change, identify: (a) which page paths need Playwright e2e tests, (b) which seed data IDs enable direct navigation, (c) which ServiceC permissions need mocking (if access control), (d) which component `__screenshots__/` directories should contain the test output. Include this in your report — the frontend dev will write the tests alongside the implementation.
+     - **E2e conventions**: customerId is UUID format, not numeric. Tables use `clickableRows`, not `<a>` links — use `row.click()` not `a[href]` for table row navigation in Playwright tests.
      - **Design intent check**: For new features, verify the implementation approach matches the ticket's stated purpose — not just code quality. Flag when the proposed solution solves a different problem than what was described.
      - Analyze the ticket/story provided
      - **Check for Jira attachments**: If the ticket mentions attached images, screenshots, or design references, use **Playwright CLI** to browse `https://your-company.atlassian.net/browse/<TICKET_ID>` and view attachments: `playwright-cli -s=amara open https://your-company.atlassian.net/browse/<TICKET_ID> --headed`. Use `playwright-cli snapshot` to get element refs and `playwright-cli screenshot --filename=jira-attachment.png` to capture images. Images are the source of truth over text descriptions if they conflict. Include key visual details (colors, layout, shapes) in your architecture report so dev agents have the specs. If authentication is needed, ask the user to log in via the headed browser.
@@ -230,6 +232,7 @@ This phase runs instead of the normal Phase 1-7 workflow when `--resume` is dete
 
 5b. **Pre-hydrated fast path** (when `.dream-team/context.md` exists from Step 2):
    - Read the context file — it contains: scope, complexity, key files, conventions summary, API contract, team recommendations, and flags.
+   - **Validate pre-hydrated context against the full Jira description.** If scope differs between the pre-hydrated context and the Jira ticket description, trust the description — it may have been updated after pre-hydration.
    - **Still spawn Amara**, but with a much shorter prompt: "You are **Amara**. Pre-hydrated context is available at `.dream-team/context.md` — read it. Your job is to **validate and refine** the pre-analysis, not redo it. Verify that key file paths still exist, check for any recent changes on main that affect the plan, and produce your architecture report. If the pre-hydrated context is accurate, you can reuse it directly — just add any missing details (API contract specifics, edge cases, conventions Amara-level details). This should take ~30% of the time of a full analysis."
    - Amara still produces the full architecture report format — but gets there faster by building on the pre-hydrated context rather than starting from scratch.
    - Continue to Phase 1.5 as normal.
@@ -384,13 +387,13 @@ Based on the tech-architect's scope assessment, spawn the needed agents. **Use t
   - Follow existing patterns in the codebase — look at similar controllers/services/repositories for reference
   - **Dapper for heavyweight SQL**: Use Dapper instead of EF Core for complex reporting queries, bulk operations, multi-join aggregations, or any query where EF Core LINQ becomes unwieldy or has performance issues. EF Core is fine for standard CRUD and simple queries.
   - For API authentication in local dev: `bash scripts/local-api-login.sh` stores token at `/tmp/repo-local-dev-token`
-  - **Testing**: Write unit tests only when you're adding new service methods with testable logic, or modifying code that already has tests. Don't write tests for thin controller wrappers or simple CRUD with no logic. If the architect's analysis says "no tests needed", skip them.
+  - **Testing**: Write unit tests only when you're adding new service methods with testable logic, or modifying code that already has tests. Don't write tests for thin controller wrappers or simple CRUD with no logic. If the architect's analysis says "no tests needed", skip them. **Unit tests** are for single-layer behavior (mock dependencies). **Integration tests** are for cross-layer flows (DB -> service -> controller). Choose the right level based on what you're testing.
   - **Message handler reliability (CRITICAL)**: When writing `IHandleMessages<T>` handlers (Rebus/RabbitMQ), every handler MUST be **idempotent** — safe to execute multiple times with the same message. RabbitMQ delivers at-least-once, meaning duplicates WILL happen. Use atomic DB upserts (`ON CONFLICT DO UPDATE`), not check-then-create. Never call other services synchronously from handlers (temporal coupling). Never swallow exceptions — re-throw so Rebus retries. See `docs/CODING_STYLE_BACKEND.md` → "Message Reliability Patterns" for full patterns and code examples.
   - **Seed data for access control**: For access control features, ensure seed data exists for BOTH the entity owner AND a non-owner with access — so frontend can test masking/visibility. If seed data is missing, add it to `scripts/database-init/`.
   - **Formatting**: Run `dotnet csharpier .` on your changed files before reporting completion. Fix any formatting issues — these will fail the GitHub build if left unfixed.
   - **Context management**: Follow the Context Management Protocol (see below). Create your notes file at `.dream-team/notes/kenji.md`.
   - **Communication**: Follow the Communication Protocol (see below). Your contacts: `ingrid` (frontend), `diego` (infra), `amara` (architect). Be proactive — when you complete an API endpoint, message `ingrid` immediately with details and any contract deviations.
-  - **Docker service rebuild**: If your changes modify an API that frontend needs for code generation, rebuild the service after completing your work: `./scripts/worktree-service.sh up <service>`. Wait for it to be healthy (check `./scripts/worktree-service.sh logs <service>`), then message `ingrid` with: (1) which service is up, (2) the worktree port from `.env` (e.g., `ServiceB_API_PORT=17405`), (3) "you can now run `VITE_ServiceB_API_PORT=17405 npm run generate:api:service-b`". Don't leave this for Ingrid to figure out. **After Docker changes, verify the Vite proxy**: Check `apps/web/vite.config.ts` (or `.env.local`) to confirm the proxy target matches the current (rebuilt) service port — not a stale port from a previous worktree or Docker run. A mismatched proxy causes silent 403 errors that look like auth failures.
+  - **Docker service rebuild**: If your changes modify an API that frontend needs for code generation, rebuild the service after completing your work: `bash ~/.claude/scripts/worktree-service.sh up <service>`. Wait for it to be healthy (check `bash ~/.claude/scripts/worktree-service.sh logs <service>`), then message `ingrid` with: (1) which service is up, (2) the worktree port from `.env` (e.g., `ServiceB_API_PORT=17405`), (3) "you can now run `bash ~/.claude/scripts/generate-api.sh service-b`". Don't leave this for Ingrid to figure out. **After Docker changes, verify the Vite proxy**: Check `apps/web/.env.local` to confirm the proxy target matches the current (rebuilt) service port — not a stale port from a previous worktree or Docker run. A mismatched proxy causes silent 403 errors that look like auth failures.
   - If the architect provided an API contract, implement it exactly. If you need to deviate, message the team lead and `ingrid`.
   - **Ambiguous requirements**: If the ticket doesn't clearly specify behavior, message the team lead. Do NOT guess — wrong guesses waste more context than asking.
   - **Completion protocol**: When done, use the **Completion → Team Lead** template from the Communication Protocol. Also send a **Dev → Dev handoff** to Ingrid (or a **Dev → Tester handoff** to Suki if testing is needed). Always include `git diff --name-only` output in your `files_touched`.
@@ -412,7 +415,7 @@ Based on the tech-architect's scope assessment, spawn the needed agents. **Use t
   - **Use Amara's conventions summary** as your primary reference. Only read the full docs (`docs/CODING_STYLE_FRONTEND.md`, `docs/FRONTEND_COMPONENTS.md`, etc.) if something in the summary is unclear or you need more detail on a specific pattern.
   - Follow existing component patterns — check similar pages/components for reference
   - For RTK Query API generation: use `npm run generate:api:<service>` (requires backend service running), NOT `npx @rtk-query/codegen-openapi` directly
-  - **i18n — HARD GATE**: See `~/.claude/docs/dev-workflow-checklist.md` Section 2. You MUST create all new keys in TranslationService via the API before reporting completion. Use bare `t("key")` only — never `defaultValue`. Before using `common_*` keys, grep the codebase to verify exact key name and casing (e.g., `common_logout` not `common_logOut`). The TranslationService API key is in `apps/web/.env.local` under `TRANSLATION_SERVICE_API_KEY`. See `docs/INTERNATIONALIZATION.md` for the full API workflow. Do NOT attempt to sync translations to S3 — that is handled automatically by CI/CD. Completion is blocked until all TranslationService API calls succeed.
+  - **i18n — HARD GATE**: See `~/.claude/docs/dev-workflow-checklist.md` Section 2. You MUST create all new keys in TranslationService via the API before reporting completion. Use bare `t("key")` only — never `defaultValue`. Before using `common_*` keys, grep the codebase to verify exact key name and casing (e.g., `common_logout` not `common_logOut`). The TranslationService API key is in `apps/web/.env.local` under `TRANSLATION_SERVICE_API_KEY`. See `docs/INTERNATIONALIZATION.md` for the full API workflow. Do NOT attempt to sync translations to S3 — that is handled automatically by CI/CD. Completion is blocked until all TranslationService API calls succeed. **Verify translation text against Jira attachment specs** before creating TranslationService keys — don't invent copy, use the exact text from the ticket's design/spec attachments.
   - **Testing**: Frontend tests are optional. Only write them if the architect specifically requests it or you're modifying code that already has tests. Don't create test files for new components by default.
   - **React skills**: You have access to these skills — use them when relevant:
     - `reactjs/react.dev:react-expert` — Look up React API usage, caveats, and best practices when unsure about a React feature
@@ -423,6 +426,7 @@ Based on the tech-architect's scope assessment, spawn the needed agents. **Use t
     - `npx tsc --noEmit` to verify no type errors
     Fix any issues — these will fail the GitHub build if left unfixed.
   - **Visual verification via Playwright e2e tests (MANDATORY for UI changes)**: If the ticket involves UI changes, you MUST write Playwright e2e tests AND take screenshots before reporting completion. **The test IS the verification** — screenshots without tests are not reproducible and become stale. Use **Playwright CLI** with a named session for manual exploration, then codify what you verified into a Playwright spec file.
+    0. **Pre-check**: Before opening Playwright, check if the target page has permission gates and verify seed data supports the test user. Missing permissions = blank page and wasted time.
     1. **Start the Vite dev server**: Check if one is already running for this worktree with `lsof -i -P | grep node | grep LISTEN`. If not, start it: `cd apps/web && npm start &`. Use the worktree's configured port.
     1b. **Verify you're on the right dev server**: Run `lsof -i :<port> | grep node` and confirm the process path contains your worktree directory (e.g., `/Documents/PROJ-1801/`), not another open worktree. Testing against the wrong server means testing old code silently.
     2. **Figure out the path**: Use the verified route paths from Amara's architecture report. If not provided, check the router config (`apps/web/src/routes/`). If the page requires authentication, check `.env.local` or mock data for test credentials.
@@ -439,6 +443,7 @@ Based on the tech-architect's scope assessment, spawn the needed agents. **Use t
          // Visual regression — fails if UI changes unexpectedly
          await expect(page).toHaveScreenshot("Component-state.png", { maxDiffPixelRatio: 0.01 });
          ```
+       - **Don't use `toHaveScreenshot()`** when TranslationService keys are newly created — translations may not have synced to S3 yet. Use `page.screenshot()` only until translations are confirmed live.
        - **Screenshot paths**: Co-locate with the component — `<component-dir>/__screenshots__/<ComponentName>-<state>.png`
        - `toHaveScreenshot()` baselines are stored in `__snapshots__/` next to the test file (managed by Playwright)
        - On first run, use `--update-snapshots` to generate baselines. Future runs compare pixel-by-pixel.
@@ -656,12 +661,12 @@ After Maya's code review is approved (all MUST FIX items resolved), spawn:
   - **Verified page routes** (from Amara's architecture report — use these exact URLs, do not infer from page names): [include the full URL paths per affected page here at spawn time, e.g. `/<customerId>/administration/access-management/organization/<tab>`]. Wrong paths will hit "Not yet implemented" pages — always use these over guessing.
   - **Test scope from architect:** Include the specific areas the architect flagged for testing
   - **Backend testing** (if backend changes were made):
-    - Use the worktree Docker service to rebuild and test: `./scripts/worktree-service.sh up <service>`
+    - Use the DTF worktree Docker service to rebuild and test: `bash ~/.claude/scripts/worktree-service.sh up <service>`
     - Read the worktree port from `.env` (`grep _API_PORT .env`)
     - Test API endpoints with `curl` against `http://localhost:<port>`
     - Verify request/response shapes match the architect's API contract
     - Test edge cases: invalid input, missing fields, unauthorized access
-    - Verify migrations applied cleanly: check `./scripts/worktree-service.sh logs <service>` for EF Core errors
+    - Verify migrations applied cleanly: check `bash ~/.claude/scripts/worktree-service.sh logs <service>` for EF Core errors
   - **Frontend testing** (if frontend changes were made):
     - Run `npx tsc --noEmit` from `apps/web/` to verify type safety
     - Run existing tests if any: `npx vitest run` from `apps/web/`
@@ -778,7 +783,7 @@ git rebase origin/main
 If there are conflicts, resolve them (keep both additions for routes/tabs — they're usually additive). If the rebase looks complex, ask the user before force-pushing.
 
 **Commit often, rebase often** — Don't accumulate a massive diff. Commit in logical chunks as work progresses. Rebase strategy:
-- **Before first push**: Always `git fetch origin main && git rebase origin/main` before pushing. This is mandatory.
+- **Before first push**: Always `git fetch origin main && git rebase origin/main` before pushing. This is mandatory. Check if main has commits ahead that touch the same files as your branch — overlapping changes cause merge conflicts that are easier to resolve early.
 - **After each push during review cycles**: If the review/fix cycle takes multiple rounds, rebase onto main before each subsequent push to avoid drift.
 - **Before marking PR ready**: Final rebase to ensure clean merge.
 - If rebase has conflicts, resolve them. For known conflict magnets (routes, tabs), keep both additions. If conflicts look complex, ask the user.
@@ -797,7 +802,7 @@ Then **commit, push, and generate the initial PR summary**:
    - If both backend and frontend were changed, create separate commits (e.g., `TICKET-ID: Add API endpoints for feature X` and `TICKET-ID: Add frontend components for feature X`)
    - If infra/migrations were involved, commit those first (e.g., `TICKET-ID: Add database migration for feature X`)
    - Each commit message should follow the `TICKET-ID: Description` pattern
-2. **Push the branch** with `git push`
+2. **Push the branch** with `git push`. If HTTPS push is rejected for workflow files (`.github/workflows/`), use SSH instead: `git push git@github.com:<OWNER>/<REPO>.git HEAD:<branch-name>`
 3. **Spawn Tane for initial summary** (see Tane's prompt below) — this summary helps GitHub AI reviewers and human reviewers understand the changes
 4. **Update the draft PR description** with Tane's summary using `gh pr edit <PR_NUMBER> --body "..."`. Include the summary, architecture section, progress checkboxes, and the **"How to Test" section** with concrete steps. The "How to Test" section must include:
    - The exact URL path (e.g., `http://localhost:<VITE_DEV_PORT>/<customerId>/employees/<employeeId>`)
@@ -809,6 +814,8 @@ Then **commit, push, and generate the initial PR summary**:
 ### Phase 5.5: GitHub Review (AI → fix → CI → mark ready → Human)
 
 The PR stays as a draft through AI review and CI. Only marked ready when everything is green.
+
+**Note:** Copilot only triggers on non-draft PRs. To get both AI reviews: mark ready → Copilot + Gemini review → fix → optionally convert back to draft.
 
 **Step A: Request AI review on the draft PR**
 
@@ -853,6 +860,7 @@ The script exits early on first failure — no waiting for remaining checks. If 
 - **CSharpier format check** → Kenji/Ravi run `dotnet csharpier .` and commit
 - **.NET build/test** → Kenji/Ravi fix compilation or test failures
 - **Web app build** → Ingrid/Elsa fix TypeScript or build errors
+- **When CI fails after a code change**, grep the test directory for usage of modified behavior before assuming the test is flaky — the failure may be a legitimate regression from your change.
 - After fixes, commit, push, and re-poll CI.
 
 **Round 2 (if Round 1 fix didn't resolve CI):**
@@ -1323,37 +1331,41 @@ This rule applies to: new entities, modified entities, new relationships, change
 
 ## Worktree Docker Workflow — Rebuilding API Services
 
-When backend changes need to be tested against a running API (not just unit tests), agents should use the **worktree Docker service** to rebuild and run the modified API from this worktree. This runs alongside the main stack without disturbing it.
+When backend changes need to be tested against a running API (not just unit tests), agents should use the **DTF worktree Docker scripts** to rebuild and run the modified API from this worktree. This runs alongside the main stack without disturbing it.
 
-See `docs/WORKTREE_DOCKER.md` for the full reference. Key points for agents below.
+> **These scripts are DTF tooling** — they live in `~/.claude/scripts/`, NOT in the Repo repo.
+> Ports are allocated by `/workspace-launch` (or manually via `allocate-ports.sh`) and stored in `.env` at the worktree root.
 
 ### Prerequisites
 - The main stack must be running: `cd ~/Documents/Repo && docker compose up -d`
-- The worktree must have a `.env` file with unique ports (generated by [`/workspace-launch`](commands.md#workspace-launch) via `allocate-ports.sh`)
+- The worktree must have a `.env` file with unique ports (generated by `/workspace-launch` via `bash ~/.claude/scripts/allocate-ports.sh <TICKET_ID>`)
 
 ### How to rebuild a service after code changes
 
 ```bash
 # Build and start the modified service (e.g., service-b-api)
-./scripts/worktree-service.sh up service-b-api
+bash ~/.claude/scripts/worktree-service.sh up service-b-api
 
 # Check it's running
-./scripts/worktree-service.sh ps
+bash ~/.claude/scripts/worktree-service.sh ps
 
 # Tail logs to verify startup
-./scripts/worktree-service.sh logs service-b-api
+bash ~/.claude/scripts/worktree-service.sh logs service-b-api
 
 # Stop when done
-./scripts/worktree-service.sh down
+bash ~/.claude/scripts/worktree-service.sh down
 ```
 
 Available services: `service-b-api`, `service-a-api`, `service-e-api`, `service-d-api`, `service-c-api`
+
+The script auto-detects the worktree from CWD. Or pass explicitly: `bash ~/.claude/scripts/worktree-service.sh --worktree ~/Documents/PROJ-1234 up service-b-api`
 
 ### How it works
 - The worktree service builds from **this worktree's code** and runs on a **unique high port** (10000+ range, from `.env`)
 - It joins the main stack's Docker network, so it can reach postgres, redis, rabbitmq, service-c-api, etc.
 - The main stack continues running untouched on default ports (500x)
 - Multiple worktrees can run simultaneously without port conflicts
+- The docker-compose template lives at `~/.claude/templates/docker-compose.worktree.yml`
 
 ### Finding your worktree ports
 
@@ -1365,31 +1377,29 @@ grep _API_PORT .env
 
 ### Pointing the frontend to the worktree API
 
-After rebuilding a service, update `apps/web/.env.local` to proxy the frontend to the worktree port:
+After rebuilding a service, update the commented-out line in `apps/web/.env.local` to proxy the frontend to the worktree port:
 
 ```bash
-# Read the port from .env, then set it in .env.local
-# Example: point ServiceB API proxy to worktree's rebuilt service
-VITE_ServiceB_API_PORT=17405
+# In apps/web/.env.local, uncomment and set the port for the rebuilt service:
+VITE_ServiceB_API_PORT=15805
 ```
 
 Then restart the Vite dev server (`npm start` in `apps/web/`). Only override the port for the service(s) you rebuilt — leave others pointing at the main stack (500x).
 
 ### RTK Query API generation from worktree service
 
-After rebuilding a service, generate the RTK Query client from its swagger:
+After rebuilding a service, generate the RTK Query client using the DTF helper:
 
 ```bash
-# Pass the worktree port via env var
-VITE_ServiceB_API_PORT=17405 npm run generate:api:service-b
+bash ~/.claude/scripts/generate-api.sh service-b
 ```
 
-When no env var is set, codegen falls back to the default port (500x) — safe for non-worktree users.
+This reads ports from `apps/web/.env.local` automatically. When no override is set, codegen falls back to the default port (500x).
 
 ### When agents should rebuild
 
-- **Kenji / Diego**: After making API changes that need testing, run `./scripts/worktree-service.sh up <service>` to rebuild. Read the port from `.env` and share it with other agents.
-- **Ingrid**: If Kenji rebuilt a service, update `VITE_*_API_PORT` in `apps/web/.env.local` to the worktree port, then restart Vite. For API generation, pass the port: `VITE_ServiceB_API_PORT=<port> npm run generate:api:service-b`
+- **Kenji / Diego**: After making API changes that need testing, run `bash ~/.claude/scripts/worktree-service.sh up <service>`. Read the port from `.env` and share it with other agents.
+- **Ingrid**: If Kenji rebuilt a service, uncomment the `VITE_*_API_PORT` line in `apps/web/.env.local` with the worktree port, then restart Vite. For API generation: `bash ~/.claude/scripts/generate-api.sh service-b`
 - **Amara**: When verifying API contracts or debugging, use the worktree service to test changes in isolation
 
 ### Running the frontend dev server
