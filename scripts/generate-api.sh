@@ -31,6 +31,12 @@ MEDHELP_ROOT="${MEDHELP_ROOT:-$HOME/Documents/Repo}"
 
 PROJECT_ROOT=""
 
+# --- Early help ---
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ] || [ "${1:-}" = "help" ] || [ $# -eq 0 ]; then
+    head -19 "$0" | tail -17
+    exit 0
+fi
+
 # --- Parse --worktree flag ---
 ARGS=()
 while [[ $# -gt 0 ]]; do
@@ -45,7 +51,11 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
-set -- "${ARGS[@]}"
+if [ ${#ARGS[@]} -gt 0 ]; then
+    set -- "${ARGS[@]}"
+else
+    set --
+fi
 
 # --- Auto-detect project root ---
 if [ -z "$PROJECT_ROOT" ]; then

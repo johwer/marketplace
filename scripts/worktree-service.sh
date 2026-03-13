@@ -152,6 +152,17 @@ case "${1:-help}" in
         fi
         check_main_network
         COMPOSE_NAME=$(to_compose_name "$SERVICE")
+
+        # When ServiceC is started from the worktree, other worktree services should
+        # route authorization calls to it (not to the main stack's ServiceC).
+        if [ "$SERVICE" = "service-c-api" ]; then
+            if ! grep -q '^ServiceC_SERVICE_HOST=' "$WORKTREE_DIR/.env" 2>/dev/null; then
+                echo "ServiceC_SERVICE_HOST=service-c-api-wt" >> "$WORKTREE_DIR/.env"
+            else
+                sed -i '' 's/^ServiceC_SERVICE_HOST=.*/ServiceC_SERVICE_HOST=service-c-api-wt/' "$WORKTREE_DIR/.env"
+            fi
+        fi
+
         echo "Building and starting $SERVICE from worktree ($WORKTREE_DIR)..."
         compose up --build -d "$COMPOSE_NAME"
         echo ""
@@ -161,6 +172,8 @@ case "${1:-help}" in
         ;;
     down)
         echo "Stopping all worktree services ($WORKTREE_DIR)..."
+        # Reset ServiceC host to main stack when stopping
+        sed -i '' 's/^ServiceC_SERVICE_HOST=.*/ServiceC_SERVICE_HOST=service-c-api/' "$WORKTREE_DIR/.env" 2>/dev/null || true
         compose down
         ;;
     logs)
