@@ -23,7 +23,7 @@ echo "$input" | jq '{
 }' > "$CONTEXT_FILE" 2>/dev/null
 
 # Context bar with color thresholds
-if [ "$PCT" -ge 85 ]; then
+if [ "$PCT" -ge 90 ]; then
   CTX_ICON="🔴"
 elif [ "$PCT" -ge 70 ]; then
   CTX_ICON="🟡"
