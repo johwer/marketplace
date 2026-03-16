@@ -6,7 +6,8 @@
 input=$(cat)
 
 MODEL=$(echo "$input" | jq -r '.model.display_name // "?"')
-PCT=$(echo "$input" | jq -r '.context_window.used_percentage // 0' | cut -d. -f1)
+REMAINING=$(echo "$input" | jq -r '.context_window.remaining_percentage // 100' | cut -d. -f1)
+PCT=$((100 - REMAINING))
 COST=$(echo "$input" | jq -r '.cost.total_cost_usd // 0')
 AGENT=$(echo "$input" | jq -r '.agent.name // empty')
 SESSION_ID=$(echo "$input" | jq -r '.session_id // empty')
@@ -31,12 +32,8 @@ else
   CTX_ICON="🟢"
 fi
 
-# Format cost
-if command -v bc &>/dev/null; then
-  COST_FMT=$(echo "scale=2; $COST" | bc 2>/dev/null || echo "$COST")
-else
-  COST_FMT="$COST"
-fi
+# Format cost (round to 2 decimal places)
+COST_FMT=$(printf "%.2f" "$COST" 2>/dev/null || echo "$COST")
 
 # Build output
 OUT="${CTX_ICON} ${PCT}% ctx"
