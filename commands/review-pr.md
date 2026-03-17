@@ -21,6 +21,7 @@ $ARGUMENTS
 ## Flags
 
 - `--full` — Full mode: check out branch locally into a worktree, run builds/type checks/linting, review with full codebase context. Without this flag, review uses GitHub API only (fast mode).
+- `--deep` — Multi-agent review with validation. Launches 4 parallel review agents (2x convention, 2x bug/security), then validates each finding with independent agents. Only verified issues survive. Can be combined with `--full` for maximum depth. Significantly more thorough but uses more tokens.
 - `--skip <pattern>` — Skip files matching the glob pattern (can be repeated). Examples: `--skip "*.generated.ts"`, `--skip "package-lock.json"`
 - `--skip-large <N>` — Skip files with more than N lines changed (default: no limit)
 - `--no-approve` — Never approve, only leave comments (advisory mode)
@@ -197,6 +198,8 @@ Include build/type/lint/test results in the review — any failures become **MUS
 
 ### Step 6: Review the Code
 
+**If `--deep` flag is NOT set**, do a standard single-pass review (the default — fast and token-efficient):
+
 For each file's diff, check for:
 
 **Code Quality:**
@@ -229,6 +232,113 @@ For each issue, categorize as:
 - **SUGGESTION** — Style improvements, nice-to-haves
 - **QUESTION** — Needs clarification from the author
 - **PRAISE** — Good patterns worth highlighting
+
+**Skip to Step 7.**
+
+---
+
+### Step 6 Deep: Multi-Agent Review with Validation (`--deep`)
+
+**If `--deep` flag IS set**, replace the single-pass review with a multi-agent pipeline. This is significantly more thorough but uses more tokens.
+
+#### 6a. Gate Check
+
+Before spawning review agents, check if this PR is worth a deep review:
+
+```bash
+gh pr view <PR> --json state,isDraft,additions,deletions,reviews --jq '{state: .state, draft: .isDraft, changes: (.additions + .deletions), reviewed: ([.reviews[] | select(.author.login == "claude" or .author.login == "github-actions")] | length)}'
+```
+
+**Skip deep review** (fall back to standard Step 6) if:
+- PR is closed or merged
+- PR is a draft (use `--deep` on draft PRs only if explicitly forced)
+- Total changes < 10 lines (trivial)
+- Claude has already reviewed this PR (check reviews list)
+
+If skipping, inform the user: `"Skipping deep review — [reason]. Running standard review instead."`
+
+#### 6b. Collect Convention Context
+
+Gather the relevant convention files for the changed directories:
+
+```bash
+# Find CLAUDE.md / AGENTS.md files in affected directories
+for dir in $(gh api repos/{owner}/{repo}/pulls/<PR>/files --jq '.[].filename' | xargs -I{} dirname {} | sort -u); do
+  echo "--- $dir ---"
+  # Check if AGENTS.md or CLAUDE.md exists in that directory or parents
+done
+```
+
+Also read project-level conventions:
+- `docs/CODING_STYLE_BACKEND.md` (if .cs files changed)
+- `docs/CODING_STYLE_FRONTEND.md` (if .ts/.tsx files changed)
+- `docs/API_CONVENTIONS.md` (if API routes changed)
+
+Compile a **conventions summary** — a condensed bullet list of the rules that apply to this PR's changed files. This will be passed to all review agents so they don't each re-read the full docs.
+
+#### 6c. Spawn 4 Parallel Review Agents
+
+Split the changed files into two halves (by file count). Launch 4 agents **in parallel** using the Agent tool:
+
+**Agent 1: Convention Reviewer A** (Sonnet)
+- Reviews first half of changed files
+- Prompt: "You are a convention reviewer. Check these diffs against the conventions summary below. Flag ONLY clear, unambiguous violations where you can quote the exact rule broken. Do NOT flag style preferences, subjective improvements, or things a formatter would catch. For each issue, return: `{file, line, category: 'MUST FIX'|'SUGGESTION', description, convention_violated}`."
+- Include: conventions summary, diff patches for files in first half
+
+**Agent 2: Convention Reviewer B** (Sonnet)
+- Reviews second half of changed files
+- Same prompt as Agent 1, different files
+
+**Agent 3: Bug & Security Hunter A** (Opus)
+- Reviews ALL changed files (not split — bugs need full context)
+- Prompt: "You are a bug and security reviewer. Scan these diffs for: (a) code that will fail to compile or produce wrong results regardless of input, (b) security vulnerabilities (OWASP top 10), (c) clear logic errors. Do NOT flag: style concerns, potential issues that depend on specific state, subjective improvements, pre-existing issues, things a linter catches. For each issue, return: `{file, line, category: 'MUST FIX', description, evidence}`."
+- Include: diff patches for all files
+
+**Agent 4: Bug & Security Hunter B** (Opus)
+- Same scope as Agent 3 but different focus
+- Prompt: "You are a security and correctness reviewer. Focus on: (a) auth/authz issues — missing permission checks, broken access control, privilege escalation, (b) data exposure — sensitive fields in API responses, PII in logs, (c) injection vectors — SQL, XSS, command injection, path traversal. Also check: are there new API endpoints without `[Authorize]`? New `UserAction` values without backend enforcement? For each issue, return: `{file, line, category: 'MUST FIX', description, evidence}`."
+- Include: diff patches for all files
+
+**Wait for all 4 to complete.** Collect their findings into a combined issue list.
+
+#### 6d. Deduplicate
+
+Merge the 4 agents' issue lists:
+- If two agents flagged the same file:line with the same concern → keep one, note "flagged by 2 agents" (higher confidence)
+- If issues overlap but aren't identical → keep both, they may be different aspects
+
+#### 6e. Validation Pass
+
+For each issue from 6d, spawn a **validation agent** to independently verify it. Run validations in parallel (batch of up to 8 at a time).
+
+**Validation agent prompt** (Sonnet for convention issues, Opus for bug/security issues):
+"An automated reviewer flagged this issue. Your job is to verify whether it's a REAL problem or a false positive. Read the diff context carefully. Return ONLY one of: `CONFIRMED: [brief reason]` or `REJECTED: [brief reason why this is a false positive]`."
+
+Include in the validation prompt:
+- The flagged issue (file, line, description)
+- The relevant diff hunk (±10 lines of context)
+- If `--full` mode: the full file content from the worktree
+
+#### 6f. Filter
+
+Remove all issues where the validation agent returned `REJECTED`. Keep only `CONFIRMED` issues.
+
+Report to the user how many were filtered:
+```
+Deep review: 4 agents found 12 issues → validation confirmed 7, rejected 5 false positives
+```
+
+#### 6g. Merge with Build Results
+
+If `--full` mode was also active (i.e., `--deep --full`), merge the validated issues with any build/type/lint/test failures from Step 5.5. Build failures are always MUST FIX and skip validation (they're deterministic).
+
+#### 6h. Final Categorization
+
+Categorize all surviving issues:
+- **MUST FIX** — Confirmed bugs, security issues, build failures, clear convention violations
+- **SUGGESTION** — Confirmed convention concerns that aren't blocking
+- **QUESTION** — Issues where validation was uncertain (neither clear CONFIRMED nor REJECTED)
+- **PRAISE** — Good patterns noticed by any agent (pass-through, no validation needed)
 
 ### Step 7: Present Review to User
 

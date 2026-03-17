@@ -32,9 +32,9 @@ Tears down a workspace after a story is merged. Stops worktree Docker services, 
 
 ## /review-pr {#review-pr}
 
-Reviews a pull request with line-level GitHub comments. Auto-detects the PR from the current branch, or specify a PR number. Runs in fast (API-only) or full (local checkout + builds) mode.
+Reviews a pull request with line-level GitHub comments. Auto-detects the PR from the current branch, or specify a PR number. Runs in fast (API-only), full (local checkout + builds), or deep (4 parallel review agents + validation pass to eliminate false positives) mode.
 
-**Flags:** `--full` · `--skip` · `--focus` · `--no-approve`
+**Flags:** `--full` · `--deep` · `--skip` · `--focus` · `--no-approve`
 
 ---
 
@@ -77,6 +77,12 @@ Deep quality gate for a single ticket. Checks consistency (title vs description 
 ## /ticket-examples {#ticket-examples}
 
 Generates concrete code variation examples from the codebase for a ticket. Enumerates all enum values, type combinations, data mappings, and rendering scenarios that need handling. Best used on-demand when existing patterns exist and completeness matters. Posts examples as a Jira comment.
+
+---
+
+## /evolve {#evolve}
+
+Reviews patterns detected from tool usage analysis. Runs `analyze-patterns.sh` to find context gaps, struggle points, and script candidates from your tool-usage.csv log, then lets you promote valuable patterns to skills, conventions, scripts, or memory — or dismiss noise. Part of the [Learning System](../docs/learning-system.md).
 
 ---
 
