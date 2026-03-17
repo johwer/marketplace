@@ -38,6 +38,25 @@ Flags can be combined: `--lite --no-worktree`, `--lite --local`, etc.
 
 The workflow has two phases: **parallel pre-hydration** (all tickets at once) and **sequential launch** (one at a time). This saves significant startup time — Amara doesn't need to re-explore files that were already analyzed.
 
+### Cost Model: Pre-hydration vs Amara
+
+Pre-hydration looks expensive in isolation (30-90k tokens per ticket) but it **replaces** most of Amara's Phase 1 work. The trade-off:
+
+| Without pre-hydration | With pre-hydration |
+|---|---|
+| Amara does full exploration: ~80-120k tokens | Pre-hydration: ~30-50k tokens (capped at 30 tool uses) |
+| Sequential (one ticket at a time) | Parallel (all tickets simultaneously) |
+| Each Amara session on Opus (~19x cost) | Pre-hydration on Sonnet (~4x cost), Amara validates on Opus (~30% of full) |
+
+**Net savings:** Pre-hydration costs ~40% of what a full Amara analysis would cost, and it runs in parallel. A session that previously needed 120k tokens for Amara now needs ~50k pre-hydration + ~30k Amara validation = ~80k total, but the pre-hydration happened concurrently with other tickets.
+
+**Budget cap:** Pre-hydration agents are capped at **30 tool uses** to prevent runaway exploration. If a ticket needs more than 30 tool uses to triage, it's complex enough that Amara should handle the full analysis anyway.
+
+**Phase cost tracking:** After pre-hydration completes, log the costs:
+```bash
+bash ~/.claude/scripts/phase-cost-tracker.sh log "<TICKET_ID>" "pre-hydration" "explore" "<tool_uses>" "<scope>"
+```
+
 ---
 
 ### Step 0: Clean Up Stale Worktrees
@@ -99,9 +118,59 @@ For each ticket ID, spawn an explore agent:
 
 If any ACLI call fails, note it — you'll ask the user for those ticket details in Step 4.
 
+#### Step 1.5: Quick Triage Checkpoint (User Decision Gate)
+
+**Before spending tokens on pre-hydration**, present the ticket summaries from Step 1 and let the user decide which tickets to proceed with. The user often has context that's NOT in the ticket — blocked dependencies, wrong priority, needs refinement first, or "I already know this is a 5-minute fix".
+
+Present a **rich summary** per ticket using the Jira data from Step 1 — enough for the user to make an informed decision without codebase exploration:
+
+```
+## Quick Triage — Which tickets should we pre-analyze?
+
+### 1. PROJ-1234 — Add mobile number field to employee card
+- **Status:** To Do  |  **Story Points:** 3  |  **Sprint:** Sprint 14
+- **Description:** Add a mobile phone field to the employee contact section. Should be editable by HR admins and visible on the employee card.
+- **Acceptance Criteria:**
+  - Field visible on employee card under contact section
+  - Editable only by users with HR Admin permission
+  - Validation: Swedish mobile format (+46...)
+- **Attachments:** 1 image (mockup)
+- **Labels/Components:** frontend, service-b
+
+### 2. PROJ-1235 — Fix date picker styling on service-a form
+- **Status:** To Do  |  **Story Points:** 1  |  **Sprint:** Sprint 14
+- **Description:** Date picker overlaps the submit button on mobile viewport.
+- **Acceptance Criteria:** Date picker renders correctly on all viewports
+- **Attachments:** none
+- **Labels/Components:** frontend, service-a
+
+### 3. PROJ-1236 — Update seed data for test environments
+- **Status:** Blocked  |  **Story Points:** —  |  **Sprint:** Backlog
+- **Description:** Add new test customers with specific permission configurations.
+- **Blocked by:** PROJ-1200 (ServiceC migration not complete)
+```
+
+Ask the user with AskUserQuestion:
+
+**"Which tickets should we pre-analyze? (each GO costs ~30-50k tokens on Sonnet)"**
+- **GO** — Pre-hydrate and launch (default)
+- **SKIP** — Don't pre-hydrate, don't launch. Ticket stays as-is.
+- **JUST WORKTREE** — Create worktree only, skip pre-hydration. For tickets the user already knows are trivial.
+- **REFINE FIRST** — Ticket needs work before implementation. Optionally run `/ticket-refine` on it.
+
+**Why this matters:**
+- Pre-hydration costs 30-50k tokens per ticket on Sonnet
+- A ticket the user knows is blocked = 50k wasted tokens
+- A ticket the user knows is a 2-line fix = 50k wasted tokens (just create a worktree)
+- The user may have context about dependencies, priorities, or blockers that aren't in Jira
+
+**Only proceed with GO tickets to Step 2.** SKIP tickets are removed from the pipeline. JUST WORKTREE tickets skip to Phase B Step 6 directly. REFINE FIRST tickets are queued for `/ticket-refine` after the session.
+
+---
+
 #### Step 2: Handle Attachments
 
-After all tickets are fetched, download attachments for any tickets that have them.
+After all tickets are fetched, download attachments **only for GO tickets**.
 
 **Default method — API download (no Chrome needed):**
 ```bash
@@ -122,33 +191,44 @@ open -a "Google Chrome" "<ATTACHMENT_URL>"
 ```
 Then ask the user to confirm once downloads are complete.
 
-#### Step 3: Pre-Hydrate ALL Contexts (Parallel)
+#### Step 3: Pre-Hydrate GO Ticket Contexts (Parallel)
 
-Spawn **parallel explore agents** (one per ticket, subagent_type `Explore`, model `sonnet`) to analyze each ticket against the codebase. Each agent receives the ticket info from Step 1 and runs a lightweight version of Amara's Phase 1 analysis:
+Spawn **parallel explore agents** (one per ticket, subagent_type `Explore`, model `sonnet`) to analyze each ticket against the codebase. Each agent receives the ticket info from Step 1 and runs a **budget-capped** lightweight version of Amara's Phase 1 analysis.
+
+**Budget cap: max 30 tool uses per pre-hydration agent.** Pre-hydration is NOT a full Amara analysis — it's a quick triage to determine scope, key files, and recommended mode. The full analysis happens later in Phase 1 of `/my-dream-team`. If the agent is still exploring at 25 tool uses, it MUST wrap up and return what it has.
+
+**Efficiency rules for pre-hydration agents:**
+- Use Glob FIRST (folder names), then Grep only if Glob is ambiguous — most scope questions are answered by folder structure alone
+- Do NOT read full convention docs — just note which docs apply (e.g., "CODING_STYLE_BACKEND.md needed") and let Amara read them later
+- Do NOT write full API contracts — just note "full-stack, needs API contract" and let Amara define it
+- Do NOT verify every file path — verify the top 3-5 key files, note the rest as "likely path"
+- If the ticket is clearly small (1-2 files, single area), return after 10-15 tool uses — don't over-explore
 
 ```
 For each ticket, spawn an explore agent with this prompt:
 
 "You are pre-analyzing ticket <TICKET_ID> for the Repo monorepo at ~/Documents/Repo.
 
+BUDGET: You have max 30 tool uses. This is a QUICK TRIAGE, not a full architecture analysis. Prioritize breadth over depth — determine scope, find key files, recommend a mode. Stop exploring when you have enough to recommend.
+
 Ticket: <FULL_TICKET_TEXT_FROM_STEP_1>
 
 Analyze the codebase to determine:
 1. **Scope**: backend-only, frontend-only, or full-stack
 2. **Complexity**: small (1-3 files), medium (4-8 files), large (8+ files)
-3. **Key files**: List the main files that will need modification (verify paths exist with Glob)
+3. **Key files**: List the main files that will need modification (verify top 3-5 paths with Glob, note others as likely)
 4. **Affected services**: Which services/areas of the codebase are involved
-5. **Dependencies**: Does this ticket depend on or conflict with common hot files (AppRoutes.tsx, EmployeeCardTabs.tsx)?
-6. **Existing patterns**: Are there existing components/patterns that should be reused?
-7. **Conventions summary**: Key conventions from docs/ that apply to this ticket's scope
-8. **API contract** (if full-stack): Endpoint paths, methods, request/response shapes
-9. **Seed data**: Does seed data exist in scripts/database-init/ for the entities involved?
-10. **Needs testing**: Does this need functional testing? (yes for: API changes, migrations, complex UI interactions)
-11. **Needs Docker rebuild**: Which service(s) need rebuilding?
-12. **Recommended mode**: Based on complexity and scope, recommend: Dream Team (medium/large, multi-discipline), Lite (small/medium, single discipline), or Just worktree (trivial or blocked)
-13. **Recommended team**: Which agents are needed and at what model tier
+5. **Dependencies**: Does this ticket conflict with hot files (AppRoutes.tsx, EmployeeCardTabs.tsx)?
+6. **Existing patterns**: Quick Glob/Grep for reusable components — don't deep-read them
+7. **Conventions note**: Which docs/ files apply (don't read them, just note them)
+8. **API contract note** (if full-stack): Note 'needs API contract from Amara' — don't define it yourself
+9. **Seed data**: Quick check if seed data exists for the entities involved
+10. **Needs testing**: yes/no with one-line reason
+11. **Needs Docker rebuild**: Which service(s), if any
+12. **Recommended mode**: Dream Team / Lite / Just worktree — with one-line justification
+13. **Recommended team**: Which agents at what model tier
 
-Return your analysis as a structured report."
+Return your analysis as a structured report. If you haven't finished all 13 points by tool use 25, wrap up with what you have — partial is fine, Amara will fill gaps."
 ```
 
 #### Step 4: Present Recommendations Table
@@ -167,14 +247,15 @@ After all pre-hydration agents return, present a summary table to the user:
 
 For any tickets where ACLI failed in Step 1, note "Ticket fetch failed — need details from you" in the table.
 
-#### Step 5: User Confirms Per Ticket
+#### Step 5: User Confirms Launch Mode Per GO Ticket
 
-Ask the user to confirm the launch mode for each ticket using AskUserQuestion. Present one question per ticket (up to 4 at a time):
+The user already decided GO/SKIP/WORKTREE/REFINE in Step 1.5. Now for each **GO** ticket, confirm the implementation mode based on pre-hydration analysis:
 
-- **"How should we work on \<TICKET_ID\> (\<SUMMARY\>)? Recommended: \<MODE\>"**
-  - "Dream Team" — Full orchestration with Opus architect + agents. Best for medium/large tickets.
-  - "Lite" — Sonnet solo session, spawns agents only if needed. Same quality gates, lower cost. Best for small/medium tickets.
-  - "Just worktree" — Create worktree only, no Claude session launched. User works on it manually or resumes later.
+- **"Launch mode for \<TICKET_ID\> (\<SUMMARY\>)? Recommended: \<MODE\>"**
+  - **"Dream Team"** — Full orchestration with Opus architect + agents. Best for medium/large tickets.
+  - **"Lite"** — Sonnet solo session, spawns agents only if needed. Same quality gates, lower cost. Best for small/medium tickets.
+
+Note: "Just worktree" tickets were already separated in Step 1.5 — they skip directly to Phase B Step 6 without pre-hydration.
 
 Save each choice for Phase B.
 

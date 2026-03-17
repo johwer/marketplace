@@ -1,8 +1,8 @@
 # Learning System — How Dream Team Flow Improves Over Time
 
-Dream Team Flow has a built-in learning loop that captures insights from two sources and routes them to where they'll have the most impact. Every session contributes data, and periodic analysis turns that data into concrete improvements.
+Dream Team Flow has a built-in learning loop that captures insights from four sources and routes them to where they'll have the most impact. Every session contributes data, and periodic analysis turns that data into concrete improvements.
 
-## Two Learning Paths
+## Four Learning Paths
 
 ### Path 1: Session Retrospectives (Process Learnings)
 
@@ -71,6 +71,41 @@ GitHub PR reviews → /scrape-pr-history → pr-learnings.json → /pr-insights 
 **Data flow:**
 ```
 Jira AI reviewer comments → /scrape-jira-pushback → jira-pushback-learnings.json → /retro-proposals → destination files
+```
+
+### Path 4: Tool Usage Pattern Mining (Behavioral Learnings)
+
+**What it captures:** How you and Claude actually work — which files get re-read constantly (context gaps), which files get edited repeatedly (struggle points), which bash commands run over and over (script candidates), and common tool sequences.
+
+**How it works:**
+
+1. **Every tool call is logged** via the PostToolUse hook to `~/.claude/logs/tool-usage.csv`. This runs async and non-blocking — zero performance impact.
+
+2. **Run `analyze-patterns.sh`** on-demand to analyze the logs. It detects:
+   - **Context gaps** — files read 5+ times (should be in CLAUDE.md or a skill)
+   - **Struggle points** — files edited 4+ times (unclear conventions?)
+   - **Script candidates** — bash commands run 5+ times (wrap in a script)
+   - **Tool sequences** — common pairs like `Read → Edit` or `Grep → Read`
+   - **Session sizes** — average and max tool calls per session
+
+3. **Run `/evolve`** to review detected patterns and promote them:
+   - **Promote to skill** — reusable pattern → create/update skill file
+   - **Promote to convention** — project rule → add to CLAUDE.md or conventions
+   - **Promote to script** — repeated command → wrap in utility script
+   - **Promote to memory** — context gap → save as memory
+   - **Dismiss** — noise or one-off → skip
+
+**Commands:**
+| Command | Purpose |
+|---------|---------|
+| `bash ~/.claude/scripts/analyze-patterns.sh` | Detect patterns from tool usage logs |
+| `/evolve` | Review and promote patterns to destinations |
+| `bash ~/.claude/scripts/cost-tracker.sh report` | Cost report with relative units per tool |
+
+**Data flow:**
+```
+PostToolUse hook → tool-usage.csv → analyze-patterns.sh → INSTINCTS.md → /evolve → destination files
+                                  → cost-tracker.sh → cost reports
 ```
 
 ## How Scraping Works: Waves and Agents
@@ -170,7 +205,17 @@ The learning system stores reviewer names (GitHub logins) in `pr-learnings.json`
 # 4. After several Dream Team sessions, analyze retro learnings
 /retro-proposals
 
-# 5. All commands route improvements to the same destination files
+# 5. Analyze your own tool usage patterns
+bash ~/.claude/scripts/analyze-patterns.sh
+/evolve
+
+# 6. Check session costs
+bash ~/.claude/scripts/cost-tracker.sh report
+
+# 7. Health-check your config
+bash ~/.claude/scripts/config-scan.sh
+
+# All learning paths route improvements to the same destination files
 ```
 
 ## Tips
@@ -179,4 +224,7 @@ The learning system stores reviewer names (GitHub logins) in `pr-learnings.json`
 - `/pr-insights` gets more useful with more data: 50+ PRs for initial patterns, 200+ for strong signals
 - `/retro-proposals` gets more useful after 3+ Dream Team sessions
 - Use `--dream-team-only` on `/pr-insights` to measure agent code quality over time
-- Pair both: retros capture **process** learnings, PR insights capture **code quality** learnings
+- Pair all four: retros capture **process** learnings, PR insights capture **code quality** learnings, tool usage captures **behavioral** learnings, Jira pushback captures **ticket quality** learnings
+- Run `analyze-patterns.sh` after a week of sessions — you need volume for meaningful patterns
+- Run `config-scan.sh` after changing settings or adding new hooks — catches misconfigs early
+- `cost-tracker.sh top-sessions` shows which sessions burned the most tool calls — useful for spotting runaway agents

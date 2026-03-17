@@ -65,8 +65,8 @@ Check if the arguments contain `--local`. If present:
 - **Skip Phase 1.5** (no draft PR creation)
 - **Skip Phase 5** (no commit, push, or PR ready)
 - **Skip Phase 6** (no user review loop — stop after review/testing)
-- Still run: architecture (Phase 1), implementation (Phase 2), coordination (Phase 3), code review (Phase 4), testing (Phase 4.5 if flagged)
-- After Maya's review (and Suki's testing if applicable) is clean, **stop and tell the user** that changes are ready for local review with `git diff`
+- Still run: architecture (Phase 1), implementation (Phase 2), coordination (Phase 3), code review (Phase 4), testing (Phase 4.5 if flagged), de-sloppify (Phase 4.9)
+- After Maya's review (and Suki's testing if applicable) is clean and de-sloppify pass is done, **stop and tell the user** that changes are ready for local review with `git diff`
 - Do NOT run retrospective or cleanup phases
 
 Check if the arguments contain `--lite`. If present:
@@ -83,6 +83,7 @@ Check if the arguments contain `--lite`. If present:
   - **Phase 1.5**: Draft PR created
   - **Phase 4.5**: Functional testing (if flagged)
   - **Phase 4.75**: Visual verification hard gate (if UI changes)
+  - **Phase 4.9**: De-sloppify pass (cleanup over-engineering, dead code, defensive bloat)
   - **Phase 5**: Commit, push, drift detection, rebase
   - **Phase 5.5**: Full GitHub review cycle — trigger AI bot reviews (Gemini `/gemini review`), poll for AI feedback, fix any issues, poll CI checks, mark PR ready only after user confirms, then assign reviewers from `reviewers.json`
   - **Phase 6**: User review loop — ask user for feedback, route fixes, iterate until "ship it"
@@ -92,6 +93,12 @@ Check if the arguments contain `--lite`. If present:
   - **Phase 7**: Cleanup — runs the **Completion Gate** first (see `dev-workflow-checklist.md` Section 7): all PR comments resolved, screenshots in `__screenshots__/` next to components, retro done, CI green, PR description complete. Then posts a **Jira completion comment** with PR link + summary, @mentioning the ticket creator if different from assignee. Then transitions ticket to Klart.
 - **Visual verification applies in lite mode too.** The same Phase 4.75 hard gate (Playwright e2e test file + screenshots must exist before push) applies whether you're in full Dream Team or lite mode. Don't skip it just because you're working solo.
 - The key principle: minimize agent overhead for small/medium tasks while keeping all quality gates, feedback loops, and process steps intact.
+- **Context management in lite mode**: Since you're doing all the work yourself (no subagents with separate context windows), context fills up faster. Follow the `strategic-compact` skill:
+  - Compact after Phase 1 (architecture) → before starting implementation
+  - Compact after implementation → before review pass
+  - Compact after review fixes → before Phase 5 (commit/push)
+  - If context hits 70%, compact at the next phase boundary. At 85%, compact immediately.
+- **Context mode**: Lite mode starts in **dev mode** (write code first, explain after). Switch to **review mode** when doing Phase 4 self-review. Switch to **research mode** during Phase 1 analysis. See `context-modes` skill.
 - **Shared quality gates**: Before reporting completion or pushing, follow ALL sections in `~/.claude/docs/dev-workflow-checklist.md`. These gates apply in both Dream Team and lite mode.
 
 Check if the arguments contain `--no-worktree`. If present:
@@ -159,6 +166,26 @@ This phase runs instead of the normal Phase 1-7 workflow when `--resume` is dete
    - What remains to be done
 
 6. **Continue from the appropriate phase** in the normal workflow.
+
+## Phase Cost Tracking
+
+Log tool usage at every phase boundary so costs can be measured and compared across sessions. Run this after each phase completes:
+
+```bash
+bash ~/.claude/scripts/phase-cost-tracker.sh log "<TICKET_ID>" "<phase-name>" "<agent-or-lead>" "<tool-uses>" "<note>"
+```
+
+**Where to get tool_uses:** After each agent returns, its result includes `tool_uses: N`. For the team lead's own work, estimate from the conversation length. Approximate is fine — the goal is relative comparison across sessions, not exact accounting.
+
+**Log at these points:**
+- After Phase 1 (architecture): `"phase-1-architecture" "amara" <amara's tool uses>`
+- After Phase 2 (implementation): `"phase-2-implementation" "kenji+ingrid" <sum of dev agent tool uses>`
+- After Phase 4 (review): `"phase-4-review" "maya" <maya's tool uses>`
+- After Phase 5 (commit/push): `"phase-5-push" "lead" <estimated>`
+- After Phase 5.5 (CI/review cycle): `"phase-5.5-ci-cycle" "lead" <estimated>`
+- After session ends: `"total" "all" <sum>`
+
+**Report:** `bash ~/.claude/scripts/phase-cost-tracker.sh report` or `compare --last 5` to see trends.
 
 ## Workflow
 
@@ -748,6 +775,27 @@ After Maya's code review is approved (all MUST FIX items resolved), spawn:
 - If the "before" is obvious from the ticket screenshots: skip the "before" screenshot and focus on the e2e tests
 
 Tell the user that e2e test files are in `apps/web/tests/e2e/` and screenshots are in `__screenshots__/` next to the component (both committed with PR).
+
+### Phase 4.9: De-Sloppify Pass
+
+Before committing, run a cleanup pass on ALL changed files. This catches over-engineering and defensive bloat that agents naturally introduce.
+
+**You (team lead) do this directly — no agent needed.** Run `git diff --name-only origin/main` and review each changed file for:
+
+1. **Unnecessary defensive code** — Null checks on values that can never be null (e.g., required props, non-nullable DB columns). Remove them.
+2. **Over-engineered error handling** — Try/catch blocks around code that can't throw, or fallback values for impossible states. Simplify.
+3. **Redundant tests** — Tests that duplicate other tests with trivial variations (e.g., "renders with prop X" and "renders with prop X when Y is true" where Y doesn't affect rendering). Delete the redundant ones.
+4. **Unnecessary comments** — Comments restating what the code does (`// Set the name` above `setName(value)`). Delete them. Keep only comments explaining *why*.
+5. **Dead code** — Unused imports, unused variables, unreachable branches. Remove them.
+6. **Premature abstractions** — Helper functions used exactly once, generic wrappers around simple operations, config objects for values that never change. Inline them.
+7. **Unnecessary type assertions** — `as SomeType` that TypeScript can already infer. Remove them.
+8. **Verbose patterns** — `if (x === true)` instead of `if (x)`, `return result === undefined ? undefined : result` instead of `return result`. Simplify.
+
+**How to apply:**
+- Quick scan — spend max 5 minutes on this pass
+- Only fix clear-cut slop, don't refactor working code
+- Run `dotnet build` / `npx tsc --noEmit` after cleanup to verify nothing broke
+- If you find 0 issues, great — move on. Not every session produces slop.
 
 ### Phase 5: Commit, Push & Initial Summary
 
@@ -1503,6 +1551,24 @@ All agents MUST follow these rules to stay within context limits:
 3. **No speculative doc reads.** Only read files when you need specific information. Use Grep to find relevant sections rather than reading entire files.
 
 4. **Summarize before storing.** When you read a large file for reference, write a 5-10 line summary of what you learned to your notes file. Use your summary later — don't re-read the original.
+
+### Team Lead Strategic Compaction (Full Dream Team Mode)
+
+The team lead's context window accumulates agent spawn prompts, coordination messages, and review results. Follow the `strategic-compact` skill:
+
+**Compact at these phase boundaries:**
+- After Phase 1 (Amara returns architecture report) → before spawning dev agents
+- After Phase 3 (all agents coordinated, work in progress) → before spawning Maya
+- After Phase 4 (Maya's review absorbed, fixes routed) → before Phase 5 (commit/push)
+- After Phase 5.5 (CI/review cycle complete) → before Phase 6 (user feedback loop)
+
+**Before compacting, state in your response:**
+- Current phase and what was accomplished
+- Key decisions that must survive compression
+- File paths that will be needed next
+- Which agents are still active
+
+The PreCompact hook automatically saves a CHECKPOINT.md file. Subagents have their own context windows — they don't need the lead's compaction schedule.
 
 5. **Offload completed work.** After finishing a sub-task, write a brief completion note to `## Decisions` (what you did, key decisions, file paths changed). This lets you drop that context from working memory.
 

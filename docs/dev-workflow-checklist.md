@@ -232,6 +232,36 @@ If you added or changed an API integration, **verify the action** — not just t
 
 ---
 
+## Section 5.5: De-Sloppify Pass
+
+Before committing, review all changed files for over-engineering and defensive bloat. This catches patterns that agents naturally introduce.
+
+### What to Look For
+
+| Pattern | Example | Fix |
+|---------|---------|-----|
+| Unnecessary null checks | `if (x !== null)` on a non-nullable prop | Remove the check |
+| Over-engineered error handling | try/catch around code that can't throw | Remove the try/catch |
+| Redundant tests | Tests duplicating others with trivial variations | Delete the redundant test |
+| Unnecessary comments | `// Set the name` above `setName(value)` | Delete the comment |
+| Dead code | Unused imports, unreachable branches | Remove them |
+| Premature abstractions | Helper functions used exactly once | Inline the code |
+| Unnecessary type assertions | `as SomeType` where TS can infer | Remove the assertion |
+| Verbose patterns | `if (x === true)` instead of `if (x)` | Simplify |
+
+### How to Apply
+
+- Quick scan — spend max 5 minutes on this pass
+- Only fix clear-cut slop, don't refactor working code
+- Run `dotnet build` / `npx tsc --noEmit` after cleanup to verify nothing broke
+- If you find 0 issues, great — move on
+
+### In Lite Mode
+
+The team lead does this directly. In full Dream Team mode, the team lead does it in Phase 4.9 (after visual verification, before commit).
+
+---
+
 ## Section 6: Pre-Push Quality Gates
 
 Before the first `git push` on any branch:
@@ -329,6 +359,42 @@ Run the applicable categories based on changed file types:
 - In **full mode**: Maya runs this scan (categories are in her spawn prompt)
 - In **lite mode**: The team lead runs it directly — same categories, same standard
 - Document findings with `file:line` references
+
+---
+
+## Section 7.5: Context Management
+
+### Strategic Compaction
+
+Long sessions degrade output quality. Follow these rules:
+
+**GOOD breakpoints (compact here):**
+- After research/exploration completes — before writing code
+- After a milestone — feature done, tests passing
+- After a debugging session — bug found and fixed
+- After agent results are absorbed — key points noted
+- Phase transitions — between Phase 1→2, 3→4, 4→5
+
+**BAD times (NEVER compact here):**
+- Mid-implementation — you're editing and iterating
+- During code review — need full diff context
+- While debugging — need error context and hypotheses
+- Between related file edits — finish all dependent files first
+
+**Context thresholds:**
+- < 30%: No action needed
+- 50-70%: Look for the next good breakpoint
+- \> 70%: Compact at the VERY NEXT good breakpoint
+- \> 85%: Compact NOW — quality degradation is worse than losing context
+
+### Context Modes
+
+Switch mindset based on current activity:
+- **Dev mode** — "Write code first, explain after." Priorities: working → right → clean.
+- **Review mode** — "Read thoroughly, prioritize by severity." Categorize: MUST FIX / SUGGESTION / QUESTION / PRAISE.
+- **Research mode** — "Read widely before concluding." Don't write code until understanding is clear.
+
+Activate by saying "dev mode" / "review mode" / "research mode". Auto-activates for relevant commands.
 
 ---
 

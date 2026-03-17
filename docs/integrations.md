@@ -186,10 +186,11 @@ Use the architect subagent to analyze what files need changing for this feature
 **Status:** Active
 **Location:** `~/.claude/commands/review-pr.md`
 
-Three ways to invoke:
+Four ways to invoke:
 - `/review-pr` — Auto-detects PR from current branch (fast mode)
 - `/review-pr <PR>` — Fast: GitHub API only
 - `/review-pr <PR> --full` — Full: local worktree at `.claude/worktrees/` + builds + deeper review
+- `/review-pr <PR> --deep` — Deep: 4 parallel review agents (2x convention, 2x bug/security) + independent validation pass to eliminate false positives. Combine with `--full` for maximum depth (`--deep --full`)
 
 See the command file for full workflow details.
 
@@ -209,6 +210,25 @@ bash ~/.claude/scripts/quality-gate.sh <worktree-path> [--backend] [--frontend] 
 - Runs `dotnet build` (backend) and `tsc --noEmit` (frontend)
 - Exits 0 if all checks pass, 1 if any fail
 - Referenced in `~/.claude/docs/dev-workflow-checklist.md` Section 5
+
+### Utility Scripts (Analysis & Optimization)
+
+**Status:** Active
+**Location:** `~/.claude/scripts/`
+
+| Script | Purpose |
+|--------|---------|
+| `analyze-patterns.sh` | Analyze tool usage logs for recurring patterns (context gaps, struggle points, script candidates). Writes instinct summaries to `~/.claude/instincts/`. |
+| `cost-tracker.sh` | Session cost reports from tool usage data. Commands: `report`, `session <id>`, `top-sessions`. |
+| `config-scan.sh` | Security/health scan of your Claude Code config — secrets, performance knobs, hook health, memory size. Grades A-F. Use `--fix` to auto-repair. |
+
+**Usage:**
+```bash
+bash ~/.claude/scripts/analyze-patterns.sh          # Detect patterns from last 7 days
+bash ~/.claude/scripts/cost-tracker.sh report       # Cost report since last week
+bash ~/.claude/scripts/config-scan.sh               # Health check (Grade A-F)
+bash ~/.claude/scripts/config-scan.sh --fix         # Auto-fix what it can
+```
 
 ### CI & AI Review Polling
 
@@ -391,6 +411,11 @@ From https://code.claude.com/docs/en/best-practices:
 | **Subagent investigation** | Architect subagent explores before devs code |
 | **Headless mode** | `claude -p` used in sync-config, CI workflows |
 | **Hooks for guardrails** | Tool usage logging, desktop notifications, migration guard, lock file guard, lint reminders, teammate idle gate, task completed gate |
+| **Strategic compaction** | Compact at phase boundaries (skill: `strategic-compact`) — never mid-implementation |
+| **Context modes** | Dev/review/research mindsets with distinct priorities (skill: `context-modes`) |
+| **Continuous learning** | Tool usage → pattern analysis → instinct generation → `/evolve` to promote |
+| **Cost awareness** | `cost-tracker.sh` reports, relative cost units per tool call |
+| **Config health** | `config-scan.sh` scans for secrets, performance, hygiene (A-F grade) |
 
 ---
 
@@ -412,4 +437,10 @@ From https://code.claude.com/docs/en/best-practices:
 | Commands | `~/.claude/commands/*.md` |
 | Scripts | `~/.claude/scripts/*.sh` |
 | Skills | `~/.claude/skills/*/SKILL.md` |
+| Pattern analysis | `~/.claude/scripts/analyze-patterns.sh` |
+| Cost tracker | `~/.claude/scripts/cost-tracker.sh` |
+| Config scanner | `~/.claude/scripts/config-scan.sh` |
+| Instincts | `~/.claude/instincts/<project-hash>/INSTINCTS.md` |
+| Strategic compaction | `~/.claude/skills/strategic-compact/SKILL.md` |
+| Context modes | `~/.claude/skills/context-modes/SKILL.md` |
 | This doc | `~/.claude/docs/integrations.md` |
