@@ -8,7 +8,7 @@ Quick reference for all available slash commands.
 
 Orchestrates a multi-agent team to implement a Repo feature ticket end-to-end — architecture analysis, backend/frontend implementation, PR review, testing, and GitHub review cycle.
 
-**Flags:** `--lite` · `--local` · `--no-worktree` · `--resume`
+**Flags:** `--lite` · `--interview` · `--local` · `--no-worktree` · `--resume`
 
 ---
 

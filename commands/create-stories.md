@@ -247,51 +247,64 @@ After all pre-hydration agents return, present a summary table to the user:
 
 For any tickets where ACLI failed in Step 1, note "Ticket fetch failed — need details from you" in the table.
 
-#### Step 5: User Confirms Launch Mode Per GO Ticket
+#### Step 3.5: Create ALL Worktrees (Parallel with Pre-Hydration)
 
-The user already decided GO/SKIP/WORKTREE/REFINE in Step 1.5. Now for each **GO** ticket, confirm the implementation mode based on pre-hydration analysis:
+**Worktree creation is deterministic — zero LLM tokens.** Start creating worktrees for ALL GO + JUST WORKTREE tickets immediately after triage, IN PARALLEL with Step 3 (pre-hydration). Don't wait for pre-hydration to finish.
 
-- **"Launch mode for \<TICKET_ID\> (\<SUMMARY\>)? Recommended: \<MODE\>"**
-  - **"Dream Team"** — Full orchestration with Opus architect + agents. Best for medium/large tickets.
-  - **"Lite"** — Sonnet solo session, spawns agents only if needed. Same quality gates, lower cost. Best for small/medium tickets.
-
-Note: "Just worktree" tickets were already separated in Step 1.5 — they skip directly to Phase B Step 6 without pre-hydration.
-
-Save each choice for Phase B.
-
----
-
-### Phase B: Sequential Launch (One Ticket at a Time)
-
-For each ticket, run Steps 6-8 sequentially. Complete one ticket fully before starting the next.
-
-#### Step 6: Pull Latest Main & Create Git Worktree
-
-**Pull latest main once** before the first worktree (not per ticket):
+**Pull latest main once** before creating any worktrees:
 
 ```bash
 cd ~/Documents/Repo && git checkout main && git pull origin main
 ```
 
-Then for each ticket, create the worktree:
+**Then create ALL worktrees in sequence** (git worktree add is fast, ~2 seconds each):
 
 ```bash
+# For each GO or JUST WORKTREE ticket:
 cd ~/Documents/Repo && git worktree add ~/Documents/<TICKET_ID> -b <TICKET_ID>
-```
 
-If the branch already exists:
-```bash
+# If the branch already exists:
 cd ~/Documents/Repo && git worktree add ~/Documents/<TICKET_ID> <TICKET_ID>
 ```
 
-#### Step 7: Install Dependencies & Copy Environment
+**Install dependencies in each** (can run in parallel via background jobs):
 
 ```bash
-cd ~/Documents/<TICKET_ID>/apps/web && source ~/.nvm/nvm.sh && nvm use && npm i
-cp ~/Documents/Repo/apps/web/.env.local ~/Documents/<TICKET_ID>/apps/web/.env.local
+# For each worktree (run these in parallel with &):
+(cd ~/Documents/<TICKET_ID>/apps/web && source ~/.nvm/nvm.sh && nvm use && npm i) &
 ```
 
-#### Step 8: Write Pre-Hydrated Context File
+**Copy environment files + allocate ports:**
+
+```bash
+# For each worktree:
+cp ~/Documents/Repo/apps/web/.env.local ~/Documents/<TICKET_ID>/apps/web/.env.local
+bash ~/.claude/scripts/allocate-ports.sh <TICKET_ID>
+```
+
+Wait for all `npm i` background jobs to finish before proceeding.
+
+**Why this matters:** `npm i` takes 30-60 seconds per worktree. If you have 4 tickets, that's 2-4 minutes — which now runs DURING pre-hydration instead of AFTER it. By the time pre-hydration returns, all worktrees are ready.
+
+#### Step 5: User Confirms Launch Mode Per GO Ticket
+
+Pre-hydration (Step 3) and worktree creation (Step 3.5) should both be complete by now. For each **GO** ticket, confirm the implementation mode based on pre-hydration analysis:
+
+- **"Launch mode for \<TICKET_ID\> (\<SUMMARY\>)? Recommended: \<MODE\>"**
+  - **"Dream Team"** — Full orchestration with Opus architect + agents. Best for medium/large tickets.
+  - **"Lite"** — Sonnet solo session, spawns agents only if needed. Same quality gates, lower cost. Best for small/medium tickets.
+
+Note: "Just worktree" tickets were already separated in Step 1.5 — their worktrees are already created from Step 3.5.
+
+Save each choice for Phase B.
+
+---
+
+### Phase B: Write Context & Launch (One Ticket at a Time)
+
+Worktrees already exist from Step 3.5. Phase B only writes context files and opens terminals — much faster than before.
+
+#### Step 6: Write Pre-Hydrated Context File
 
 Write the pre-hydration results from Step 3 to `.dream-team/context.md` in the worktree. This file is consumed by `/my-dream-team` to skip redundant exploration.
 
@@ -384,7 +397,7 @@ Login sequence: click "More login options" → "Username and password" → fill 
 Screenshots go to `~/Downloads/<TICKET_ID>-*.png`. This is NOT optional for UI changes.
 ```
 
-#### Step 9: Launch Based on User's Choice (from Step 5)
+#### Step 7: Launch Based on User's Choice (from Step 5)
 
 **Check the user's terminal preference** in `~/.claude/CLAUDE.md` under "Workspace Preferences" for the configured terminal app.
 
@@ -406,11 +419,11 @@ Replace `<TERMINAL_APP>` with the configured app (Alacritty, Terminal, iTerm, Wa
 
 **Important:** Escape any special characters (quotes, parentheses) in the ticket text. Keep the description concise.
 
-#### Step 10: Repeat for Next Ticket
+#### Step 8: Repeat for Next Ticket
 
-If there are more tickets, go back to Step 6 for the next ticket.
+If there are more GO tickets, go back to Step 6 for the next ticket.
 
-#### Step 11: Summary
+#### Step 9: Summary
 
 After all tickets are launched, present a summary:
 - List all created workspaces with their ticket IDs and tmux session names
