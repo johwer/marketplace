@@ -137,6 +137,16 @@ if [[ "$RUN_FRONTEND" == "true" ]]; then
       TSC_ERRORS=$(tail -3 /tmp/qg-tsc.log)
       add_result "TypeScript (tsc --noEmit)" "FAIL" "$TSC_ERRORS"
     fi
+
+    # Vitest — only tests related to changed files
+    echo "  → Vitest (changed files only)..."
+    if (cd "$WEB_DIR" && npx vitest run --changed 2>&1) > /tmp/qg-vitest.log 2>&1; then
+      TEST_COUNT=$(grep -oE '[0-9]+ passed' /tmp/qg-vitest.log | tail -1 || echo "passed")
+      add_result "Vitest (--changed)" "PASS" "$TEST_COUNT"
+    else
+      VITEST_ERRORS=$(tail -5 /tmp/qg-vitest.log)
+      add_result "Vitest (--changed)" "FAIL" "$VITEST_ERRORS"
+    fi
   else
     add_result "Frontend (no apps/web found)" "PASS" "skipped"
   fi
