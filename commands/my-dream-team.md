@@ -59,6 +59,16 @@ The user will provide a ticket/story description (Jira, GitHub issue, or plain t
 
 $ARGUMENTS
 
+## Pre-flight skill suggestions
+
+Before starting Phase 1, check the ticket type and suggest the right skill if applicable. Do NOT block — these are suggestions, not gates. If the user says "just do it", skip and proceed.
+
+**Bug tickets** (Jira type = Bug, or description contains "bug", "regression", "fix", "broken"):
+> "This looks like a bug. Want me to run `/triage-issue` first? It investigates root cause, designs a TDD fix plan, and creates a structured Jira ticket — then we can kick off the Dream Team against that plan. Or say 'just implement it' to go straight to Phase 1."
+
+**New service/API tickets** (ticket describes a brand-new endpoint, service, or module with no existing code to extend):
+> "This involves designing a new interface from scratch. Want me to run `/design-an-interface` first? It generates 3 radically different designs in parallel so you can pick the best shape before implementation starts. Or say 'just build it' to let Amara decide the interface in Phase 1."
+
 ## Flags
 
 Check if the arguments contain `--local`. If present:

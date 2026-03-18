@@ -126,7 +126,15 @@ Risk: [what could break — migration path if needed]
 Test: [how to verify the fix didn't change behavior]
 ```
 
-### Step 5 — Implement (if user approves)
+### Step 5 — Plan before implementing (if multiple P1/P2 findings)
+
+If there are 3 or more P1/P2 findings, suggest running `/request-refactor-plan` before touching any code:
+
+> "There are [N] high-priority findings. Want me to run `/request-refactor-plan` first? It turns this into a structured tiny-commit plan filed as a Jira ticket — safer to implement incrementally than all at once. Or say 'just do it' to start implementing now."
+
+If the user confirms, hand off to `/request-refactor-plan` with the audit findings as context.
+
+### Step 6 — Implement (if user approves)
 
 For approved refactors:
 
