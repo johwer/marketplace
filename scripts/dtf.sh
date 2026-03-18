@@ -495,6 +495,13 @@ cmd_doctor() {
     fi
   done
 
+  # Check performance tools
+  if command -v eslint_d &>/dev/null; then
+    ok "eslint_d installed (10x faster ESLint in quality-gate.sh)"
+  else
+    warn "eslint_d not found (optional — install: npm install -g eslint_d)"
+  fi
+
   # Check symlinks
   if [[ -n "$DTF_WORKFLOW_REPO" ]]; then
     local broken=0

@@ -122,8 +122,8 @@ if [[ "$RUN_FRONTEND" == "true" ]]; then
 
     # ESLint (eslint_d if available for ~10x faster warm runs, fallback to eslint)
     echo "  → ESLint..."
-    if (cd "$WEB_DIR" && ./node_modules/.bin/eslint_d --status &>/dev/null); then
-      ESLINT_CMD="./node_modules/.bin/eslint_d"
+    if command -v eslint_d &>/dev/null; then
+      ESLINT_CMD="eslint_d"
     else
       ESLINT_CMD="npx eslint"
     fi
