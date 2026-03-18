@@ -120,10 +120,15 @@ if [[ "$RUN_FRONTEND" == "true" ]]; then
       add_result "Prettier formatting" "FAIL" "$(tail -3 /tmp/qg-prettier.log)"
     fi
 
-    # ESLint
+    # ESLint (eslint_d if available for ~10x faster warm runs, fallback to eslint)
     echo "  → ESLint..."
-    if (cd "$WEB_DIR" && npx eslint --fix . 2>&1) > /tmp/qg-eslint.log 2>&1; then
-      add_result "ESLint" "PASS" ""
+    if (cd "$WEB_DIR" && ./node_modules/.bin/eslint_d --status &>/dev/null); then
+      ESLINT_CMD="./node_modules/.bin/eslint_d"
+    else
+      ESLINT_CMD="npx eslint"
+    fi
+    if (cd "$WEB_DIR" && $ESLINT_CMD --fix . 2>&1) > /tmp/qg-eslint.log 2>&1; then
+      add_result "ESLint" "PASS" "($ESLINT_CMD)"
     else
       ESLINT_ERRORS=$(grep -c "error" /tmp/qg-eslint.log 2>/dev/null || echo "?")
       add_result "ESLint" "FAIL" "$ESLINT_ERRORS errors (see /tmp/qg-eslint.log)"
