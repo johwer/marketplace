@@ -121,10 +121,15 @@ if [ ! -f "$WEB_ENV" ] && [ -f "$MEDHELP_ROOT/apps/web/.env.local" ]; then
     cp "$MEDHELP_ROOT/apps/web/.env.local" "$WEB_ENV"
 fi
 
-# Strip any previous worktree port block (between markers), then re-append
+# Strip any previous worktree port block (between markers) and stale VITE_DEV_PORT outside markers
 if [ -f "$WEB_ENV" ]; then
-    awk '/^# --- WORKTREE PORTS START ---$/{skip=1; next} /^# --- WORKTREE PORTS END ---$/{skip=0; next} !skip' \
+    awk '/^# --- WORKTREE PORTS START ---$/{skip=1; next} /^# --- WORKTREE PORTS END ---$/{skip=0; next} !skip && !/^VITE_DEV_PORT=/' \
         "$WEB_ENV" > "$WEB_ENV.tmp" && mv "$WEB_ENV.tmp" "$WEB_ENV"
+fi
+
+# Ensure trailing newline before appending (source .env.local may lack one)
+if [ -f "$WEB_ENV" ] && [ -s "$WEB_ENV" ] && [ "$(tail -c 1 "$WEB_ENV" | xxd -p)" != "0a" ]; then
+    echo "" >> "$WEB_ENV"
 fi
 
 cat >> "$WEB_ENV" << EOF

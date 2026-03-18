@@ -69,8 +69,17 @@ Check if the arguments contain `--local`. If present:
 - After Maya's review (and Suki's testing if applicable) is clean and de-sloppify pass is done, **stop and tell the user** that changes are ready for local review with `git diff`
 - Do NOT run retrospective or cleanup phases
 
+Check if the arguments contain `--interview`. If present:
+- **Before any other phase**, interview the user about the ticket using the AskUserQuestion tool
+- Ask about: technical constraints they know about, edge cases, UX expectations, things the ticket description doesn't cover, dependencies on other work, and what "done" looks like to them
+- Don't ask obvious questions — dig into the hard parts they might not have considered
+- Keep interviewing until you've covered everything (typically 3-6 questions)
+- Write the findings to `.dream-team/interview.md` in the worktree
+- Amara (or you in lite mode) reads this file in Phase 1 — the interview findings take priority over assumptions from the ticket text
+- Can be combined with any other flag (`--lite --interview`, `--local --interview`)
+
 Check if the arguments contain `--lite`. If present:
-- **Phase 1 (Architecture)**: YOU do the analysis directly — don't spawn Amara. **Always read the full Jira ticket description** — the title alone can mislead scope. Read the relevant docs, explore the codebase, determine scope, key files, and conventions. Produce the same architecture report format Amara would.
+- **Phase 1 (Architecture)**: YOU do the analysis directly — don't spawn Amara. **Always read the full Jira ticket description** — the title alone can mislead scope. Read the relevant docs, explore the codebase, determine scope, key files, and conventions. Produce the same architecture report format Amara would. **If `--interview` was used, read `.dream-team/interview.md` first** — the user's answers override ticket assumptions.
 - **Phase 2 (Implementation)**: Based on complexity, decide:
   - **Simple** (1-3 files, single area): Implement directly yourself, no agents needed
   - **Medium** (4-8 files, single discipline): Optionally spawn 1 dev agent (Ingrid or Kenji)
@@ -98,7 +107,13 @@ Check if the arguments contain `--lite`. If present:
   - Compact after implementation → before review pass
   - Compact after review fixes → before Phase 5 (commit/push)
   - If context hits 70%, compact at the next phase boundary. At 85%, compact immediately.
-- **Context mode**: Lite mode starts in **dev mode** (write code first, explain after). Switch to **review mode** when doing Phase 4 self-review. Switch to **research mode** during Phase 1 analysis. See `context-modes` skill.
+- **Explicit phase gates in lite mode** (Explore → Plan → Implement → Commit):
+  - **Explore** (research mode): Read the ticket, explore the codebase, understand the problem. Do NOT write code yet. Output: architecture report.
+  - **Plan** (research mode): Present the implementation plan to the user. Wait for confirmation before proceeding. If the user says "just do it", skip the wait.
+  - **Implement** (dev mode): Write code against the plan. Run build/tests after every meaningful edit.
+  - **Commit** (dev mode): Run quality-gate.sh, de-sloppify, commit, push.
+  Each transition is a natural compact point (see strategic compaction above).
+- **Context mode** follows the phase gates: **research mode** during Explore+Plan, **dev mode** during Implement+Commit, **review mode** during Phase 4 self-review. See `context-modes` skill.
 - **Shared quality gates**: Before reporting completion or pushing, follow ALL sections in `~/.claude/docs/dev-workflow-checklist.md`. These gates apply in both Dream Team and lite mode.
 
 Check if the arguments contain `--no-worktree`. If present:
@@ -226,6 +241,7 @@ bash ~/.claude/scripts/phase-cost-tracker.sh log "<TICKET_ID>" "<phase-name>" "<
      - **E2e test plan for all UI tickets**: For every UI change, identify: (a) which page paths need Playwright e2e tests, (b) which seed data IDs enable direct navigation, (c) which ServiceC permissions need mocking (if access control), (d) which component `__screenshots__/` directories should contain the test output. Include this in your report — the frontend dev will write the tests alongside the implementation.
      - **E2e conventions**: customerId is UUID format, not numeric. Tables use `clickableRows`, not `<a>` links — use `row.click()` not `a[href]` for table row navigation in Playwright tests.
      - **Design intent check**: For new features, verify the implementation approach matches the ticket's stated purpose — not just code quality. Flag when the proposed solution solves a different problem than what was described.
+     - **If `.dream-team/interview.md` exists** (from `--interview` flag), read it first — the user's answers take priority over assumptions from the ticket text
      - Analyze the ticket/story provided
      - **Check for Jira attachments**: If the ticket mentions attached images, screenshots, or design references, use **Playwright CLI** to browse `https://your-company.atlassian.net/browse/<TICKET_ID>` and view attachments: `playwright-cli -s=amara open https://your-company.atlassian.net/browse/<TICKET_ID> --headed`. Use `playwright-cli snapshot` to get element refs and `playwright-cli screenshot --filename=jira-attachment.png` to capture images. Images are the source of truth over text descriptions if they conflict. Include key visual details (colors, layout, shapes) in your architecture report so dev agents have the specs. If authentication is needed, ask the user to log in via the headed browser.
      - Explore the codebase to determine what files/services are affected. **Start with Glob patterns for file/folder names** before grepping file contents — folder naming often differs from code naming conventions (e.g., `medicalcertificate` vs `MedicalCertificate`).
