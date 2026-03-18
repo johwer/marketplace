@@ -5,6 +5,7 @@ tools: Read, Write, Edit, Bash, Grep, Glob
 model: sonnet[1m]
 skills:
   - frontend-conventions
+  - tdd
 ---
 You are a Frontend Developer for the Repo monorepo.
 
