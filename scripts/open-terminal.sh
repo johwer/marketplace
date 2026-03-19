@@ -43,12 +43,23 @@ require_linux() {
   fi
 }
 
+# Write COMMAND to a temp script to avoid quote-stripping in nested bash -c shells.
+# mktemp template must end with X's (no .sh suffix) to work on macOS.
+make_tmpscript() {
+  local tmp
+  tmp="$(mktemp /tmp/terminal-launch-XXXXXX)"
+  printf '#!/bin/bash\n%s\n' "$COMMAND" > "$tmp"
+  chmod +x "$tmp"
+  echo "$tmp"
+}
+
 case "$TERMINAL_APP" in
 
   # --- Cross-platform ---
 
   Alacritty)
-    alacritty -e bash -c "$COMMAND" &
+    TMPSCRIPT="$(make_tmpscript)"
+    alacritty -e "$TMPSCRIPT" &
     ;;
 
   Warp)
@@ -67,20 +78,24 @@ tell application \"System Events\"
 end tell"
     else
       # Linux: Warp supports CLI launch
-      warp-terminal -e bash -c "$COMMAND" &
+      TMPSCRIPT="$(make_tmpscript)"
+      warp-terminal -e "$TMPSCRIPT" &
     fi
     ;;
 
   Kitty)
-    kitty --detach bash -c "$COMMAND"
+    TMPSCRIPT="$(make_tmpscript)"
+    kitty --detach "$TMPSCRIPT"
     ;;
 
   WezTerm)
-    wezterm start -- bash -c "$COMMAND" &
+    TMPSCRIPT="$(make_tmpscript)"
+    wezterm start -- "$TMPSCRIPT" &
     ;;
 
   Ghostty)
-    ghostty -e bash -c "$COMMAND" &
+    TMPSCRIPT="$(make_tmpscript)"
+    ghostty -e "$TMPSCRIPT" &
     ;;
 
   # --- macOS only ---
@@ -108,12 +123,14 @@ end tell"
 
   GNOME-Terminal)
     require_linux
-    gnome-terminal -- bash -c "$COMMAND; exec bash"
+    TMPSCRIPT="$(make_tmpscript)"
+    gnome-terminal -- bash -c "$TMPSCRIPT; exec bash"
     ;;
 
   Konsole)
     require_linux
-    konsole -e bash -c "$COMMAND; exec bash" &
+    TMPSCRIPT="$(make_tmpscript)"
+    konsole -e bash -c "$TMPSCRIPT; exec bash" &
     ;;
 
   # --- Windows (WSL) ---
@@ -121,7 +138,8 @@ end tell"
   Windows-Terminal)
     if grep -qi microsoft /proc/version 2>/dev/null; then
       # Inside WSL: use cmd.exe to open a new Windows Terminal tab running in WSL
-      cmd.exe /c "wt.exe -w 0 nt wsl.exe bash -c \"$COMMAND\"" &
+      TMPSCRIPT="$(make_tmpscript)"
+      cmd.exe /c "wt.exe -w 0 nt wsl.exe bash -c \"$TMPSCRIPT\"" &
     else
       echo "Error: Windows-Terminal is only supported inside WSL (Windows Subsystem for Linux)"
       echo "Cross-platform alternatives: Alacritty, Kitty, WezTerm, Ghostty"
