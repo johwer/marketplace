@@ -380,18 +380,43 @@ generate_claude_md() {
   local repo_dir="$1" monorepo="$2" terminal="$3"
   local template="$repo_dir/CLAUDE.md.template"
   local output="$CLAUDE_DIR/CLAUDE.md"
+  local dtf_start="<!-- DTF:START -->"
+  local dtf_end="<!-- DTF:END -->"
 
   if [[ ! -f "$template" ]]; then
     warn "No CLAUDE.md.template in repo — skipping CLAUDE.md generation"
     return
   fi
 
-  sed \
+  # Render template with personal values
+  local rendered
+  rendered=$(sed \
     -e "s|{{MONOREPO_PATH}}|$monorepo|g" \
     -e "s|{{TERMINAL}}|$terminal|g" \
-    "$template" > "$output"
+    "$template")
 
-  ok "Generated CLAUDE.md with monorepo=$monorepo, terminal=$terminal"
+  local dtf_block
+  dtf_block=$(printf '%s\n%s\n%s' "$dtf_start" "$rendered" "$dtf_end")
+
+  if [[ ! -f "$output" ]]; then
+    # Fresh install — write DTF block + personal section placeholder
+    printf '%s\n\n## Personal\n\n<!-- Add your personal customizations below. DTF will never touch this section. -->\n' \
+      "$dtf_block" > "$output"
+    ok "Generated CLAUDE.md"
+  elif grep -q "$dtf_start" "$output"; then
+    # Existing file with DTF section — replace only between markers
+    local before after
+    before=$(sed "/$dtf_start/,\$d" "$output")
+    after=$(sed "1,/$dtf_end/d" "$output")
+    printf '%s%s\n%s' "$before" "$dtf_block" "$after" > "$output"
+    ok "Merged CLAUDE.md (DTF section updated, personal content preserved)"
+  else
+    # Existing file without markers — prepend DTF block, keep rest as personal
+    local existing
+    existing=$(cat "$output")
+    printf '%s\n\n%s' "$dtf_block" "$existing" > "$output"
+    ok "Merged CLAUDE.md (DTF section prepended, existing content preserved)"
+  fi
 }
 
 # ──────────────────────────────────────────────
