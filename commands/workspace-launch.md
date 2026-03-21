@@ -20,6 +20,14 @@ $ARGUMENTS
 
 ## Workflow
 
+### Step 0: Quick Health Check
+
+Run memory health check (0 token cost):
+```bash
+bash ~/.claude/scripts/memory-health.sh
+```
+Only mention if there are warnings. If clean, proceed silently.
+
 ### Step 1: Fetch Ticket from Jira
 
 **Primary method — ACLI CLI:**

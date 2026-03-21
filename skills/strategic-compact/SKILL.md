@@ -46,6 +46,7 @@ Before suggesting /compact:
 3. **State what phase you're in** and what comes next
 4. The PreCompact hook will automatically save a CHECKPOINT.md file
 
+
 ## Dream Team Integration
 
 For Dream Team sessions, the team lead should compact:

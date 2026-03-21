@@ -31,7 +31,9 @@ Public repo (generic framework)
 
 | Command | What it does |
 |---------|-------------|
-| `dtf install <URL> [--company-config <path>]` | Full setup: clone, wizard, symlinks, de-sanitize, generate CLAUDE.md |
+| `dtf install <URL> [--company-config <path>]` | Full setup: clone, wizard (role + steps), symlinks, de-sanitize, generate CLAUDE.md |
+| `dtf configure` | Set or change role and workflow steps (works for existing users) |
+| `dtf steps <list\|add\|remove\|reset>` | Manage personal workflow steps anytime |
 | `dtf update` | Pull latest, verify symlinks, re-merge settings, regenerate CLAUDE.md |
 | `dtf doctor` | Health check: config, symlinks, required tools (jq, tmux, gh) |
 | `dtf contribute` | Export session retro learnings as a PR to the workflow repo |
@@ -69,12 +71,22 @@ Shared by a team lead with new members. Defines company-specific values:
 
 ### Personal Config (`~/.claude/dtf-config.json`)
 
-Per-user, never committed. Created by `dtf install`:
+Per-user, never committed. Created by `dtf install` or updated by `dtf configure`:
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "user": { "name": "...", "githubUsername": "..." },
+  "role": "frontend-dev",
+  "roleConfig": {
+    "displayName": "Developer (Frontend)",
+    "agents": ["engineering/frontend-dev", "engineering/architect", "engineering/pr-reviewer"],
+    "skills": ["frontend-conventions", "tdd", "playwright-cli"]
+  },
+  "workflowSteps": [
+    { "name": "ESLint check", "type": "automated", "command": "npm run lint", "when": "before-commit" },
+    { "name": "Visual verification", "type": "reminder", "when": "before-pr" }
+  ],
   "paths": { "monorepo": "...", "worktreeParent": "...", "workflowRepo": "..." },
   "extraPaths": { "frontendApp": "apps/web" },
   "terminal": "Alacritty"
@@ -82,6 +94,18 @@ Per-user, never committed. Created by `dtf install`:
 ```
 
 All command files read this config via a **Config Resolution** section — paths adapt per user automatically.
+
+### Role-Based Setup
+
+DTF supports 12 roles beyond just developers. The wizard asks for your role during `dtf install`, or existing users can run `dtf configure` to add role and workflow steps.
+
+See [dtf-roles.md](dtf-roles.md) for the full reference — roles, agents, skills, workflow steps, and plugin recommendations.
+
+### Custom Workflow Steps
+
+Each role has default workflow steps (reminders and automated checks). Users customize them:
+- During install: accept defaults, remove, or add custom steps
+- Anytime: `dtf steps add` / `dtf steps remove` / `dtf steps list` / `dtf steps reset`
 
 ### Shared Learnings
 
@@ -95,14 +119,17 @@ After Dream Team sessions, retro learnings stay local per user. When ready to sh
 1. Team lead shares `company-config.json` (Slack, email, or in the company fork)
 2. New member runs: `dtf install <REPO_URL> --company-config company-config.json`
 3. Answers personal questions (name, monorepo path, terminal)
-4. Done — all commands, scripts, agents, hooks are symlinked and ready
+4. **Selects their role** — determines which agents, skills, and workflow steps they get
+5. **Customizes workflow steps** — accepts defaults or tailors to their process
+6. Done — all commands, scripts, agents, hooks are symlinked and ready
 
 ### Files
 
 | File | Purpose |
 |------|---------|
-| `scripts/dtf.sh` | Main CLI |
+| `scripts/dtf.sh` | Main CLI (install, configure, steps, update, doctor, contribute) |
 | `scripts/dtf-env.sh` | Config loader (exports DTF_* vars for scripts) |
+| `docs/dtf-roles.md` | Full role reference — agents, skills, steps, plugins |
 | `dtf-config.template.json` | Template for personal config |
 | `company-config.example.json` | Example company config with all options documented |
 | `CLAUDE.md.template` | Template with `{{MONOREPO_PATH}}`, `{{TERMINAL}}` placeholders |
