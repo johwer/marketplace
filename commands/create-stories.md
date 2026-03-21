@@ -94,7 +94,16 @@ Before creating new workspaces, check if any existing worktrees have merged/clos
 
 4. **If no stale worktrees**, skip silently and proceed.
 
-5. **Also kill any orphan tmux sessions** that don't have a matching worktree:
+5. **Memory health check** — run the bash script (0 token cost) and report if action is needed:
+   ```bash
+   bash ~/.claude/scripts/memory-health.sh
+   ```
+   If it reports warnings (MEMORY.md over budget, dream-team-learnings > 500 lines, stale files), show the output and ask:
+   > Memory health check found [N] suggestion(s). Want me to clean up now, or skip and continue?
+
+   If they say yes, use the `memory-hygiene` skill to handle it. If no, proceed — don't nag.
+
+6. **Also kill any orphan tmux sessions** that don't have a matching worktree:
    ```bash
    tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^PROJ-'
    ```

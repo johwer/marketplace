@@ -5,6 +5,9 @@
 # Commands:
 #   install <REPO_URL> [--company-config <path>] [--to <dir>]  Install DTF from a repo
 #   update                                                       Pull latest + verify
+#   configure                                                    Set/change role and workflow steps
+#   steps <list|add|remove|reset>                                Manage workflow steps
+#   apply-config <path-to-company-config.json> [--update]        Apply company config after install
 #   doctor                                                       Check installation health
 #   contribute                                                   Export learnings as PR
 #
@@ -19,6 +22,76 @@ DTF_VERSION="1.0.0"
 
 # Terminals supported
 TERMINALS=("Alacritty" "Terminal" "iTerm" "Warp" "Kitty" "WezTerm" "Ghostty" "GNOME-Terminal" "Konsole" "Windows-Terminal")
+
+# Roles: display|key pairs (pipe-separated to avoid associative array issues)
+ROLE_COUNT=12
+ROLE_DISPLAY=("Developer (Frontend)" "Developer (Backend)" "Developer (Fullstack)" "Data Engineer" "Data Analyst" "Infrastructure / DevOps" "QA / Tester (E2E, automation)" "UAT / QA Stakeholder (staging testing, no code)" "Product Owner" "Sales" "Marketing" "Customer Operations")
+ROLE_KEY=("frontend-dev" "backend-dev" "fullstack-dev" "data-engineer" "data-analyst" "infra" "tester" "uat-tester" "po" "sales" "marketing" "customer-ops")
+
+# Lookup functions for role config (avoids declare -A compatibility issues)
+get_role_agents() {
+  case "$1" in
+    frontend-dev)  echo "engineering/frontend-dev engineering/architect engineering/pr-reviewer engineering/api-designer design/ui-designer" ;;
+    backend-dev)   echo "engineering/backend-dev engineering/architect engineering/pr-reviewer engineering/api-designer engineering/migration-planner" ;;
+    fullstack-dev) echo "engineering/frontend-dev engineering/backend-dev engineering/architect engineering/pr-reviewer engineering/api-designer engineering/performance-analyst engineering/migration-planner" ;;
+    data-engineer) echo "data/data-engineer data/pipeline-builder data/insights-reporter engineering/architect" ;;
+    data-analyst)  echo "data/data-analyst data/insights-reporter" ;;
+    infra)         echo "infrastructure/infra-engineer infrastructure/ci-cd-engineer infrastructure/security-auditor" ;;
+    tester)        echo "testing/qa-tester testing/api-tester testing/performance-benchmarker" ;;
+    uat-tester)    echo "testing/uat-tester" ;;
+    po)            echo "product/po-analyst product/requirements-analyst product/sprint-prioritizer engineering/architect" ;;
+    sales)         echo "marketing/sales-enablement data/data-analyst data/insights-reporter" ;;
+    marketing)     echo "marketing/marketing-ops marketing/content-creator marketing/social-strategist" ;;
+    customer-ops)  echo "operations/customer-ops operations/support-responder" ;;
+    *)             echo "" ;;
+  esac
+}
+
+get_role_skills() {
+  case "$1" in
+    frontend-dev)  echo "frontend-conventions frontend-performance tdd playwright-cli visual-development-workflow mermaid-diagram code-insights" ;;
+    backend-dev)   echo "backend-conventions backend-performance tdd mermaid-diagram code-insights" ;;
+    fullstack-dev) echo "frontend-conventions backend-conventions frontend-performance backend-performance tdd playwright-cli visual-development-workflow mermaid-diagram data-conventions code-insights" ;;
+    data-engineer) echo "data-conventions data-analysis-workflows mermaid-diagram" ;;
+    data-analyst)  echo "data-analysis-workflows" ;;
+    infra)         echo "infra-conventions aws-performance" ;;
+    tester)        echo "testing-workflows playwright-cli" ;;
+    uat-tester)    echo "uat-workflows" ;;
+    po)            echo "po-workflows mermaid-diagram" ;;
+    sales)         echo "presentation-workflows" ;;
+    marketing)     echo "content-workflows" ;;
+    customer-ops)  echo "" ;;
+    *)             echo "" ;;
+  esac
+}
+
+get_role_external_skills() {
+  case "$1" in
+    data-engineer) echo "AltimateAI/data-engineering-skills (dbt models, Snowflake optimization)" ;;
+    data-analyst)  echo "AltimateAI/data-engineering-skills (dbt + SQL skills)" ;;
+    infra)         printf "LukasNiessen/terrashark (Terraform failure-mode skill)\nterramate-io/agent-skills (37 Terraform rules)\na-pavithraa/aws-serverless-skill (Lambda, DynamoDB, API Gateway)" ;;
+    tester)        printf "PramodDutta/qaskills (20+ QA skills)\nproffesor-for-testing/agentic-qe (AI-powered test generation)\nsharmasundip/playwright-qa-skills (no-code recording)" ;;
+    *)             echo "" ;;
+  esac
+}
+
+get_role_default_steps() {
+  case "$1" in
+    frontend-dev)  echo '[{"name":"ESLint check","type":"automated","command":"npm run lint","when":"before-commit"},{"name":"Code insights (quick nudges + DTO analysis)","type":"reminder","when":"before-push"},{"name":"Visual verification","type":"reminder","when":"before-pr"},{"name":"Screenshot capture","type":"reminder","when":"before-pr"},{"name":"Accessibility check","type":"reminder","when":"before-pr"}]' ;;
+    backend-dev)   echo '[{"name":"CSharpier format","type":"automated","command":"dotnet csharpier .","when":"before-commit"},{"name":"Run unit tests","type":"automated","command":"dotnet test","when":"before-push"},{"name":"Code insights (quick nudges + DTO analysis)","type":"reminder","when":"before-push"},{"name":"Swagger validation","type":"reminder","when":"before-pr"}]' ;;
+    fullstack-dev) echo '[{"name":"ESLint check","type":"automated","command":"npm run lint","when":"before-commit"},{"name":"CSharpier format","type":"automated","command":"dotnet csharpier .","when":"before-commit"},{"name":"Run all tests","type":"automated","command":"dotnet test && npm run test","when":"before-push"},{"name":"Code insights (quick nudges + DTO analysis)","type":"reminder","when":"before-push"},{"name":"Visual verification","type":"reminder","when":"before-pr"},{"name":"Screenshot capture","type":"reminder","when":"before-pr"}]' ;;
+    data-engineer) echo '[{"name":"dbt build","type":"automated","command":"dbt build","when":"before-push"},{"name":"dbt test","type":"automated","command":"dbt test","when":"before-push"},{"name":"SQL review","type":"reminder","when":"before-pr"}]' ;;
+    data-analyst)  echo '[{"name":"Notebook outputs cleared","type":"reminder","when":"before-commit"},{"name":"SQL queries documented","type":"reminder","when":"before-push"},{"name":"Findings summarized","type":"reminder","when":"before-pr"}]' ;;
+    infra)         echo '[{"name":"terraform fmt","type":"automated","command":"terraform fmt -check -recursive infra/","when":"before-commit"},{"name":"terraform validate","type":"automated","command":"cd infra && terraform validate","when":"before-commit"},{"name":"No secrets in code","type":"reminder","when":"before-commit"},{"name":"terraform plan","type":"automated","command":"bash ~/.claude/scripts/terraform-plan-summary.sh","when":"before-push"},{"name":"WAF rules: rate limits set","type":"reminder","when":"before-pr"},{"name":"Monitoring: alarms + Slack channel","type":"reminder","when":"before-pr"},{"name":"Tags on all resources","type":"reminder","when":"before-pr"},{"name":"GH Actions workflows verified","type":"automated","command":"bash ~/.claude/scripts/verify-infra-workflows.sh","when":"before-pr"}]' ;;
+    tester)        echo '[{"name":"Test plan documented","type":"reminder","when":"on-start"},{"name":"All tests passing","type":"automated","command":"npm run test:e2e","when":"before-pr"},{"name":"Coverage report reviewed","type":"reminder","when":"before-pr"}]' ;;
+    uat-tester)    echo '[{"name":"Acceptance criteria listed","type":"reminder","when":"on-start"},{"name":"All user roles tested","type":"reminder","when":"before-pr"},{"name":"Permission matrix verified","type":"reminder","when":"before-pr"},{"name":"Bug reports filed","type":"reminder","when":"after-pr"}]' ;;
+    po)            echo '[{"name":"Impact analysis done","type":"reminder","when":"on-start"},{"name":"Acceptance criteria written","type":"reminder","when":"before-pr"},{"name":"Stakeholders notified","type":"reminder","when":"after-pr"}]' ;;
+    sales)         echo '[{"name":"Data sources verified","type":"reminder","when":"on-start"},{"name":"ROI calculated","type":"reminder","when":"before-pr"},{"name":"Customer-specific data checked","type":"reminder","when":"before-pr"}]' ;;
+    marketing)     echo '[{"name":"SEO keywords checked","type":"reminder","when":"before-push"},{"name":"Multi-language considered","type":"reminder","when":"before-pr"},{"name":"Brand voice reviewed","type":"reminder","when":"before-pr"}]' ;;
+    customer-ops)  echo '[{"name":"Mapping validated","type":"reminder","when":"before-push"},{"name":"Existing customer patterns checked","type":"reminder","when":"on-start"},{"name":"Acceptance test in staging","type":"reminder","when":"before-pr"}]' ;;
+    *)             echo '[]' ;;
+  esac
+}
 
 # Directories to symlink
 SYMLINK_DIRS=("commands" "scripts" "agents" "docs")
@@ -39,12 +112,13 @@ header(){ echo ""; echo "=== $1 ==="; echo ""; }
 
 ask() {
   local prompt="$1" default="$2" var="$3"
+  local input=""
   if [[ -n "$default" ]]; then
     read -rp "  $prompt [$default]: " input
-    eval "$var=\"${input:-$default}\""
+    printf -v "$var" '%s' "${input:-$default}"
   else
     read -rp "  $prompt: " input
-    eval "$var=\"$input\""
+    printf -v "$var" '%s' "$input"
   fi
 }
 
@@ -56,13 +130,32 @@ ask_choice() {
   for i in "${!options[@]}"; do
     echo "    $((i+1)). ${options[$i]}"
   done
+  local choice=""
   read -rp "  Choose [1]: " choice
   choice="${choice:-1}"
   local idx=$((choice - 1))
   if [[ $idx -ge 0 && $idx -lt ${#options[@]} ]]; then
-    eval "$var=\"${options[$idx]}\""
+    printf -v "$var" '%s' "${options[$idx]}"
   else
-    eval "$var=\"${options[0]}\""
+    printf -v "$var" '%s' "${options[0]}"
+  fi
+}
+
+# Ask for role and set role_display + role_key
+ask_role() {
+  echo "  What's your primary role?"
+  for i in "${!ROLE_DISPLAY[@]}"; do
+    echo "    $((i+1)). ${ROLE_DISPLAY[$i]}"
+  done
+  read -rp "  Choose [1]: " choice
+  choice="${choice:-1}"
+  local idx=$((choice - 1))
+  if [[ $idx -ge 0 && $idx -lt $ROLE_COUNT ]]; then
+    role_display="${ROLE_DISPLAY[$idx]}"
+    role_key="${ROLE_KEY[$idx]}"
+  else
+    role_display="${ROLE_DISPLAY[0]}"
+    role_key="${ROLE_KEY[0]}"
   fi
 }
 
@@ -136,6 +229,118 @@ cmd_install() {
   ask "Parent directory for worktrees" "$default_worktree" worktree_parent
   ask_choice "Preferred terminal" terminal "${TERMINALS[@]}"
 
+  # 3b. Ask about role
+  echo ""
+  local role_display="" role_key=""
+  ask_role
+  ok "Role: $role_display ($role_key)"
+
+  # Show recommended external skills for this role
+  local ext_skills
+  ext_skills=$(get_role_external_skills "$role_key")
+  if [[ -n "$ext_skills" ]]; then
+    echo ""
+    info "Recommended external skills for your role:"
+    echo -e "$ext_skills" | while IFS= read -r skill; do
+      [[ -n "$skill" ]] && info "  → $skill"
+    done
+    echo ""
+    info "You can install these later. See ~/.claude/docs/dtf-roles.md for install commands."
+  fi
+
+  # 3c. Configure workflow steps
+  local default_steps
+  default_steps=$(get_role_default_steps "$role_key")
+  local workflow_steps="$default_steps"
+
+  if [[ "$default_steps" != "[]" ]]; then
+    echo ""
+    header "Workflow Steps"
+    info "Default steps for your role:"
+    echo "$default_steps" | jq -r '.[] | "  [\(.when)] \(.name) (\(.type))"'
+    echo ""
+
+    local customize_steps
+    read -rp "  Customize these steps? (y/N): " customize_steps
+    if [[ "$customize_steps" =~ ^[yY] ]]; then
+      # Let user remove steps
+      local step_count
+      step_count=$(echo "$default_steps" | jq 'length')
+      info "Enter step numbers to REMOVE (comma-separated), or press Enter to keep all:"
+      for i in $(seq 0 $((step_count - 1))); do
+        local step_name step_when step_type
+        step_name=$(echo "$default_steps" | jq -r ".[$i].name")
+        step_when=$(echo "$default_steps" | jq -r ".[$i].when")
+        step_type=$(echo "$default_steps" | jq -r ".[$i].type")
+        echo "    $((i+1)). [$step_when] $step_name ($step_type)"
+      done
+      local remove_indices
+      read -rp "  Remove: " remove_indices
+
+      if [[ -n "$remove_indices" ]]; then
+        # Build jq filter to remove selected indices (convert 1-based to 0-based)
+        local jq_filter="[.[] | select(false"
+        workflow_steps="$default_steps"
+        for idx in $(echo "$remove_indices" | tr ',' ' '); do
+          idx=$((idx - 1))
+          workflow_steps=$(echo "$workflow_steps" | jq "del(.[$idx])")
+        done
+        # Re-index after deletion (jq handles this automatically)
+      fi
+
+      # Let user add custom steps
+      local add_custom
+      read -rp "  Add custom steps? (y/N): " add_custom
+      while [[ "$add_custom" =~ ^[yY] ]]; do
+        local step_name step_type step_when step_command=""
+        ask "Step name" "" step_name
+        ask_choice "Step type" step_type "reminder" "automated"
+        if [[ "$step_type" == "automated" ]]; then
+          ask "Shell command to run" "" step_command
+        fi
+        ask_choice "When to trigger" step_when "before-commit" "before-push" "before-pr" "after-pr" "on-start"
+
+        if [[ "$step_type" == "automated" ]]; then
+          workflow_steps=$(echo "$workflow_steps" | jq \
+            --arg n "$step_name" --arg t "$step_type" --arg c "$step_command" --arg w "$step_when" \
+            '. + [{"name":$n,"type":$t,"command":$c,"when":$w}]')
+        else
+          workflow_steps=$(echo "$workflow_steps" | jq \
+            --arg n "$step_name" --arg t "$step_type" --arg w "$step_when" \
+            '. + [{"name":$n,"type":$t,"when":$w}]')
+        fi
+        ok "Added: [$step_when] $step_name ($step_type)"
+        read -rp "  Add another step? (y/N): " add_custom
+      done
+    fi
+  else
+    # No default steps — offer to add custom ones
+    echo ""
+    local add_custom
+    read -rp "  Add custom workflow steps? (y/N): " add_custom
+    while [[ "$add_custom" =~ ^[yY] ]]; do
+      local step_name step_type step_when step_command=""
+      ask "Step name" "" step_name
+      ask_choice "Step type" step_type "reminder" "automated"
+      if [[ "$step_type" == "automated" ]]; then
+        ask "Shell command to run" "" step_command
+      fi
+      ask_choice "When to trigger" step_when "before-commit" "before-push" "before-pr" "after-pr" "on-start"
+
+      if [[ "$step_type" == "automated" ]]; then
+        workflow_steps=$(echo "$workflow_steps" | jq \
+          --arg n "$step_name" --arg t "$step_type" --arg c "$step_command" --arg w "$step_when" \
+          '. + [{"name":$n,"type":$t,"command":$c,"when":$w}]')
+      else
+        workflow_steps=$(echo "$workflow_steps" | jq \
+          --arg n "$step_name" --arg t "$step_type" --arg w "$step_when" \
+          '. + [{"name":$n,"type":$t,"when":$w}]')
+      fi
+      ok "Added: [$step_when] $step_name ($step_type)"
+      read -rp "  Add another step? (y/N): " add_custom
+    done
+  fi
+
   # 4. Ask about extra paths from company config
   local extra_paths_json="{}"
   if [[ -n "$company_config" && -f "$company_config" ]]; then
@@ -172,13 +377,47 @@ cmd_install() {
 
   # 6. Write dtf-config.json
   mkdir -p "$CLAUDE_DIR"
+
+  # Resolve company config to absolute path if provided
+  local abs_company_config=""
+  if [[ -n "$company_config" && -f "$company_config" ]]; then
+    abs_company_config=$(cd "$(dirname "$company_config")" && echo "$(pwd)/$(basename "$company_config")")
+  fi
+
+  # Build role config
+  local role_agents
+  role_agents=$(get_role_agents "$role_key")
+  local role_skills
+  role_skills=$(get_role_skills "$role_key")
+
+  # Convert space-separated lists to JSON arrays
+  local agents_json="[]"
+  if [[ -n "$role_agents" ]]; then
+    agents_json=$(echo "$role_agents" | tr ' ' '\n' | jq -R . | jq -s .)
+  fi
+  local skills_json="[]"
+  if [[ -n "$role_skills" ]]; then
+    skills_json=$(echo "$role_skills" | tr ' ' '\n' | jq -R . | jq -s .)
+  fi
+
+  # Format workflow steps (compact)
+  local steps_json
+  steps_json=$(echo "$workflow_steps" | jq -c '.')
+
   cat > "$DTF_CONFIG" << EOF
 {
-  "version": 1,
+  "version": 2,
   "user": {
     "name": "$user_name",
     "githubUsername": "$gh_user"
   },
+  "role": "$role_key",
+  "roleConfig": {
+    "displayName": "$role_display",
+    "agents": $agents_json,
+    "skills": $skills_json
+  },
+  "workflowSteps": $(echo "$workflow_steps" | jq '.'),
   "paths": {
     "monorepo": "$monorepo",
     "worktreeParent": "$worktree_parent",
@@ -188,6 +427,14 @@ cmd_install() {
   "terminal": "$terminal"
 }
 EOF
+
+  # Add companyConfig field if provided (use jq to keep valid JSON)
+  if [[ -n "$abs_company_config" ]]; then
+    local tmp
+    tmp=$(jq --arg p "$abs_company_config" '.companyConfig = $p' "$DTF_CONFIG")
+    echo "$tmp" > "$DTF_CONFIG"
+  fi
+
   ok "Config written to $DTF_CONFIG"
 
   # 5. Create symlinks
@@ -297,24 +544,44 @@ create_symlinks() {
 
     mkdir -p "$dst"
 
-    # Symlink each file individually (not the directory) to allow personal files too
+    # Symlink files in top-level directory
+    local file_count=0
     for f in "$src"/*; do
-      [[ ! -f "$f" ]] && continue
-      local basename=$(basename "$f")
-      local target="$dst/$basename"
+      if [[ -f "$f" ]]; then
+        local basename=$(basename "$f")
+        local target="$dst/$basename"
 
-      # Skip personal files
-      local skip=false
-      for pf in "${PERSONAL_FILES[@]}"; do
-        [[ "$basename" == "$pf" ]] && skip=true
-      done
-      $skip && continue
+        # Skip personal files
+        local skip=false
+        for pf in "${PERSONAL_FILES[@]}"; do
+          [[ "$basename" == "$pf" ]] && skip=true
+        done
+        $skip && continue
 
-      # Remove existing file/symlink
-      [[ -e "$target" || -L "$target" ]] && rm -f "$target"
-      ln -s "$f" "$target"
+        [[ -e "$target" || -L "$target" ]] && rm -f "$target"
+        ln -s "$f" "$target"
+        file_count=$((file_count + 1))
+      fi
     done
-    ok "$dir/ — $(ls -1 "$src" | wc -l | tr -d ' ') files linked"
+
+    # Symlink subdirectories (e.g., agents/engineering/, agents/product/)
+    for subdir in "$src"/*/; do
+      [[ ! -d "$subdir" ]] && continue
+      local subdir_name=$(basename "$subdir")
+      local dst_subdir="$dst/$subdir_name"
+
+      mkdir -p "$dst_subdir"
+      for f in "$subdir"*; do
+        [[ ! -f "$f" ]] && continue
+        local basename=$(basename "$f")
+        local target="$dst_subdir/$basename"
+        [[ -e "$target" || -L "$target" ]] && rm -f "$target"
+        ln -s "$f" "$target"
+        file_count=$((file_count + 1))
+      done
+    done
+
+    ok "$dir/ — $file_count files linked"
   done
 
   # Symlink skill directories
@@ -486,6 +753,19 @@ cmd_doctor() {
     issues=$((issues + 1))
   fi
 
+  # Check company config
+  local cc_path
+  cc_path=$(jq -r '.companyConfig // empty' "$DTF_CONFIG" 2>/dev/null || true)
+  if [[ -n "$cc_path" ]]; then
+    if [[ -f "$cc_path" ]]; then
+      ok "Company config: $cc_path"
+    else
+      warn "Company config not found at: $cc_path (file moved?)"
+    fi
+  else
+    info "No company config applied — run: dtf apply-config <path>"
+  fi
+
   # Check workflow repo
   if [[ -n "$DTF_WORKFLOW_REPO" && -d "$DTF_WORKFLOW_REPO/.git" ]]; then
     ok "Workflow repo: $DTF_WORKFLOW_REPO"
@@ -642,6 +922,364 @@ cmd_contribute() {
 }
 
 # ──────────────────────────────────────────────
+# dtf apply-config
+# ──────────────────────────────────────────────
+
+cmd_apply_config() {
+  if [[ ! -f "$DTF_CONFIG" ]]; then
+    err "DTF not installed. Run: dtf install <REPO_URL>"
+    exit 1
+  fi
+
+  source "$CLAUDE_DIR/scripts/dtf-env.sh"
+
+  local company_config="" do_update=false
+
+  # Parse args
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --update) do_update=true; shift ;;
+      -*) err "Unknown flag: $1"; exit 1 ;;
+      *) company_config="$1"; shift ;;
+    esac
+  done
+
+  if [[ -z "$company_config" ]]; then
+    err "Usage: dtf apply-config <path-to-company-config.json> [--update]"
+    exit 1
+  fi
+
+  if [[ ! -f "$company_config" ]]; then
+    err "Company config not found: $company_config"
+    exit 1
+  fi
+
+  if [[ -z "$DTF_WORKFLOW_REPO" || ! -d "$DTF_WORKFLOW_REPO" ]]; then
+    err "Workflow repo not found at: $DTF_WORKFLOW_REPO"
+    exit 1
+  fi
+
+  header "Dream Team Flow — Apply Company Config"
+
+  # Optionally pull latest first
+  if $do_update; then
+    info "Pulling latest..."
+    cd "$DTF_WORKFLOW_REPO" && git pull
+    ok "Repo updated"
+  fi
+
+  # Save company config path (absolute) in dtf-config.json for reference
+  local abs_company_config
+  abs_company_config=$(cd "$(dirname "$company_config")" && echo "$(pwd)/$(basename "$company_config")")
+  local updated
+  updated=$(jq --arg p "$abs_company_config" '.companyConfig = $p' "$DTF_CONFIG")
+  echo "$updated" > "$DTF_CONFIG"
+  ok "Saved company config reference: $abs_company_config"
+
+  # Apply company config (de-sanitization)
+  apply_company_config "$DTF_WORKFLOW_REPO" "$company_config"
+
+  # Check for extra paths in company config that are missing from dtf-config.json
+  local extra_keys
+  extra_keys=$(jq -r '.extraPaths // {} | keys[]' "$company_config" 2>/dev/null || true)
+  if [[ -n "$extra_keys" ]]; then
+    local existing_extras
+    existing_extras=$(jq -r '.extraPaths // {} | keys[]' "$DTF_CONFIG" 2>/dev/null || true)
+    local missing_keys=()
+    while IFS= read -r key; do
+      if ! echo "$existing_extras" | grep -qx "$key"; then
+        missing_keys+=("$key")
+      fi
+    done <<< "$extra_keys"
+
+    if [[ ${#missing_keys[@]} -gt 0 ]]; then
+      header "Project-Specific Paths"
+      info "Company config defines paths not yet in your personal config:"
+      echo ""
+      local updated_config
+      updated_config=$(cat "$DTF_CONFIG")
+      for key in "${missing_keys[@]}"; do
+        local desc=$(jq -r ".extraPaths[\"$key\"].description // \"$key\"" "$company_config")
+        local default_val=$(jq -r ".extraPaths[\"$key\"].default // \"\"" "$company_config")
+        local val
+        ask "$desc" "$default_val" val
+        updated_config=$(echo "$updated_config" | jq --arg k "$key" --arg v "$val" '.extraPaths += {($k): $v}')
+      done
+      echo "$updated_config" > "$DTF_CONFIG"
+      ok "Updated dtf-config.json with new paths"
+      # Re-source to pick up new values
+      source "$CLAUDE_DIR/scripts/dtf-env.sh"
+    fi
+  fi
+
+  # Refresh symlinks (file contents changed via sed)
+  info "Refreshing symlinks..."
+  create_symlinks "$DTF_WORKFLOW_REPO"
+
+  # Re-merge settings (content may have changed)
+  merge_settings "$DTF_WORKFLOW_REPO"
+
+  # Re-generate CLAUDE.md (template content may have changed)
+  generate_claude_md "$DTF_WORKFLOW_REPO" "$DTF_MONOREPO" "$DTF_TERMINAL"
+
+  header "Company Config Applied"
+  info "Run 'dtf doctor' to verify everything looks correct."
+}
+
+# ──────────────────────────────────────────────
+# dtf configure — set/change role and workflow (works for existing users)
+# ──────────────────────────────────────────────
+
+cmd_configure() {
+  if [[ ! -f "$DTF_CONFIG" ]]; then
+    err "DTF not installed. Run: dtf install <REPO_URL>"
+    exit 1
+  fi
+
+  header "Configure Your Role & Workflow"
+
+  local current_role
+  current_role=$(jq -r '.role // "not set"' "$DTF_CONFIG")
+  local current_display
+  current_display=$(jq -r '.roleConfig.displayName // "not set"' "$DTF_CONFIG")
+  info "Current role: $current_display ($current_role)"
+  echo ""
+
+  # 1. Choose role
+  local role_display="" role_key=""
+  ask_role
+  ok "Role: $role_display ($role_key)"
+
+  # 2. Show recommended external skills
+  local ext_skills
+  ext_skills=$(get_role_external_skills "$role_key")
+  if [[ -n "$ext_skills" ]]; then
+    echo ""
+    info "Recommended external skills for your role:"
+    echo -e "$ext_skills" | while IFS= read -r skill; do
+      [[ -n "$skill" ]] && info "  → $skill"
+    done
+  fi
+
+  # 3. Configure workflow steps
+  local default_steps
+  default_steps=$(get_role_default_steps "$role_key")
+  local workflow_steps="$default_steps"
+
+  if [[ "$default_steps" != "[]" ]]; then
+    echo ""
+    info "Default workflow steps for $role_display:"
+    echo "$default_steps" | jq -r '.[] | "  [\(.when)] \(.name) (\(.type))"'
+    echo ""
+
+    local customize_steps
+    read -rp "  Customize these steps? (y/N): " customize_steps
+    if [[ "$customize_steps" =~ ^[yY] ]]; then
+      local step_count
+      step_count=$(echo "$default_steps" | jq 'length')
+      info "Enter step numbers to REMOVE (comma-separated), or press Enter to keep all:"
+      for i in $(seq 0 $((step_count - 1))); do
+        local step_name step_when step_type
+        step_name=$(echo "$default_steps" | jq -r ".[$i].name")
+        step_when=$(echo "$default_steps" | jq -r ".[$i].when")
+        step_type=$(echo "$default_steps" | jq -r ".[$i].type")
+        echo "    $((i+1)). [$step_when] $step_name ($step_type)"
+      done
+      local remove_indices
+      read -rp "  Remove: " remove_indices
+
+      if [[ -n "$remove_indices" ]]; then
+        for idx in $(echo "$remove_indices" | tr ',' ' ' | sort -rn); do
+          idx=$((idx - 1))
+          workflow_steps=$(echo "$workflow_steps" | jq "del(.[$idx])")
+        done
+      fi
+
+      local add_custom
+      read -rp "  Add custom steps? (y/N): " add_custom
+      while [[ "$add_custom" =~ ^[yY] ]]; do
+        local step_name step_type step_when step_command=""
+        ask "Step name" "" step_name
+        ask_choice "Step type" step_type "reminder" "automated"
+        if [[ "$step_type" == "automated" ]]; then
+          ask "Shell command to run" "" step_command
+        fi
+        ask_choice "When to trigger" step_when "before-commit" "before-push" "before-pr" "after-pr" "on-start"
+
+        if [[ "$step_type" == "automated" ]]; then
+          workflow_steps=$(echo "$workflow_steps" | jq \
+            --arg n "$step_name" --arg t "$step_type" --arg c "$step_command" --arg w "$step_when" \
+            '. + [{"name":$n,"type":$t,"command":$c,"when":$w}]')
+        else
+          workflow_steps=$(echo "$workflow_steps" | jq \
+            --arg n "$step_name" --arg t "$step_type" --arg w "$step_when" \
+            '. + [{"name":$n,"type":$t,"when":$w}]')
+        fi
+        ok "Added: [$step_when] $step_name ($step_type)"
+        read -rp "  Add another step? (y/N): " add_custom
+      done
+    fi
+  fi
+
+  # 4. Build role config
+  local role_agents
+  role_agents=$(get_role_agents "$role_key")
+  local role_skills
+  role_skills=$(get_role_skills "$role_key")
+  local agents_json="[]"
+  if [[ -n "$role_agents" ]]; then
+    agents_json=$(echo "$role_agents" | tr ' ' '\n' | jq -R . | jq -s .)
+  fi
+  local skills_json="[]"
+  if [[ -n "$role_skills" ]]; then
+    skills_json=$(echo "$role_skills" | tr ' ' '\n' | jq -R . | jq -s .)
+  fi
+
+  # 5. Update config (preserve existing paths, user, terminal, extraPaths)
+  local updated
+  updated=$(jq \
+    --arg role "$role_key" \
+    --arg display "$role_display" \
+    --argjson agents "$agents_json" \
+    --argjson skills "$skills_json" \
+    --argjson steps "$workflow_steps" \
+    '.version = 2 |
+     .role = $role |
+     .roleConfig = {"displayName": $display, "agents": $agents, "skills": $skills} |
+     .workflowSteps = $steps' "$DTF_CONFIG")
+  echo "$updated" > "$DTF_CONFIG"
+
+  ok "Config updated!"
+  echo ""
+  info "Your workflow:"
+  echo "$workflow_steps" | jq -r '.[] | "  [\(.when)] \(.name) (\(.type))"'
+  echo ""
+  info "Manage steps anytime with: dtf steps <list|add|remove|reset>"
+}
+
+# ──────────────────────────────────────────────
+# dtf steps — manage workflow steps
+# ──────────────────────────────────────────────
+
+cmd_steps() {
+  if [[ ! -f "$DTF_CONFIG" ]]; then
+    err "DTF not installed. Run: dtf install <REPO_URL>"
+    exit 1
+  fi
+
+  local subcmd="${1:-list}"
+  shift 2>/dev/null || true
+
+  case "$subcmd" in
+    list)
+      header "Workflow Steps"
+      local steps
+      steps=$(jq -r '.workflowSteps // []' "$DTF_CONFIG")
+      local count
+      count=$(echo "$steps" | jq 'length')
+
+      if [[ "$count" -eq 0 ]]; then
+        info "No workflow steps configured."
+        info "Add one with: dtf steps add"
+        return
+      fi
+
+      # Group by 'when'
+      for phase in "on-start" "before-commit" "before-push" "before-pr" "after-pr"; do
+        local phase_steps
+        phase_steps=$(echo "$steps" | jq -r "[.[] | select(.when == \"$phase\")]")
+        local phase_count
+        phase_count=$(echo "$phase_steps" | jq 'length')
+        if [[ "$phase_count" -gt 0 ]]; then
+          echo "  [$phase]"
+          echo "$phase_steps" | jq -r '.[] | "    \(if .type == "automated" then "⚡" else "📋" end) \(.name)\(if .command then " → " + .command else "" end)"'
+        fi
+      done
+      echo ""
+      info "⚡ = automated  📋 = reminder"
+      ;;
+
+    add)
+      local step_name step_type step_when step_command=""
+      ask "Step name" "" step_name
+      ask_choice "Step type" step_type "reminder" "automated"
+      if [[ "$step_type" == "automated" ]]; then
+        ask "Shell command to run" "" step_command
+      fi
+      ask_choice "When to trigger" step_when "before-commit" "before-push" "before-pr" "after-pr" "on-start"
+
+      local updated
+      if [[ "$step_type" == "automated" ]]; then
+        updated=$(jq \
+          --arg n "$step_name" --arg t "$step_type" --arg c "$step_command" --arg w "$step_when" \
+          '.workflowSteps += [{"name":$n,"type":$t,"command":$c,"when":$w}]' "$DTF_CONFIG")
+      else
+        updated=$(jq \
+          --arg n "$step_name" --arg t "$step_type" --arg w "$step_when" \
+          '.workflowSteps += [{"name":$n,"type":$t,"when":$w}]' "$DTF_CONFIG")
+      fi
+      echo "$updated" > "$DTF_CONFIG"
+      ok "Added: [$step_when] $step_name ($step_type)"
+      ;;
+
+    remove)
+      local steps
+      steps=$(jq -r '.workflowSteps // []' "$DTF_CONFIG")
+      local count
+      count=$(echo "$steps" | jq 'length')
+
+      if [[ "$count" -eq 0 ]]; then
+        info "No steps to remove."
+        return
+      fi
+
+      info "Current steps:"
+      for i in $(seq 0 $((count - 1))); do
+        local name when type
+        name=$(echo "$steps" | jq -r ".[$i].name")
+        when=$(echo "$steps" | jq -r ".[$i].when")
+        type=$(echo "$steps" | jq -r ".[$i].type")
+        echo "    $((i+1)). [$when] $name ($type)"
+      done
+
+      local idx
+      ask "Step number to remove" "" idx
+      if [[ -n "$idx" && "$idx" -ge 1 && "$idx" -le "$count" ]]; then
+        local removed_name
+        removed_name=$(echo "$steps" | jq -r ".[$((idx-1))].name")
+        local updated
+        updated=$(jq "del(.workflowSteps[$((idx-1))])" "$DTF_CONFIG")
+        echo "$updated" > "$DTF_CONFIG"
+        ok "Removed: $removed_name"
+      else
+        err "Invalid step number."
+      fi
+      ;;
+
+    reset)
+      # Reset to role defaults
+      source "$CLAUDE_DIR/scripts/dtf-env.sh" 2>/dev/null || true
+      local role
+      role=$(jq -r '.role // empty' "$DTF_CONFIG")
+      if [[ -z "$role" ]]; then
+        err "No role configured."
+        return
+      fi
+      local default_steps
+      default_steps=$(get_role_default_steps "$role")
+      local updated
+      updated=$(jq --argjson s "$default_steps" '.workflowSteps = $s' "$DTF_CONFIG")
+      echo "$updated" > "$DTF_CONFIG"
+      ok "Reset to default steps for role: $role"
+      ;;
+
+    *)
+      echo "Usage: dtf steps <list|add|remove|reset>"
+      ;;
+  esac
+}
+
+# ──────────────────────────────────────────────
 # Main dispatcher
 # ──────────────────────────────────────────────
 
@@ -649,10 +1287,13 @@ cmd="${1:-help}"
 shift 2>/dev/null || true
 
 case "$cmd" in
-  install)    cmd_install "$@" ;;
-  update)     cmd_update "$@" ;;
-  doctor)     cmd_doctor "$@" ;;
-  contribute) cmd_contribute "$@" ;;
+  install)      cmd_install "$@" ;;
+  update)       cmd_update "$@" ;;
+  apply-config) cmd_apply_config "$@" ;;
+  configure)    cmd_configure "$@" ;;
+  doctor)       cmd_doctor "$@" ;;
+  contribute)   cmd_contribute "$@" ;;
+  steps)        cmd_steps "$@" ;;
   version)    echo "dtf v$DTF_VERSION" ;;
   help|--help|-h)
     echo "dtf — Dream Team Flow CLI v$DTF_VERSION"
@@ -663,6 +1304,20 @@ case "$cmd" in
     echo ""
     echo "  update"
     echo "    Pull latest changes, verify symlinks, regenerate CLAUDE.md"
+    echo ""
+    echo "  apply-config <path-to-company-config.json> [--update]"
+    echo "    Apply company config after install (de-sanitize service names, etc.)"
+    echo "    Use --update to also pull latest changes first"
+    echo ""
+    echo "  configure"
+    echo "    Set or change your role and workflow steps (works for existing users)"
+    echo ""
+    echo "  steps <list|add|remove|reset>"
+    echo "    Manage your personal workflow steps"
+    echo "    list    — Show current steps grouped by phase"
+    echo "    add     — Add a new step (reminder or automated)"
+    echo "    remove  — Remove a step by number"
+    echo "    reset   — Reset to role defaults"
     echo ""
     echo "  doctor"
     echo "    Check installation health"
