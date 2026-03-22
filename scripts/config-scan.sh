@@ -50,6 +50,9 @@ fi
 if [ -f "$CLAUDE_DIR/settings.json" ]; then
   if jq -e '.skipDangerousModePermissionPrompt == true' "$CLAUDE_DIR/settings.json" &>/dev/null; then
     warning "skipDangerousModePermissionPrompt is enabled — all tools run without confirmation"
+    info "  → Required for Dream Team autonomous mode"
+    info "  → Mitigate with permissions.deny rules in settings.json (see Security Guide Level 2)"
+    info "  → Example: deny rm -rf, deny git push --force, deny network access to specific hosts"
   fi
 fi
 
@@ -66,10 +69,16 @@ fi
 ok "Hook scripts scanned for injection patterns"
 
 # Scan installed skills for suspicious patterns
+# Allowlist: known skills with legitimate eval/shell patterns
+SKILL_ALLOWLIST="anthropic-skill-creator|anthropic-pdf|anthropic-docx|anthropic-pptx|anthropic-xlsx|context-optimization|playwright-cli|code-review-skill"
 SKILL_ISSUES=0
 for skill_dir in "$CLAUDE_DIR"/skills/*/; do
   [ ! -d "$skill_dir" ] && continue
   skill_name=$(basename "$skill_dir")
+  # Skip allowlisted skills
+  if echo "$skill_name" | grep -qE "^($SKILL_ALLOWLIST)$"; then
+    continue
+  fi
   # Check for shell execution in SKILL.md that could be dangerous
   for f in "$skill_dir"*.md "$skill_dir"**/*.md; do
     [ ! -f "$f" ] && continue
