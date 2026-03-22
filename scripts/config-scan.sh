@@ -65,6 +65,75 @@ if [ -f "$CLAUDE_DIR/settings.json" ]; then
 fi
 ok "Hook scripts scanned for injection patterns"
 
+# Scan installed skills for suspicious patterns
+SKILL_ISSUES=0
+for skill_dir in "$CLAUDE_DIR"/skills/*/; do
+  [ ! -d "$skill_dir" ] && continue
+  skill_name=$(basename "$skill_dir")
+  # Check for shell execution in SKILL.md that could be dangerous
+  for f in "$skill_dir"*.md "$skill_dir"**/*.md; do
+    [ ! -f "$f" ] && continue
+    # Look for dangerous patterns outside of code blocks (``` fenced blocks are examples)
+    # Extract non-fenced content and check for: curl piped to sh, eval, rm -rf /, chmod 777
+    NON_FENCED=$(awk '/^```/{skip=!skip; next} !skip{print}' "$f" 2>/dev/null)
+    if echo "$NON_FENCED" | grep -qiE '(curl|wget)\s+[^#]*\|.*sh|eval\s|rm\s+-rf\s+/|chmod\s+777' 2>/dev/null; then
+      warning "Suspicious pattern in skill $skill_name/$(basename "$f") — review manually"
+      SKILL_ISSUES=$((SKILL_ISSUES + 1))
+    fi
+    # Look for hardcoded API keys/tokens
+    if grep -qiE '(api[_-]?key|secret|token)\s*[:=]\s*["\x27][A-Za-z0-9+/=_-]{20,}' "$f" 2>/dev/null; then
+      issue "Possible secret in skill $skill_name/$(basename "$f")"
+    fi
+  done
+done
+if [ "$SKILL_ISSUES" -eq 0 ]; then
+  ok "Skills scanned: no suspicious patterns in $(ls -d "$CLAUDE_DIR"/skills/*/ 2>/dev/null | wc -l | tr -d ' ') skills"
+fi
+
+# Scan agent definitions for overly broad tool access
+AGENT_ISSUES=0
+for agent_file in "$CLAUDE_DIR"/agents/**/*.md "$CLAUDE_DIR"/agents/*.md; do
+  [ ! -f "$agent_file" ] && continue
+  agent_name=$(basename "$agent_file" .md)
+  # Check for dangerous tool combinations
+  if grep -qiE 'tools:.*Bash' "$agent_file" 2>/dev/null; then
+    if grep -qiE 'model:.*opus' "$agent_file" 2>/dev/null; then
+      : # Opus with Bash is fine (trusted model)
+    else
+      # Sonnet with Bash — note but don't flag
+      : # info "Agent $agent_name: Sonnet model with Bash access"
+    fi
+  fi
+done
+
+# Check company-config.json for issues
+COMPANY_CONFIG="$CLAUDE_DIR/company-config.json"
+if [ -f "$COMPANY_CONFIG" ]; then
+  # Check for real credentials
+  if grep -qiE '(password|secret|api.?key)\s*[:=]\s*"[^"]{8,}"' "$COMPANY_CONFIG" 2>/dev/null; then
+    issue "Possible credentials in company-config.json"
+  else
+    ok "company-config.json: no credentials detected"
+  fi
+  # Check it's valid JSON
+  if ! jq empty "$COMPANY_CONFIG" 2>/dev/null; then
+    warning "company-config.json is not valid JSON"
+  fi
+fi
+
+# Check permissions section
+if [ -f "$CLAUDE_DIR/settings.json" ]; then
+  # Count allowed permissions
+  ALLOW_COUNT=$(jq '[.permissions // {} | to_entries[] | select(.value == "allow")] | length' "$CLAUDE_DIR/settings.json" 2>/dev/null || echo 0)
+  DENY_COUNT=$(jq '[.. | objects | select(.deny) | .deny[]] | length' "$CLAUDE_DIR/settings.json" 2>/dev/null || echo 0)
+  info "Permissions: $ALLOW_COUNT allowed, $DENY_COUNT denied"
+
+  # Check for wildcard allows
+  if jq -e '.permissions | to_entries[] | select(.key == "*" and .value == "allow")' "$CLAUDE_DIR/settings.json" &>/dev/null 2>&1; then
+    warning "Wildcard permission allow (*) — all tools run without confirmation"
+  fi
+fi
+
 # Check MCP server count
 if [ -f "$CLAUDE_DIR/settings.json" ]; then
   MCP_COUNT=$(jq '.mcpServers // {} | length' "$CLAUDE_DIR/settings.json" 2>/dev/null || echo 0)
