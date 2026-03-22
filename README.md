@@ -17,7 +17,7 @@ dtf configure
 | Type | Count | Highlights |
 |------|-------|-----------|
 | **Agents** | 29 (8 domains) | Engineering, data, infra, testing, product, marketing, design, operations |
-| **Skills** | 42 | Conventions, performance, code review, security, workflows per role |
+| **Skills** | 74+ | Conventions, performance, code review, security, marketing, official Anthropic (PDF/PPTX/XLSX/DOCX) |
 | **Commands** | 21 | Dream Team orchestration, PR review, ticket triage, infra workflows |
 | **Scripts** | 33 | Quality gates, terraform plan, memory health, cost tracking |
 | **Roles** | 12 | Frontend, Backend, Fullstack, Data, Infra, QA, UAT, PO, Sales, Marketing, Ops |
