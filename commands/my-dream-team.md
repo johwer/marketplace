@@ -89,7 +89,7 @@ Check if the arguments contain `--interview`. If present:
 - Can be combined with any other flag (`--lite --interview`, `--local --interview`)
 
 Check if the arguments contain `--lite`. If present:
-- **Phase 1 (Architecture)**: YOU do the analysis directly — don't spawn Amara. **Always read the full Jira ticket description** — the title alone can mislead scope. Read the relevant docs, explore the codebase, determine scope, key files, and conventions. Produce the same architecture report format Amara would. **If `--interview` was used, read `.dream-team/interview.md` first** — the user's answers override ticket assumptions.
+- **Phase 1 (Architecture)**: YOU do the analysis directly — don't spawn Amara. **Always read the full Jira ticket description** (via `acli jira workitem view <TICKET_ID>` or browsing Jira) — the title alone can mislead scope. Do NOT implement based on the command argument text alone; it may describe a proposed solution rather than the actual problem. Read the relevant docs, explore the codebase, determine scope, key files, and conventions. Produce the same architecture report format Amara would. **If `--interview` was used, read `.dream-team/interview.md` first** — the user's answers override ticket assumptions.
 - **Phase 2 (Implementation)**: Based on complexity, decide:
   - **Simple** (1-3 files, single area): Implement directly yourself, no agents needed
   - **Medium** (4-8 files, single discipline): Optionally spawn 1 dev agent (Ingrid or Kenji)
@@ -273,6 +273,7 @@ bash ~/.claude/scripts/phase-cost-tracker.sh log "<TICKET_ID>" "<phase-name>" "<
        - **Spawn the data engineer (Mei)** when the ticket involves: complex database queries, report generation, data aggregation/service-e, data mapping between models, or features in the Reports & ServiceE / Analytics Dashboard area. Mei handles the data layer (query services, data mappers, report generators) while Kenji focuses on API endpoints/controllers. If the backend work is primarily data-heavy (mostly queries and transformations), spawn Mei instead of a second backend dev — not both.
        - **Bias toward fewer agents.** Each extra agent costs coordination overhead and token budget. Only add one if the work is genuinely parallelizable (not just large). When in doubt, use one dev.
        - **Check team sizing history**: Read `your project memory directory (see Config Resolution above) for `dream-team-history.json`` (if it exists). If past sessions with similar ticket types used extra devs, check whether it helped (fewer review rounds) or hurt (coordination issues in journal highlights). Calibrate accordingly.
+       - **Tiny scope (<30 lines, 1-2 files)**: Recommend `--lite` mode — spawning 3+ agents for a 1-file change wastes coordination overhead. Flag this in your report: "Recommend --lite for this scope."
        - **Full-stack tickets with 15+ files**: Consider recommending `--lite` mode to the team lead — coordination overhead from multiple agents can exceed the parallelism benefit on large tickets, and context exhaustion mid-session is a known risk.
      - **Model tier decision**: For each dev agent, recommend a model tier based on task complexity:
        - **`opus`** — Complex architectural work, multi-service coordination, tricky edge cases, domain model changes. Use for: Amara (always), Diego.
@@ -445,7 +446,10 @@ Based on the tech-architect's scope assessment, spawn the needed agents. **Use t
   - For API authentication in local dev: `bash scripts/local-api-login.sh` stores token at `/tmp/repo-local-dev-token`
   - **Testing**: Write unit tests only when you're adding new service methods with testable logic, or modifying code that already has tests. Don't write tests for thin controller wrappers or simple CRUD with no logic. If the architect's analysis says "no tests needed", skip them. **Unit tests** are for single-layer behavior (mock dependencies). **Integration tests** are for cross-layer flows (DB -> service -> controller). Choose the right level based on what you're testing.
   - **Message handler reliability (CRITICAL)**: When writing `IHandleMessages<T>` handlers (Rebus/RabbitMQ), every handler MUST be **idempotent** — safe to execute multiple times with the same message. RabbitMQ delivers at-least-once, meaning duplicates WILL happen. Use atomic DB upserts (`ON CONFLICT DO UPDATE`), not check-then-create. Never call other services synchronously from handlers (temporal coupling). Never swallow exceptions — re-throw so Rebus retries. See `docs/CODING_STYLE_BACKEND.md` → "Message Reliability Patterns" for full patterns and code examples.
+  - **UserCompany resolver scope warning**: Before adding CRUD operations via `resolver.UserCompany(UserPermission, CompanyAction)`, ask the team lead about scope implications — UserCompany grants CompanyAction for ALL assignment scopes including user-scoped. Use `resolver.Company(CompanyPermission, CompanyAction)` for company-level mutations unless elevation is explicitly desired.
+  - **Minimal auth mapping for 500 fixes**: When fixing a 500 error in an auth check, find the minimal mapping needed (read-only first) rather than mirroring full CRUD permissions. Avoid granting broader access than needed.
   - **Seed data for access control**: For access control features, ensure seed data exists for BOTH the entity owner AND a non-owner with access — so frontend can test masking/visibility. If seed data is missing, add it to `scripts/database-init/`.
+  - **Seed summary UNION ALL must mirror DELETE block**: Every table deleted in the seed reset block should appear in the summary UNION ALL query, and vice versa. Missing tables cause silent data inconsistencies.
   - **Formatting**: Run `dotnet csharpier .` on your changed files before reporting completion. Fix any formatting issues — these will fail the GitHub build if left unfixed.
   - **Context management**: Follow the Context Management Protocol (see below). Create your notes file at `.dream-team/notes/kenji.md`.
   - **Communication**: Follow the Communication Protocol (see below). Your contacts: `ingrid` (frontend), `diego` (infra), `amara` (architect). Be proactive — when you complete an API endpoint, message `ingrid` immediately with details and any contract deviations.
@@ -523,6 +527,7 @@ Based on the tech-architect's scope assessment, spawn the needed agents. **Use t
   - If the architect provided an API contract, build your RTK Query types and components against it. You don't need to wait for backend — work in parallel.
   - **API code generation (CRITICAL — stale types cause review churn)**: Don't run `npm run generate:api:<service>` until Kenji messages you that the Docker service is up and gives you the port. The codegen config points at the main stack (port 500x) by default — you MUST use the worktree port via env var: `VITE_<SERVICE>_API_PORT=<port> npm run generate:api:<service>`. After regeneration, **verify the generated types include the new fields** Kenji added (grep for the field name in the generated file). If they don't, the swagger is stale — ask Kenji to rebuild. Do NOT use `as Parameters<...>` or `as unknown as` type assertions as a workaround for missing generated types — these hide real type mismatches and will be flagged as MUST FIX in review. If you need types before Kenji rebuilds, use manual interface types, then swap to generated types once available. **Current limitation**: Docker services run on static ports, so only one workspace can run a given service at a time — don't try to start your own Docker service.
   - **Ambiguous requirements**: If the ticket doesn't clearly specify UI behavior, message the team lead. Do NOT guess — wrong guesses waste more context than asking.
+  - **Empty-state / first-visit checkpoint**: Before reporting completion, verify what renders when there's no data (empty lists, null values, new users with no history). If Amara's report flagged empty-state scenarios, test each one.
   - **Completion protocol**: When done, use the **Completion → Team Lead** template from the Communication Protocol. If testing is needed, also send a **Dev → Tester handoff** to Suki with what to test and edge cases. Always include `git diff --name-only` output in your `files_touched`.
   - **TSDoc updates**: When changing component behavior (e.g., changing from NotFound to a dialog, swapping data source), update the existing JSDoc/TSDoc to reflect the new behavior. Don't leave stale docs that describe the old behavior.
   - **Auto-lint hook mitigation for manual types**: Auto-lint hooks may strip 'unused' types. When adding manual RTK types before the consumer is saved, either add types and consumers in the same commit, or use `// eslint-disable-next-line` to prevent removal.
@@ -878,7 +883,9 @@ If there are conflicts, resolve them (keep both additions for routes/tabs — th
 bash ~/.claude/scripts/quality-gate.sh <worktree-path>
 ```
 
-The script auto-detects which checks to run (backend/frontend) based on changed files. It auto-fixes formatting (CSharpier, Prettier) and reports any remaining failures. If it exits non-zero, fix the reported issues before proceeding.
+The script auto-detects which checks to run (backend/frontend) based on changed files. It auto-fixes formatting (CSharpier, Prettier) and reports any remaining failures. **Quality gate failures BLOCK the commit** — if the script exits non-zero, you MUST fix the reported issues before committing. Do not treat failures as advisory.
+
+**Lite mode extra**: In lite mode, also run `npx prettier --write` on all changed frontend files before committing (the quality gate script should handle this, but verify).
 
 Then **commit, push, and generate the initial PR summary**:
 
@@ -921,6 +928,7 @@ If it times out, proceed — bots may be slow or not configured.
    ```
 2. **If AI bots found issues:**
    - Categorize as MUST FIX (security, bugs, broken patterns) vs SUGGESTION (style, nice-to-have)
+   - **When Gemini and Copilot contradict each other**, evaluate each suggestion on merit against the codebase conventions — don't auto-apply all suggestions. One bot may be wrong.
    - Route MUST FIX items to the relevant dev agents
    - Wait for fixes, commit, and push
 3. **Resolve all review conversations** — After addressing each comment (reply + code fix), resolve the conversation thread via the GraphQL API. Replying without resolving leaves conversations visibly open on GitHub:
@@ -1446,7 +1454,7 @@ The script auto-detects the worktree from CWD. Or pass explicitly: `bash ~/.clau
 
 ### How it works
 - The worktree service builds from **this worktree's code** and runs on a **unique high port** (10000+ range, from `.env`)
-- It joins the main stack's Docker network, so it can reach postgres, redis, rabbitmq, service-c-api, etc.
+- It joins the main stack's Docker network, so it can reach postgres, redis, rabbitmq, service-c-api, etc. If the service starts on the wrong network, manually connect it: `docker network connect repo_default <container-name>`
 - The main stack continues running untouched on default ports (500x)
 - Multiple worktrees can run simultaneously without port conflicts
 - The docker-compose template lives at `~/.claude/templates/docker-compose.worktree.yml`
