@@ -32,7 +32,7 @@ Before designing, understand:
 
 Also explore the codebase briefly to understand:
 - Existing patterns for similar modules
-- Conventions in `docs/CODING_STYLE_BACKEND.md` or `docs/CODING_STYLE_FRONTEND.md`
+- Conventions from project-level `.claude/skills/` (backend-conventions.md, frontend-conventions.md)
 - Adjacent interfaces the new module will interact with
 
 ### Step 2 — Generate designs (parallel sub-agents)

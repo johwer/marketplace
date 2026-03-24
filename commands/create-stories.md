@@ -313,13 +313,17 @@ Save each choice for Phase B.
 
 Worktrees already exist from Step 3.5. Phase B only writes context files and opens terminals — much faster than before.
 
-#### Step 6: Write Pre-Hydrated Context File
+#### Step 6: Write Jira Ticket & Pre-Hydrated Context Files
 
-Write the pre-hydration results from Step 3 to `.dream-team/context.md` in the worktree. This file is consumed by `/my-dream-team` to skip redundant exploration.
+First, write the full Jira ticket to disk. This is the **single source of truth** that every agent reads from.
 
 ```bash
 mkdir -p ~/Documents/<TICKET_ID>/.dream-team
 ```
+
+Use the Write tool to create `~/Documents/<TICKET_ID>/.dream-team/jira-ticket.md` with the full Jira output from Step 1 (summary, description, acceptance criteria, attachments, raw acli output). This file persists in the worktree and is read by every agent — no more pasting ticket text into prompts.
+
+Then write the pre-hydration results from Step 3 to `.dream-team/context.md` in the worktree. This file is consumed by `/my-dream-team` to skip redundant exploration.
 
 Then write the file using the Write tool at `~/Documents/<TICKET_ID>/.dream-team/context.md` with this format:
 

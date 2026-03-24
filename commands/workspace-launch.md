@@ -115,6 +115,39 @@ The script:
 
 Show the user the output — it lists all assigned ports.
 
+### Step 6.5: Save Jira Ticket to Disk
+
+Write the full Jira ticket to a persistent file in the worktree. This is the **single source of truth** that every agent reads from — no more pasting ticket text into prompts or summarizing.
+
+```bash
+mkdir -p ~/Documents/<TICKET_ID>/.dream-team
+```
+
+Then use the Write tool to create `~/Documents/<TICKET_ID>/.dream-team/jira-ticket.md` with:
+
+```markdown
+# Jira Ticket: <TICKET_ID>
+
+Fetched: <today's date>
+
+## Summary
+<ticket title>
+
+## Description
+<full description from acli output>
+
+## Acceptance Criteria
+<acceptance criteria, or "None specified" if absent>
+
+## Attachments
+<list of attachment names and URLs, or "None">
+
+## Raw Output
+<paste the complete acli jira workitem view output here, unedited>
+```
+
+**Why this file exists:** Every agent (Amara, Kenji, Ingrid, etc.) reads `.dream-team/jira-ticket.md` directly instead of receiving a summarized version in their prompt. This eliminates the "summary-of-a-summary" problem where critical scope details get lost at each handoff. The file is cleaned up automatically when the worktree is removed.
+
 ### Step 7: Launch Claude in New Terminal
 
 This uses the self-contained launcher script at `~/.claude/scripts/launch-workspace.sh` which handles everything: cd, unset CLAUDECODE, start tmux, launch Claude, and attach.
@@ -132,10 +165,10 @@ Replace `<TERMINAL_APP>` with the configured app (Alacritty, Terminal, iTerm, Wa
 Tell the user to run the following command in the new Claude session:
 
 ```
-/my-dream-team <paste the full ticket description>
+/my-dream-team <TICKET_ID>
 ```
 
-Display the full extracted ticket text (including description, acceptance criteria, and attachment context) so the user can copy-paste it.
+The full ticket text is already saved at `.dream-team/jira-ticket.md` in the worktree — no need to paste it. The Dream Team will read it from disk.
 
 ## Important Rules
 

@@ -218,7 +218,18 @@ bash ~/.claude/scripts/phase-cost-tracker.sh log "<TICKET_ID>" "<phase-name>" "<
 
 1. **Determine ticket ID** from the input or current directory (e.g., `PROJ-1234`). This is used for the team name.
 
-2. **Check for pre-hydrated context**: Look for `.dream-team/context.md` in the current worktree directory. If it exists, this ticket was pre-analyzed by `/create-stories` during parallel pre-hydration.
+2. **Load the Jira ticket from disk**: Check for `.dream-team/jira-ticket.md` in the worktree. If it exists (written by `/workspace-launch` or `/create-stories`), read it — this is the **single source of truth** for the ticket.
+   ```bash
+   cat .dream-team/jira-ticket.md 2>/dev/null
+   ```
+   If the file does NOT exist, fetch it now and write it to disk:
+   ```bash
+   mkdir -p .dream-team
+   acli jira workitem view <TICKET_ID>
+   ```
+   Then use the Write tool to create `.dream-team/jira-ticket.md` with the full output (summary, description, acceptance criteria, attachments, raw output). This file will be read by every agent in the team.
+
+   **Also check for pre-hydrated context**: Look for `.dream-team/context.md`. If it exists, this ticket was pre-analyzed by `/create-stories` during parallel pre-hydration.
    ```bash
    cat .dream-team/context.md 2>/dev/null
    ```
@@ -283,14 +294,14 @@ bash ~/.claude/scripts/phase-cost-tracker.sh log "<TICKET_ID>" "<phase-name>" "<
      - In your report, state: "**Team:** Kenji (sonnet), Ingrid (sonnet)" etc. with one-line justification for team size. Also rate the ticket complexity: `small`, `medium`, or `large`.
      - **Context management**: Follow the Context Management Protocol (see below). Create your notes file at `.dream-team/notes/amara.md`.
      - Stay available to help troubleshoot issues other agents encounter
-     - Include the full ticket text in the prompt
+     - **Jira ticket on disk**: Tell Amara to read `.dream-team/jira-ticket.md` as the first thing she does. This file contains the complete, unedited Jira output and is the source of truth for scope and acceptance criteria. Do NOT paste a summary of the ticket into Amara's prompt — she reads it from disk.
 
 5a. **Wait for Amara's analysis** before proceeding (normal path — when no pre-hydrated context exists).
 
 5b. **Pre-hydrated fast path** (when `.dream-team/context.md` exists from Step 2):
    - Read the context file — it contains: scope, complexity, key files, conventions summary, API contract, team recommendations, and flags.
    - **Validate pre-hydrated context against the full Jira description.** If scope differs between the pre-hydrated context and the Jira ticket description, trust the description — it may have been updated after pre-hydration.
-   - **Still spawn Amara**, but with a much shorter prompt: "You are **Amara**. Pre-hydrated context is available at `.dream-team/context.md` — read it. Your job is to **validate and refine** the pre-analysis, not redo it. Verify that key file paths still exist, check for any recent changes on main that affect the plan, and produce your architecture report. If the pre-hydrated context is accurate, you can reuse it directly — just add any missing details (API contract specifics, edge cases, conventions Amara-level details). This should take ~30% of the time of a full analysis."
+   - **Still spawn Amara**, but with a much shorter prompt: "You are **Amara**. Two files are available: `.dream-team/jira-ticket.md` (source of truth — full Jira output) and `.dream-team/context.md` (pre-hydrated analysis). Read BOTH. Your job is to **diff and validate**: compare the pre-hydrated context against the Jira ticket and list any scope items, acceptance criteria, or specifics in the ticket that are MISSING from the pre-hydrated context. Add them to your architecture report. Verify that key file paths still exist, check for any recent changes on main that affect the plan. If the pre-hydrated context is accurate, you can reuse it directly — just add any missing details (API contract specifics, edge cases, conventions Amara-level details). This should take ~30% of the time of a full analysis."
    - Amara still produces the full architecture report format — but gets there faster by building on the pre-hydrated context rather than starting from scratch.
    - Continue to Phase 1.5 as normal.
 
@@ -415,7 +426,8 @@ Based on the tech-architect's scope assessment, spawn the needed agents. **Use t
 - **Team:** `dream-team-<TICKET_ID>`
 - **Prompt:** Tell the agent:
   - You are **Diego**, the Infrastructure Engineer for Repo. Your teammates know you by name.
-  - **First read the agent instructions**: `AGENTS.md` (root) and `services/AGENTS.md` for repo-specific conventions
+  - **First read `.dream-team/jira-ticket.md`** — this is the full Jira ticket and the source of truth for scope and acceptance criteria. Do NOT rely solely on your task description.
+  - **Then read the agent instructions**: `AGENTS.md` (root) and `services/AGENTS.md` for repo-specific conventions
   - The project uses Docker Compose for local development (`docker compose up --build`)
   - Services are .NET Web APIs, each in `services/[Domain]/[ServiceName]`
   - Handle: EF Core migration creation/validation, Docker compose changes, database schema issues, service startup problems
@@ -439,7 +451,8 @@ Based on the tech-architect's scope assessment, spawn the needed agents. **Use t
 - **Prompt:** Tell the agent:
   - You are **Kenji**, the Backend Developer for Repo. Your teammates know you by name.
   - Tech stack: .NET Web API, Entity Framework Core, Dapper (for heavyweight queries), C#
-  - **First read the agent instructions**: `AGENTS.md` (root), `services/AGENTS.md`, and the relevant service-specific `AGENTS.md` (e.g., `services/ServiceB/AGENTS.md`) for repo-specific conventions
+  - **First read `.dream-team/jira-ticket.md`** — this is the full Jira ticket and the source of truth for scope and acceptance criteria. Do NOT rely solely on your task description.
+  - **Then read the agent instructions**: `AGENTS.md` (root), `services/AGENTS.md`, and the relevant service-specific `AGENTS.md` (e.g., `services/ServiceB/AGENTS.md`) for repo-specific conventions
   - **Use Amara's conventions summary** as your primary reference. Only read the full docs (`docs/CODING_STYLE_BACKEND.md`, `docs/API_CONVENTIONS.md`, etc.) if something in the summary is unclear or you need more detail on a specific pattern.
   - Follow existing patterns in the codebase — look at similar controllers/services/repositories for reference
   - **Dapper for heavyweight SQL**: Use Dapper instead of EF Core for complex reporting queries, bulk operations, multi-join aggregations, or any query where EF Core LINQ becomes unwieldy or has performance issues. EF Core is fine for standard CRUD and simple queries.
@@ -475,7 +488,8 @@ Based on the tech-architect's scope assessment, spawn the needed agents. **Use t
 - **Prompt:** Tell the agent:
   - You are **Ingrid**, the Frontend Developer for Repo. Your teammates know you by name.
   - Tech stack: React, TypeScript, Vite, Tailwind CSS, RTK Query, React Router
-  - **First read the agent instructions**: `AGENTS.md` (root) and `apps/web/AGENTS.md` for repo-specific conventions and commands
+  - **First read `.dream-team/jira-ticket.md`** — this is the full Jira ticket and the source of truth for scope and acceptance criteria. Do NOT rely solely on your task description.
+  - **Then read the agent instructions**: `AGENTS.md` (root) and `apps/web/AGENTS.md` for repo-specific conventions and commands
   - **Use Amara's conventions summary** as your primary reference. Only read the full docs (`docs/CODING_STYLE_FRONTEND.md`, `docs/FRONTEND_COMPONENTS.md`, etc.) if something in the summary is unclear or you need more detail on a specific pattern.
   - Follow existing component patterns — check similar pages/components for reference
   - For RTK Query API generation: use `npm run generate:api:<service>` (requires backend service running), NOT `npx @rtk-query/codegen-openapi` directly
@@ -1676,10 +1690,13 @@ reasoning: [convention doc or pattern that's violated]
 ```
 DONE: [what you completed]
 files_touched: [run git diff --name-only and include output]
+acceptance_criteria_check: [re-read .dream-team/jira-ticket.md, list each AC, confirm addressed or flag gaps]
 deviations: [any changes from the plan]
 risks: [anything the next phase should watch for]
 next_phase_needs: [what should happen next]
 ```
+
+**Acceptance criteria gate**: Before sending your completion message, re-read `.dream-team/jira-ticket.md` and verify every acceptance criterion is addressed by your changes. If any are NOT addressed, flag them explicitly — do not silently skip them.
 
 ### Avoid message storms
 Batch your updates. A good cadence: (1) when you start your main task, (2) when you hit a meaningful milestone or blocker, (3) when you finish. Three messages total is the target, not ten.
