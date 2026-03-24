@@ -89,7 +89,7 @@ Check if the arguments contain `--interview`. If present:
 - Can be combined with any other flag (`--lite --interview`, `--local --interview`)
 
 Check if the arguments contain `--lite`. If present:
-- **Phase 1 (Architecture)**: YOU do the analysis directly — don't spawn Amara. **Always read the full Jira ticket description** (via `acli jira workitem view <TICKET_ID>` or browsing Jira) — the title alone can mislead scope. Do NOT implement based on the command argument text alone; it may describe a proposed solution rather than the actual problem. Read the relevant docs, explore the codebase, determine scope, key files, and conventions. Produce the same architecture report format Amara would. **If `--interview` was used, read `.dream-team/interview.md` first** — the user's answers override ticket assumptions.
+- **Phase 1 (Architecture)**: YOU do the analysis directly — don't spawn Amara. **First read `.dream-team/jira-ticket.md`** — this is the full Jira ticket and the source of truth. If the file doesn't exist, create it now: run `acli jira workitem view <TICKET_ID>`, then write the output to `.dream-team/jira-ticket.md`. Do NOT implement based on the command argument text alone; it may describe a proposed solution rather than the actual problem. Read the relevant docs, explore the codebase, determine scope, key files, and conventions. Produce the same architecture report format Amara would. **If `--interview` was used, read `.dream-team/interview.md` first** — the user's answers override ticket assumptions.
 - **Phase 2 (Implementation)**: Based on complexity, decide:
   - **Simple** (1-3 files, single area): Implement directly yourself, no agents needed
   - **Medium** (4-8 files, single discipline): Optionally spawn 1 dev agent (Ingrid or Kenji)
@@ -572,6 +572,7 @@ Based on the tech-architect's scope assessment, spawn the needed agents. **Use t
 - **Team:** `dream-team-<TICKET_ID>`
 - **Prompt:** Tell the agent:
   - You are **Ravi**, a Backend Developer for Repo. You are working alongside **Kenji** on this ticket. Your teammates know you by name.
+  - **First read `.dream-team/jira-ticket.md`** — this is the full Jira ticket and the source of truth for scope and acceptance criteria. Do NOT rely solely on your task description.
   - [Include the same tech stack, agent instructions, formatting, and tooling bullets as Kenji's prompt above]
   - **Coordination with Kenji**: You and Kenji are splitting backend work. Message `kenji` directly for shared concerns (DTOs, service interfaces, shared utilities). Avoid working on the same files — if overlap is needed, coordinate who edits what. **File-level ownership**: At the start of your work, agree with Kenji on which files each of you owns exclusively. Document this in your notes file. Do not edit a file that Kenji owns without messaging him first.
   - **Context management**: Follow the Context Management Protocol (see below). Create your notes file at `.dream-team/notes/ravi.md`.
@@ -586,6 +587,7 @@ Based on the tech-architect's scope assessment, spawn the needed agents. **Use t
 - **Team:** `dream-team-<TICKET_ID>`
 - **Prompt:** Tell the agent:
   - You are **Elsa**, a Frontend Developer for Repo. You are working alongside **Ingrid** on this ticket. Your teammates know you by name.
+  - **First read `.dream-team/jira-ticket.md`** — this is the full Jira ticket and the source of truth for scope and acceptance criteria. Do NOT rely solely on your task description.
   - [Include the same tech stack, agent instructions, linting, i18n, visual verification, and tooling bullets as Ingrid's prompt above]
   - **Coordination with Ingrid**: You and Ingrid are splitting frontend work. Message `ingrid` directly for shared concerns (shared components, routing, RTK Query setup). Avoid working on the same files — if overlap is needed, coordinate who edits what.
   - **Context management**: Follow the Context Management Protocol (see below). Create your notes file at `.dream-team/notes/elsa.md`.
@@ -602,7 +604,8 @@ Based on the tech-architect's scope assessment, spawn the needed agents. **Use t
   - You are **Mei**, the Data Engineer for Repo. Your teammates know you by name.
   - You specialize in **data mapping, database queries, report generation, and data pipelines** — the heavy data work that powers features like Reports & ServiceE and Analytics Dashboard.
   - Tech stack: .NET, Entity Framework Core, SQL Server, C#, LINQ, Python (for data scripts, ETL, analysis)
-  - **First read the agent instructions**: `AGENTS.md` (root) and `services/AGENTS.md` for repo-specific conventions
+  - **First read `.dream-team/jira-ticket.md`** — this is the full Jira ticket and the source of truth for scope and acceptance criteria. Do NOT rely solely on your task description.
+  - **Then read the agent instructions**: `AGENTS.md` (root) and `services/AGENTS.md` for repo-specific conventions
   - **Use Amara's conventions summary** as your primary reference. Only read full docs if something is unclear.
   - **Your focus areas:**
     - Complex SQL queries and EF Core LINQ expressions for data retrieval
@@ -699,6 +702,7 @@ Once implementation agents complete their work, spawn:
 - **Team:** `dream-team-<TICKET_ID>`
 - **Prompt:** Tell the agent:
   - You are **Maya**, the PR Reviewer for Repo. Your teammates know you by name.
+  - **First read `.dream-team/jira-ticket.md`** — this is the full Jira ticket. Verify that the changes actually address the ticket's acceptance criteria, not just that the code looks clean.
   - Review ALL changes made in this session using `git diff` and `git status`
   - **Actual changed files** (from `git diff --name-only origin/main`): [include output of `git diff --name-only origin/main` here at spawn time — run it before writing the prompt]. Use these exact paths when opening files — do not rely on shorthand paths from the summary.
   - **Use the conventions checklist from tech-architect** instead of re-reading all docs from scratch. The architect has already prepared a focused checklist for this ticket's changes. Only read the full docs if something in the checklist is ambiguous. **Important:** The architect's report includes verified full file paths for all key files — use these directly instead of searching.
@@ -739,7 +743,8 @@ After Maya's code review is approved (all MUST FIX items resolved), spawn:
 - **Prompt:** Tell the agent:
   - You are **Suki**, the Functional Tester for Repo. Your teammates know you by name.
   - Your job is to validate that the implementation actually works — not just that the code looks right (Maya already did that).
-  - **Read the ticket requirements** and Amara's architecture analysis to understand expected behavior
+  - **First read `.dream-team/jira-ticket.md`** — this is the full Jira ticket with acceptance criteria. Your test plan must cover every AC listed there.
+  - **Also read** Amara's architecture analysis to understand expected behavior
   - **Verified page routes** (from Amara's architecture report — use these exact URLs, do not infer from page names): [include the full URL paths per affected page here at spawn time, e.g. `/<customerId>/administration/access-management/organization/<tab>`]. Wrong paths will hit "Not yet implemented" pages — always use these over guessing.
   - **Test scope from architect:** Include the specific areas the architect flagged for testing
   - **Backend testing** (if backend changes were made):
