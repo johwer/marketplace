@@ -129,6 +129,16 @@ case "$TEAMMATE_NAME" in
         ERRORS="${ERRORS}TypeScript errors found. Fix them before completing:\n$(echo "$TSC_OUTPUT" | head -5)\n"
       fi
     fi
+
+    # Check visual verification — if .tsx files changed, e2e tests + screenshots must exist
+    TSX_CHANGES=$(git diff --name-only origin/main -- '*.tsx' 2>/dev/null | wc -l | tr -d ' ')
+    if [ "$TSX_CHANGES" -gt 0 ]; then
+      SCREENSHOT_COUNT=$(find "$WORKTREE/apps/web/src" -path '*/__screenshots__/*.png' -newer "$WORKTREE/.git/refs/heads/main" 2>/dev/null | wc -l | tr -d ' ')
+      E2E_COUNT=$(find "$WORKTREE/apps/web/tests/e2e" -name '*.spec.ts' -newer "$WORKTREE/.git/refs/heads/main" 2>/dev/null | wc -l | tr -d ' ')
+      if [ "$SCREENSHOT_COUNT" -eq 0 ] && [ "$E2E_COUNT" -eq 0 ]; then
+        ERRORS="${ERRORS}Visual verification missing (Phase 4.75): $TSX_CHANGES .tsx file(s) changed but no new Playwright e2e tests or __screenshots__ found.\nWrite e2e tests in apps/web/tests/e2e/<feature>/ that take screenshots, then run: npx playwright test\nDo not skip this — it is a hard gate.\n"
+      fi
+    fi
     ;;
 esac
 

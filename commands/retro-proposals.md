@@ -10,6 +10,34 @@ Analyze accumulated Dream Team session data (retro learnings, history, journals)
 
 > **Renamed from `/team-review`.** This command is part of the [Learning System](../docs/learning-system.md) alongside `/scrape-pr-history` and `/pr-insights`.
 
+## STEP 0 — Route Pre-Declaration (DO THIS FIRST, before any analysis)
+
+**Before reading history or producing a health report**, scan `dream-team-learnings.md` for all unresolved deferred items (not struck through) and output the routing table immediately. This is the first thing the user sees.
+
+Classify each item using the Repo File Decision Tree (see Learning Router section below). Then output:
+
+```
+## Route Pre-Declaration
+
+I found [N] unresolved learnings. Here is how I will route them:
+
+### Ticket + PR required (shared repo — I WILL create Jira + branch + PR for these)
+| # | Learning | Destination | File |
+|---|---------|-------------|------|
+| 1 | [description] | repo-docs | docs/CODING_STYLE_BACKEND.md |
+| 2 | [description] | agents-md:services/ServiceB | services/ServiceB/AGENTS.md |
+
+### Direct apply (personal config — I will edit these files directly)
+| # | Learning | Destination | File |
+|---|---------|-------------|------|
+| 3 | [description] | dream-team | my-dream-team.md |
+
+### No route (already addressed or not actionable)
+- [item] — [reason]
+```
+
+After outputting the pre-declaration, continue with the health report and full routing workflow below.
+
 ## Data Sources
 
 Read these files (skip any that don't exist yet):
@@ -214,27 +242,39 @@ Learnings split into two tracks based on who they affect:
    - Don't restructure the file, just append to the right section
    - After all direct items are applied, offer to run `/sync-config`
 
-7. **Create ticket + PR for repo items**. If there are any repo-bound learnings:
+7. **Create ticket + PR for repo items**. If there are any repo-bound learnings, execute ALL 7 steps in order. Output a step marker before and after each one — this makes skipping visible.
 
-   a. **Create a Jira ticket** with `acli`:
+   **Before starting, output:**
+   ```
+   EXECUTING TICKET+PR FLOW for [N] repo-bound items: [list item descriptions]
+   Steps: 1. Jira ticket → 2. Branch → 3. Edit files → 4. Commit → 5. Draft PR → 6. Mark done → 7. Report
+   ```
+
+   a. **STEP 1 — Create Jira ticket**:
       ```bash
       acli jira workitem create --project PLRS --type Uppgift \
         --summary "Apply retro learnings to repo docs and conventions" \
         --description "<description with the table of proposed changes>"
       ```
-      Check allowed issue types first if the create fails: `acli jira workitem create --help` or try `Task`, `Uppgift`, or `Story` depending on your project's config. If `acli` is unavailable, tell the user the ticket details to create manually.
+      Output: `✓ STEP 1 COMPLETE: Jira ticket [PROJ-XXXX] created`
+      If `acli` fails, try `Task` or `Story` as the type. If unavailable, tell the user the details to create manually — do NOT skip silently.
 
-   b. **Create a branch and PR** using `/workspace-launch` or manually:
+   b. **STEP 2 — Create branch**:
       ```bash
       cd <monorepo>
       git checkout -b retro-learnings-<date>
       ```
+      Output: `✓ STEP 2 COMPLETE: Branch retro-learnings-<date> created`
 
-   c. **Apply the repo changes** to the branch:
+   c. **STEP 3 — Edit destination files** on the branch:
+      - Read each file first
       - Edit each destination file (CLAUDE.md, AGENTS.md, docs/*.md)
-      - Commit with message referencing the Jira ticket
+      Output: `✓ STEP 3 COMPLETE: Edited [N] files: [list filenames]`
 
-   d. **Create a draft PR**:
+   d. **STEP 4 — Commit** with message referencing the Jira ticket:
+      Output: `✓ STEP 4 COMPLETE: Committed as [short hash]`
+
+   e. **STEP 5 — Create draft PR**:
       ```bash
       gh pr create --draft --title "PROJ-XXXX: Apply retro learnings to repo conventions" \
         --body "$(cat <<'EOF'
@@ -249,8 +289,17 @@ Learnings split into two tracks based on who they affect:
       EOF
       )"
       ```
+      Output: `✓ STEP 5 COMPLETE: Draft PR created at [URL]`
 
-   e. **Report** the Jira ticket ID and PR URL to the user.
+   f. **STEP 6 — Mark items in `dream-team-learnings.md`**:
+      - `- ~~[description]~~ → Ticketed as [PROJ-XXXX] / PR #[number] on [date]`
+      Output: `✓ STEP 6 COMPLETE: [N] items marked as ticketed in dream-team-learnings.md`
+
+   g. **STEP 7 — Report to user**:
+      Output: `✓ STEP 7 COMPLETE: Jira [PROJ-XXXX] | PR [URL]`
+
+   If ANY step fails or is skipped, output explicitly:
+   `✗ STEP [N] SKIPPED: [reason]` — do NOT silently omit it.
 
 8. **Mark applied/ticketed items** in `dream-team-learnings.md`:
    - Direct items: `- ~~[description]~~ → Applied to [destination] on [date]`
@@ -266,6 +315,25 @@ After presenting the health report AND the routing table, ask the user:
 - "Route learnings only" — Skip health report changes, just run the routing
 - "Save report" — Append the report to `dream-team-learnings.md` under a `## Team Review: [date]` heading
 - "Skip"
+
+## Completion Gate — HARD GATE (DO NOT SKIP)
+
+Before responding to the user with "done", confirm each item:
+
+**Direct apply items** (`dream-team`, `memory`, `agent:*`, `skill:*`):
+- [ ] Each file was read before editing
+- [ ] Changes were added to the correct section (not just appended to end)
+- [ ] Offer to run `/sync-config` after all direct items are applied
+
+**Ticket+PR items** (`repo-docs`, `agents-md:*`, `project-claude`):
+- [ ] Jira ticket created → report ticket ID to user
+- [ ] Branch created → `git checkout -b retro-learnings-<date>`
+- [ ] Each destination file edited on the branch
+- [ ] Committed with message referencing the Jira ticket
+- [ ] Draft PR created → report PR URL to user
+- [ ] Items marked in `dream-team-learnings.md` as `~~done~~ → Ticketed as PROJ-XXXX / PR #N on <date>`
+
+**If you skipped any Ticket+PR step**, tell the user explicitly which step and why — do not silently omit it.
 
 ## Tips
 
