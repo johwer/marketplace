@@ -1338,6 +1338,13 @@ Only triggered when the user confirms they are done:
 
 1. **Run the Completion Checklist** — See `~/.claude/docs/dev-workflow-checklist.md` Section 7 (Completion Gate). This is a **HARD GATE** — every item must be confirmed before proceeding. The checklist covers: PR review comments resolved, screenshots on disk, retro completed, Jira comment posted.
 
+   **Before checking "PR review comments resolved"**, run the GraphQL query to verify — do not assume. Every comment needs both a **reply** (explaining what was changed or pushing back with reasoning) AND a **resolve**. Replying without resolving leaves threads visibly open. Resolving without replying leaves reviewers without confirmation:
+   ```bash
+   gh api graphql -f query='{ repository(owner: "<OWNER>", name: "<REPO>") { pullRequest(number: <PR_NUMBER>) { reviewThreads(first: 50) { nodes { id isResolved comments(first: 1) { nodes { body author { login } } } } } } } }' \
+     --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false) | .comments.nodes[0].body'
+   ```
+   If the output is non-empty, handle each thread before proceeding.
+
 2. **Move ticket to Done** in Jira:
    ```bash
    acli jira workitem transition --key "<TICKET_ID>" --status "Klart"
