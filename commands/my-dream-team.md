@@ -111,6 +111,7 @@ Check if the arguments contain `--lite`. If present:
   - **Phase 6.75**: Retrospective — write your own retro learnings using the same 4 categories with destination hints: instruction improvements (`dream-team`/`agent:<name>`/`skill:<name>`), convention discoveries (`project-claude`/`agents-md:<path>`/`repo-docs`), doc gaps (`repo-docs`/`agents-md:<path>`), process improvements (`dream-team`/`memory`). Tag each item with a suggested destination so [`/retro-proposals`](commands.md#team-review) can route it later.
   - **Phase 7**: Cleanup — runs the **Completion Gate** first (see `dev-workflow-checklist.md` Section 7): all PR comments resolved, screenshots in `__screenshots__/` next to components, retro done, CI green, PR description complete. Then posts a **Jira completion comment** with PR link + summary, @mentioning the ticket creator if different from assignee. Then transitions ticket to Klart.
 - **Visual verification applies in lite mode too.** The same Phase 4.75 hard gate (Playwright e2e test file + screenshots must exist before push) applies whether you're in full Dream Team or lite mode. Don't skip it just because you're working solo.
+- **Phase 6.9 gate is mandatory in lite mode.** Before Phase 7, you MUST output completion markers for both Phase 4.75 and Phase 6.75. No markers = Phase 7 blocked. See Phase 6.9 section.
 - The key principle: minimize agent overhead for small/medium tasks while keeping all quality gates, feedback loops, and process steps intact.
 - **Context management in lite mode**: Since you're doing all the work yourself (no subagents with separate context windows), context fills up faster. Follow the `strategic-compact` skill:
   - Compact after Phase 1 (architecture) → before starting implementation
@@ -1285,6 +1286,50 @@ Before shutting down the team, run a retrospective to capture learnings that imp
    - 🌟 **MVP** — Agent received 3+ shoutouts in a single session
 
 **Important:** Keep retrospective changes surgical — only modify agent prompt sections, never restructure the overall workflow phases unless the user explicitly asks.
+
+### Phase 6.9: Lite Mode Completion Gate (--lite only)
+
+> **This gate only applies when running with `--lite`.** In full Dream Team mode, TeammateIdle and TaskCompleted hooks enforce Phase 4.75 and 6.75 automatically. In lite mode there are no named agents, so those hooks never fire. You must self-enforce here — explicitly.
+
+**You MAY NOT enter Phase 7 until BOTH markers below have been output in this session.**
+
+---
+
+**Marker 1 — Phase 4.75 (Visual Verification):**
+
+If the ticket involved ANY `.tsx` / frontend changes, output exactly:
+```
+✓ PHASE 4.75 COMPLETE
+  e2e spec:    apps/web/tests/e2e/<path>/<file>.spec.ts
+  screenshots: <component-dir>/__screenshots__/<Component>-<state>.png
+  playwright:  npx playwright test — PASSED
+```
+
+If the ticket had zero frontend/UI changes, output exactly:
+```
+✓ PHASE 4.75 SKIPPED — no UI changes
+  Evidence: git diff --name-only origin/main shows no .tsx/.css files
+```
+
+If you have not yet done Phase 4.75 — **STOP. Go do it now. Then come back here.**
+
+---
+
+**Marker 2 — Phase 6.75 (Retrospective):**
+
+Output exactly:
+```
+✓ PHASE 6.75 COMPLETE
+  journal:    .dream-team/journal/lead.md — <N> entries written
+  learnings:  dream-team-learnings.md — session entry appended
+  history:    dream-team-history.json — session record added
+```
+
+If you have not yet done Phase 6.75 — **STOP. Go do it now. Then come back here.**
+
+---
+
+**Both markers must appear in your output before you write the first line of Phase 7.** If either is missing, Phase 7 has been entered prematurely and the session is incomplete.
 
 ### Phase 7: Cleanup & Workspace Teardown
 
