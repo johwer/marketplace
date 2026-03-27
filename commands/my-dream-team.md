@@ -129,7 +129,6 @@ Check if the arguments contain `--lite`. If present:
 
 Check if the arguments contain `--no-worktree`. If present:
 - Work in the **current directory** — do not create a worktree or branch
-- Skip workspace status file writing (Phase 7)
 - Skip "tell orchestrator to clean up" messaging
 - The user is responsible for their own branch/directory management
 - All other phases run normally
@@ -163,8 +162,8 @@ This phase runs instead of the normal Phase 1-7 workflow when `--resume` is dete
    # Jira ticket status
    acli jira workitem view <TICKET_ID>
 
-   # Workspace status file (if exists)
-   cat ~/.claude/workspace-status/<TICKET_ID>.json 2>/dev/null
+   # PR status
+   cd ~/Documents/Repo && gh pr list --head <TICKET_ID> --state all --json number,state,title 2>/dev/null
    ```
 
 3. **Assess what phase the previous session was in** based on the gathered context:
