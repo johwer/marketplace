@@ -14,6 +14,8 @@ Analyze accumulated Dream Team session data (retro learnings, history, journals)
 
 **Before reading history or producing a health report**, scan `dream-team-learnings.md` for all unresolved deferred items (not struck through) and output the routing table immediately. This is the first thing the user sees.
 
+While scanning, check each deferred item for a `(recurred: N)` annotation. Items with `(recurred: 2+)` are **auto-promoted** — they bypass the normal deferral path and go straight to Ticket+PR regardless of any previous rationale for deferring them. Flag these prominently.
+
 Classify each item using the Repo File Decision Tree (see Learning Router section below). Then output:
 
 ```
@@ -21,16 +23,21 @@ Classify each item using the Repo File Decision Tree (see Learning Router sectio
 
 I found [N] unresolved learnings. Here is how I will route them:
 
+### ⚠ Auto-promoted (recurred 2+ times — Ticket+PR is mandatory, no deferral allowed)
+| # | Learning | Recurrences | Destination | File |
+|---|---------|------------|-------------|------|
+| 1 | [description] | 3 | repo-docs | docs/CODING_STYLE_BACKEND.md |
+
 ### Ticket + PR required (shared repo — I WILL create Jira + branch + PR for these)
 | # | Learning | Destination | File |
 |---|---------|-------------|------|
-| 1 | [description] | repo-docs | docs/CODING_STYLE_BACKEND.md |
-| 2 | [description] | agents-md:services/ServiceB | services/ServiceB/AGENTS.md |
+| 2 | [description] | repo-docs | docs/CODING_STYLE_BACKEND.md |
+| 3 | [description] | agents-md:services/ServiceB | services/ServiceB/AGENTS.md |
 
 ### Direct apply (personal config — I will edit these files directly)
 | # | Learning | Destination | File |
 |---|---------|-------------|------|
-| 3 | [description] | dream-team | my-dream-team.md |
+| 4 | [description] | dream-team | my-dream-team.md |
 
 ### No route (already addressed or not actionable)
 - [item] — [reason]
@@ -94,6 +101,7 @@ Otherwise, analyze across all sessions and produce a report:
 [List changes from past retros that were saved but never applied]
 - From [date] session: [change description]
 - **Still relevant?** [yes/no based on current command file]
+- **⚠ Auto-promoted (recurred 2+):** [description] — appeared [N] times, Ticket+PR is mandatory
 
 ### Achievement Trends
 - Most common: [achievement] ([N] times)
@@ -201,7 +209,16 @@ Learnings split into two tracks based on who they affect:
 
 1. **Scan** all "Deferred" items from `dream-team-learnings.md` that aren't struck through (`~~`). Also check items with destination hints from recent retros.
 
-2. **Classify** each using the Repo File Decision Tree above. If the retro already tagged a destination hint, use it as a **starting point only** — verify it's correct using the decision tree. Retro destination hints are often wrong (e.g., coding conventions tagged as `agents-md:apps/web/AGENTS.md` when they belong in `docs/CODING_STYLE_FRONTEND.md`).
+   **Recurrence check — do this before adding any new learning:**
+   When a session produces a learning that already exists as an unresolved deferred entry, do NOT add a duplicate line. Instead, find the existing entry and increment its recurrence counter:
+   - First occurrence (no counter yet): `- Deferred: [description]`
+   - Second time it surfaces: `- Deferred: [description] (recurred: 1)`
+   - Third time: `- Deferred: [description] (recurred: 2)` ← auto-promotion threshold
+   - And so on.
+
+   **Auto-promotion rule:** Any item with `(recurred: 2+)` is automatically placed in the Ticket+PR track. No rationale overrides this — not "the service is about to be rewritten", not "it's a small thing", not "we'll do it next sprint". If it keeps reappearing, the team hasn't acted on it and a Jira ticket is the only way to make it real.
+
+2. **Classify** each using the Repo File Decision Tree above. Auto-promoted items (`recurred: 2+`) skip classification debate — they go to whichever destination was previously tagged or the most appropriate one from the decision tree. If the retro already tagged a destination hint, use it as a **starting point only** — verify it's correct using the decision tree. Retro destination hints are often wrong (e.g., coding conventions tagged as `agents-md:apps/web/AGENTS.md` when they belong in `docs/CODING_STYLE_FRONTEND.md`).
 
 3. **Read each destination file** before proposing changes — understand what's already there so you add to the right section and avoid duplicates. Pay attention to the file's purpose: if it's a style guide, add to a relevant existing section. If it's an AGENTS.md, only add operational/command content — never coding conventions.
 
