@@ -1379,26 +1379,9 @@ TICKET_ID=$(basename "$PWD")
 # by /workspace-cleanup when the worktree is removed. Keep notes/journals intact.
 ```
 
-9. **Write a workspace status file** so the orchestrator session knows this workspace is done and ready for cleanup after merge:
+9. **Tell the user** the implementation is done and the PR is ready for their manual review and merge. When the PR is merged, clean up the worktree by running `/workspace-cleanup <TICKET_ID>` or saying "clean up <TICKET_ID>" in a `/create-stories` orchestrator session.
 
-```bash
-TICKET_ID=$(basename "$PWD")
-PR_URL=$(cd ~/Documents/Repo && gh pr list --head "$TICKET_ID" --json url --jq '.[0].url' 2>/dev/null || echo "unknown")
-cat > ~/.claude/workspace-status/$TICKET_ID.json << EOF
-{
-  "ticketId": "$TICKET_ID",
-  "status": "done",
-  "prUrl": "$PR_URL",
-  "completedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-  "worktree": "$HOME/Documents/$TICKET_ID",
-  "branch": "$TICKET_ID"
-}
-EOF
-```
-
-10. **Tell the user** the implementation is done and the PR is ready for their manual review and merge. Remind them that the orchestrator session will handle worktree/branch cleanup when they say "it's merged" or "clean up <TICKET_ID>".
-
-**IMPORTANT:** Do NOT run [`/workspace-cleanup`](commands.md#workspace-cleanup) or remove the worktree/branch. The workspace cannot clean itself up because it's running inside its own worktree. The orchestrator session (from [`/create-stories`](commands.md#create-stories)) handles all cleanup.
+**IMPORTANT:** Do NOT run [`/workspace-cleanup`](commands.md#workspace-cleanup) or remove the worktree/branch from here. The workspace cannot clean itself up because it's running inside its own worktree.
 
 <!-- DISABLED: Worktree/branch cleanup is now manual. User merges PRs themselves.
 # cd ~/Documents/Repo

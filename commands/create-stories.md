@@ -487,31 +487,28 @@ When the user says "resume PROJ-1234" or "pick up PROJ-1234" or "continue PROJ-1
 
 ### Check workspace status
 
-The user can ask "how are the workspaces doing?" or "check status". Check for status files and tmux sessions:
+The user can ask "how are the workspaces doing?" or "check status". Check tmux sessions and worktrees:
 
 ```bash
-# Check for completed workspaces (status files written by Dream Teams)
-ls ~/.claude/workspace-status/*.json 2>/dev/null && cat ~/.claude/workspace-status/*.json
-
 # Check which tmux sessions are running
 tmux list-sessions 2>/dev/null
 
 # Check which worktrees exist
 cd ~/Documents/Repo && git worktree list
+
+# Check PR status for each worktree branch
+cd ~/Documents/Repo && git worktree list --porcelain | grep branch | awk '{print $2}' | while read branch; do
+  gh pr list --head "$branch" --state all --json number,state,title --jq '.[] | "\(.state) \(.number) \(.title)"' 2>/dev/null
+done
 ```
 
-Report a summary table showing each workspace's status (running / done-awaiting-merge / no session).
+Report a summary table showing each workspace's status (tmux running / no session) and PR state (open draft / open ready / merged / none).
 
 ### When the user says "it's merged" or "clean up"
 
 When the user indicates a story is done or merged (e.g., "PROJ-1234 is merged", "clean up PROJ-1234", "that story is finished"):
 
-1. **Check the status file** (if exists):
-   ```bash
-   cat ~/.claude/workspace-status/<TICKET_ID>.json 2>/dev/null
-   ```
-
-2. **Run cleanup from this orchestrator session** (NOT from inside the worktree). Execute these steps directly — do NOT delegate to `/workspace-cleanup` since we're already in the orchestrator:
+1. **Run cleanup from this orchestrator session** (NOT from inside the worktree). Execute these steps directly — do NOT delegate to `/workspace-cleanup` since we're already in the orchestrator:
 
    ```bash
    # Safety: check PR status first
@@ -536,9 +533,6 @@ When the user indicates a story is done or merged (e.g., "PROJ-1234 is merged", 
 
    # Prune worktree references
    cd ~/Documents/Repo && git worktree prune
-
-   # Remove status file
-   rm -f ~/.claude/workspace-status/<TICKET_ID>.json
    ```
 
 3. **If PR is NOT merged**, warn the user before proceeding — code may only exist on the remote branch.
@@ -548,10 +542,11 @@ When the user indicates a story is done or merged (e.g., "PROJ-1234 is merged", 
 ### Bulk cleanup
 
 When the user says "clean up all done workspaces" or similar:
-1. Read all status files from `~/.claude/workspace-status/`
-2. For each with `"status": "done"`, check PR merge status
-3. Clean up all that are merged (or user-confirmed)
-4. Show summary of what was cleaned
+1. Run `cd ~/Documents/Repo && git worktree list` to find all worktrees
+2. For each worktree branch, check PR merge status via `gh pr list --head <branch> --state all --json state,mergedAt`
+3. Ask the user which merged ones to clean up
+4. Run the cleanup steps above for each confirmed one
+5. Show summary of what was cleaned
 
 ## Important Rules
 
