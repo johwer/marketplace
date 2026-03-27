@@ -59,19 +59,29 @@ cd ~/Documents/<TICKET_ID> && docker compose -f docker-compose.worktree.yml down
 
 ### Step 4: Kill Vite Dev Server & tmux Session
 
-Stop any Vite/Node dev servers running in this worktree before removing it. If Vite was started as a background process, it can survive tmux kill and keep the port locked as an orphan.
+Before removing the worktree, check if there's a Vite dev server running on its allocated port and ask the user whether to kill it.
 
 ```bash
-# Kill Vite/Node dev servers for this worktree
-PIDS=$(pgrep -f "node.*~/Documents/<TICKET_ID>" 2>/dev/null || true)
-if [ -z "$PIDS" ]; then
-  PIDS=$(lsof -i -P 2>/dev/null | grep node | grep LISTEN | grep "<TICKET_ID>" | awk '{print $2}' | sort -u || true)
-fi
-if [ -n "$PIDS" ]; then
-  echo "$PIDS" | xargs kill 2>/dev/null || true
-fi
+# Read the allocated port from the worktree's .env.local
+VITE_PORT=$(grep VITE_DEV_PORT ~/Documents/<TICKET_ID>/apps/web/.env.local 2>/dev/null | cut -d= -f2)
 
-# Kill tmux session
+# Check if anything is listening on that port
+if [ -n "$VITE_PORT" ]; then
+  PORT_PID=$(lsof -ti tcp:$VITE_PORT 2>/dev/null || true)
+fi
+```
+
+**If a process is found on the port**, tell the user: "Vite dev server is still running on port `$VITE_PORT` (PID $PORT_PID). Kill it?" and kill it if they confirm:
+
+```bash
+kill $PORT_PID 2>/dev/null || true
+```
+
+**If no port is found or nothing is listening**, skip silently.
+
+Then kill the tmux session regardless:
+
+```bash
 tmux kill-session -t <TICKET_ID> 2>/dev/null || true
 ```
 
@@ -110,12 +120,6 @@ cd ~/Documents/Repo && git branch -D <TICKET_ID>
 
 ```bash
 cd ~/Documents/Repo && git worktree prune
-```
-
-### Step 9.5: Remove Status File (if exists)
-
-```bash
-rm -f ~/.claude/workspace-status/<TICKET_ID>.json
 ```
 
 ### Step 10: Confirm
