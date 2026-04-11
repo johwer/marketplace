@@ -127,6 +127,47 @@ check_main_network() {
 # Available services (user-facing names)
 SERVICES="service-b-api service-a-api service-e-api service-d-api service-c-api"
 
+# Map service name → main stack port (500x default)
+main_stack_port() {
+    case "$1" in
+        service-c-api)        echo 5001 ;;
+        service-a-api)    echo 5002 ;;
+        service-e-api) echo 5003 ;;
+        service-b-api)        echo 5005 ;;
+        service-d-api)  echo 5006 ;;
+    esac
+}
+
+# Map service name → worktree port (from .env)
+worktree_port() {
+    local env_key
+    case "$1" in
+        service-c-api)        env_key="ServiceC_API_PORT" ;;
+        service-a-api)    env_key="ABSENCE_API_PORT" ;;
+        service-e-api) env_key="STATISTICS_API_PORT" ;;
+        service-b-api)        env_key="ServiceB_API_PORT" ;;
+        service-d-api)  env_key="MESSENGER_API_PORT" ;;
+    esac
+    grep "^${env_key}=" "$WORKTREE_DIR/.env" 2>/dev/null | cut -d= -f2
+}
+
+# Switch a service's proxy in vite.config.worktree.mts to the given port
+switch_vite_proxy() {
+    local service="$1" new_port="$2"
+    local old_port
+    old_port=$(main_stack_port "$service")
+    local vite_config="$WORKTREE_DIR/apps/web/vite.config.worktree.mts"
+    [ -f "$vite_config" ] || return 0
+    # Also handle the case where it was already switched to a worktree port
+    local wt_port
+    wt_port=$(worktree_port "$service")
+    sed -i '' \
+        -e "s#http://localhost:${old_port}\"#http://localhost:${new_port}\"#g" \
+        -e "s#http://localhost:${wt_port}\"#http://localhost:${new_port}\"#g" \
+        "$vite_config"
+    echo "Updated vite proxy: $service → localhost:$new_port"
+}
+
 # Map user-facing service name to compose service name.
 # Worktree services are suffixed with "-wt" to avoid Docker DNS collisions
 # with the main stack on the shared network.
@@ -172,6 +213,17 @@ case "${1:-help}" in
 
         echo "Building and starting $SERVICE from worktree ($WORKTREE_DIR)..."
         compose up --build -d "$COMPOSE_NAME"
+
+        # Switch vite proxy for this service to the worktree port
+        WT_PORT=$(worktree_port "$SERVICE")
+        if [ -n "$WT_PORT" ]; then
+            switch_vite_proxy "$SERVICE" "$WT_PORT"
+            echo ""
+            echo "⚡ Vite proxy updated: $SERVICE → localhost:$WT_PORT"
+            echo "  Restart Vite to pick up the change:"
+            echo "  cd apps/web && npx vite --config vite.config.worktree.mts --host"
+        fi
+
         echo ""
         echo "Service started. Check health:"
         echo "  bash ~/.claude/scripts/worktree-service.sh status"
@@ -181,6 +233,14 @@ case "${1:-help}" in
         echo "Stopping all worktree services ($WORKTREE_DIR)..."
         # Reset ServiceC host to main stack when stopping
         sed -i '' 's/^ServiceC_SERVICE_HOST=.*/ServiceC_SERVICE_HOST=service-c-api/' "$WORKTREE_DIR/.env" 2>/dev/null || true
+
+        # Revert all vite proxies back to main stack (500x)
+        for svc in $SERVICES; do
+            MAIN_PORT=$(main_stack_port "$svc")
+            switch_vite_proxy "$svc" "$MAIN_PORT" 2>/dev/null
+        done
+        echo "Vite proxies reverted to main stack (500x)"
+
         compose down
         ;;
     logs)

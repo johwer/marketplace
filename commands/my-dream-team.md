@@ -142,7 +142,32 @@ This phase runs instead of the normal Phase 1-7 workflow when `--resume` is dete
 
 1. **Determine ticket ID** from the arguments or current directory.
 
-2. **Gather current state** — read all of these:
+2. **Verify working directory** — confirm you are running from the worktree, not the main repo:
+   ```bash
+   pwd  # Should be ~/Documents/<TICKET_ID>, NOT ~/Documents/Repo
+   ```
+   If you're in the main repo, `cd` to the worktree: `cd ~/Documents/<TICKET_ID>` (or `$DTF_WORKTREE_PARENT/<TICKET_ID>`).
+
+3. **Validate worktree environment** — check ports and env files before anything else:
+   ```bash
+   # Check .env exists with port allocations
+   if [ ! -f .env ]; then
+     echo "⚠️ .env missing — regenerating..."
+     bash ~/.claude/scripts/allocate-ports.sh <TICKET_ID>
+   fi
+   grep -E "^(ServiceB|ServiceC|ABSENCE|STATISTICS|MESSENGER)_API_PORT=" .env
+
+   # Check Vite config
+   cat apps/web/.env.local 2>/dev/null | grep VITE_DEV_PORT
+
+   # Check for stale Docker containers on worktree ports
+   for port in $(grep "_API_PORT=" .env 2>/dev/null | cut -d= -f2); do
+     lsof -ti :$port 2>/dev/null && echo "⚠️ Port $port already in use"
+   done
+   ```
+   If `.env` is missing or ports are stale, re-run `bash ~/.claude/scripts/allocate-ports.sh <TICKET_ID>`. Report any port conflicts to the user.
+
+4. **Gather current state** — read all of these:
    ```bash
    # What code changes exist
    git diff --name-only
@@ -162,20 +187,23 @@ This phase runs instead of the normal Phase 1-7 workflow when `--resume` is dete
    # Jira ticket status
    acli jira workitem view <TICKET_ID>
 
-   # PR status
-   cd ~/Documents/Repo && gh pr list --head <TICKET_ID> --state all --json number,state,title 2>/dev/null
+   # Check if Docker services are still running from previous session
+   docker ps --format '{{.Names}}' | grep -i "<TICKET_ID>" 2>/dev/null
    ```
 
-3. **Assess what phase the previous session was in** based on the gathered context:
+5. **Assess what phase the previous session was in** based on the gathered context:
    - **No code changes, no PR** → Previous session barely started. Start fresh from Phase 1.
    - **Code changes exist, no PR** → Implementation was in progress. Skip to Phase 2 with context.
    - **Draft PR exists, code pushed** → Implementation is done or nearly done. Check if review/testing is needed.
    - **PR is ready (not draft)** → Review cycle. Check for feedback to address.
    - **Status file says "done"** → Previous session completed. Ask user what needs to happen next (fixes? additional work?).
 
-4. **Present a summary to the user**:
+6. **Present a summary to the user**:
    ```
    ## Resume: <TICKET_ID>
+   - **Working directory:** [confirmed worktree path]
+   - **Environment:** [.env OK / .env regenerated / ⚠️ port conflicts]
+   - **Docker services:** [running: X, Y / none running]
    - **Previous state:** [what phase it was in]
    - **Code changes:** [X files modified]
    - **PR:** [draft/ready/none] — [URL if exists]
@@ -184,13 +212,15 @@ This phase runs instead of the normal Phase 1-7 workflow when `--resume` is dete
    ```
    Ask the user to confirm before proceeding.
 
-5. **Create a fresh team** (`dream-team-<TICKET_ID>`) and spawn agents as needed for the remaining work. Include in each agent's prompt:
+7. **Create a fresh team** (`dream-team-<TICKET_ID>`) and spawn agents as needed for the remaining work. Include in each agent's prompt:
    - "You are resuming work from a previous session"
+   - "Your working directory is `<worktree-path>` — verify all file operations use this path"
    - "Read your notes file at `.dream-team/notes/<your-name>.md` for decisions and progress from last session"
    - What's already been done (from git diff and agent notes)
    - What remains to be done
+   - The worktree ports from `.env` (so agents don't need to re-discover them)
 
-6. **Continue from the appropriate phase** in the normal workflow.
+8. **Continue from the appropriate phase** in the normal workflow.
 
 ## Phase Cost Tracking
 
@@ -266,6 +296,7 @@ bash ~/.claude/scripts/phase-cost-tracker.sh log "<TICKET_ID>" "<phase-name>" "<
      - Analyze the ticket/story provided
      - **Check for Jira attachments**: If the ticket mentions attached images, screenshots, or design references, use **Playwright CLI** to browse `https://your-company.atlassian.net/browse/<TICKET_ID>` and view attachments: `playwright-cli -s=amara open https://your-company.atlassian.net/browse/<TICKET_ID> --headed`. Use `playwright-cli snapshot` to get element refs and `playwright-cli screenshot --filename=jira-attachment.png` to capture images. Images are the source of truth over text descriptions if they conflict. Include key visual details (colors, layout, shapes) in your architecture report so dev agents have the specs. If authentication is needed, ask the user to log in via the headed browser.
      - Explore the codebase to determine what files/services are affected. **Start with Glob patterns for file/folder names** before grepping file contents — folder naming often differs from code naming conventions (e.g., `medicalcertificate` vs `MedicalCertificate`).
+     - **Independent candidate discovery**: Do NOT limit your exploration to files mentioned in the ticket or pre-hydrated context. Independently grep the codebase for the pattern/anti-pattern being addressed — there may be additional instances the ticket author missed. Report any extra candidates you find so the team lead can decide whether to include them in scope.
      - Determine if the ticket needs: backend-only, frontend-only, or both
      - **Check main for partial implementations**: Run `git diff origin/main -- <key-files>` to see if main already has partial work from previous PRs. Report any overlap to avoid duplicating existing changes.
 - Determine if there are infrastructure concerns (new migrations, Docker changes, new services)
@@ -273,8 +304,10 @@ bash ~/.claude/scripts/phase-cost-tracker.sh log "<TICKET_ID>" "<phase-name>" "<
      - Report back with: (a) scope assessment, (b) which agents are needed, (c) **verified key files to modify** (see below), (d) any architectural concerns, (e) whether functional testing is needed (flag `needs_testing: true/false` — say yes for: API behavior changes, migrations, complex frontend interactions, multi-service flows; say no for: simple CRUD, styling-only changes, copy/i18n updates), (f) whether Docker service rebuild is needed (flag `needs_docker_rebuild: true/false` with which service(s) — e.g., `service-b-api`). If true, note that Kenji must rebuild and notify Ingrid before she can run API code generation.
      - **Verified file paths**: For every key file you reference in your report, verify the path exists using Read or Glob. Include the full resolved path (e.g., `apps/web/src/pages/employees/pages/employeecard/pages/medicalcertificate/components/CertificateAttachments.tsx`), not just the filename. Downstream agents will use these paths directly — wrong paths cause silent Read failures and wasted round-trips.
      - **If both backend and frontend are needed**, define the API contract upfront: endpoint paths, HTTP methods, request/response DTOs with field names and types, **and sample JSON payloads** (not just field lists — exact shapes including nested objects and arrays). This allows frontend and backend to work in parallel — Ingrid builds components against the contract while Kenji implements the API. When `needs_docker_rebuild: true`, Ingrid should use manual types from the contract first, then swap to generated types after Kenji's Docker service is ready.
+     - **Response contract completeness**: For every endpoint in the API contract, explicitly include: (a) **pagination metadata** if the response is a list (`offset`, `limit`, `totalCount`, `hasMore`), (b) **display name resolution targets** — any ID field that the frontend will need to resolve to a human-readable name (e.g., "userId resolves to user.displayName via /api/service-c/users/{id}"). Missing pagination metadata forces frontend to guess, and missing resolution targets cause extra API calls or blank labels.
      - **Known UI/UX patterns**: Before evaluating approaches, check if the codebase already has an established pattern for the ticket's UI problem. Run a quick Glob/Grep for relevant component names (e.g., `RoutingTabMenu`, `TabMenu`, `Modal`, `Drawer`). If an established pattern exists, default to extending it rather than evaluating alternatives — document it in your report as "use existing `XComponent` pattern" and skip the alternatives analysis.
      - **Conventions summary**: Instead of having each agent read all docs independently, include a concise summary of the relevant conventions for each agent in your report. Bullet-point the key rules they must follow (naming, patterns, folder structure, etc.) so they don't waste context re-reading entire docs.
+     - **Known deviations from standard patterns**: If the implementation intentionally breaks conventions, document each deviation in your report with: (a) what the standard pattern is, (b) what you're doing instead, (c) why. Examples: using a different state management approach, skipping a normally-required abstraction layer, non-standard folder structure. This prevents the PR reviewer from flagging intentional choices as bugs.
      - **Conventions checklist for PR reviewer**: Prepare a short checklist of the specific conventions that apply to this ticket's changes. The PR reviewer will use this instead of re-reading all convention docs.
      - **Verified route paths**: For each affected page, include the full URL path as it appears in `AppRoutes.tsx` (e.g., `/<customerId>/administration/access-management/organization`). These are passed directly to Ingrid (visual verification), Suki (functional testing), and Tane (How to Test section). Wrong paths cause testers to hit "Not yet implemented" pages.
      - **Team sizing decision**: Decide how many devs to spawn per discipline:
@@ -392,7 +425,7 @@ Immediately after creating the draft PR, spawn Lena to record the current (broke
   - You are **Lena**, the Visual Verifier for Repo. Your teammates know you by name.
   - Your job is to capture a "BEFORE" screenshot showing the current bug state. You do NOT edit any files.
   - **Use Playwright CLI** for browser automation — no Chrome queue needed, you get your own isolated session.
-  - **Dev server**: Check if Vite is running with `lsof -i -P | grep node | grep LISTEN`. If not running, start it: `cd apps/web && npm start &` and wait for it to be ready.
+  - **Dev server**: Check if Vite is running with `lsof -i -P | grep node | grep LISTEN`. If not running, start it: `cd apps/web && npx vite --config vite.config.worktree.mts --host &` and wait for it to be ready. **Always use vite.config.worktree.mts in worktrees** — `npm start` uses port 3000 which conflicts with other worktrees.
   - **Login**: Open the browser with `playwright-cli -s=lena open http://localhost:<port> --headed`. If you see a login page, use `playwright-cli snapshot` to get element refs, then `playwright-cli click <ref>` to click "More login options" → "Username and password" → `playwright-cli fill <ref> "gunner"` for username. If you cannot enter a password, message the team lead to ask the user to log in, then continue.
   - **Page path**: [Include the specific page path from the architect's analysis]
   - **Reproduction steps**: [Include the ticket's reproduction steps]
@@ -471,6 +504,7 @@ Based on the tech-architect's scope assessment, spawn the needed agents. **Use t
     2. Wait for healthy: check `bash ~/.claude/scripts/worktree-service.sh logs <service>`
     3. Message `ingrid` with: (a) which service is up, (b) the worktree port from `.env` (e.g., `ServiceB_API_PORT=17405`), (c) the exact regeneration command: `VITE_ServiceB_API_PORT=17405 npm run generate:api:service-b`, (d) **which DTOs changed** so she can verify the generated types include the new fields
     4. **After Docker changes, verify the Vite proxy**: Check `apps/web/.env.local` to confirm the proxy target matches the current (rebuilt) service port — not a stale port from a previous worktree or Docker run. A mismatched proxy causes silent 403 errors that look like auth failures.
+  - **Backend contract freeze gate**: After implementing all DTOs and endpoints, send a **contract freeze** message to `ingrid` via the Communication Protocol: include the final DTO shapes (with field names, types, and nullability), the exact endpoint paths, and confirm "DTOs are frozen — safe to generate types." Do NOT message completion until this freeze message is sent. If you need to change a DTO after the freeze, message `ingrid` immediately with what changed — she may need to regenerate types.
   - If the architect provided an API contract, implement it exactly. If you need to deviate, message the team lead and `ingrid`.
   - **Ambiguous requirements**: If the ticket doesn't clearly specify behavior, message the team lead. Do NOT guess — wrong guesses waste more context than asking.
   - **Completion protocol**: When done, use the **Completion → Team Lead** template from the Communication Protocol. Also send a **Dev → Dev handoff** to Ingrid (or a **Dev → Tester handoff** to Suki if testing is needed). Always include `git diff --name-only` output in your `files_touched`.
@@ -494,6 +528,7 @@ Based on the tech-architect's scope assessment, spawn the needed agents. **Use t
   - Follow existing component patterns — check similar pages/components for reference
   - For RTK Query API generation: use `npm run generate:api:<service>` (requires backend service running), NOT `npx @rtk-query/codegen-openapi` directly
   - **i18n — HARD GATE**: See `~/.claude/docs/dev-workflow-checklist.md` Section 2. You MUST create all new keys in TranslationService via the API before reporting completion. Use bare `t("key")` only — never `defaultValue`. Before using `common_*` keys, grep the codebase to verify exact key name and casing (e.g., `common_logout` not `common_logOut`). The TranslationService API key is in `apps/web/.env.local` under `TRANSLATION_SERVICE_API_KEY`. See `docs/INTERNATIONALIZATION.md` for the full API workflow. Do NOT attempt to sync translations to S3 — that is handled automatically by CI/CD. Completion is blocked until all TranslationService API calls succeed. **Verify translation text against Jira attachment specs** before creating TranslationService keys — don't invent copy, use the exact text from the ticket's design/spec attachments.
+  - **i18n for editedValues / change log patterns**: When implementing `formatEditedValue` or similar change-tracking displays, create i18n keys for ALL property name labels (e.g., `edited_value_firstName`, `edited_value_startDate`). These are easy to miss because they're dynamic keys built from enum/property names. Checklist: (1) enumerate all possible property names from the enum/type, (2) create a TranslationService key for each, (3) verify the `t()` call uses the correct dynamic key pattern (e.g., `t(\`edited_value_\${propertyName}\`)`).
   - **Testing**: Frontend tests are optional. Only write them if the architect specifically requests it or you're modifying code that already has tests. Don't create test files for new components by default.
   - **React skills**: You have access to these skills — use them when relevant:
     - `reactjs/react.dev:react-expert` — Look up React API usage, caveats, and best practices when unsure about a React feature
@@ -505,7 +540,7 @@ Based on the tech-architect's scope assessment, spawn the needed agents. **Use t
     Fix any issues — these will fail the GitHub build if left unfixed.
   - **Visual verification via Playwright e2e tests (MANDATORY for UI changes)**: If the ticket involves UI changes, you MUST write Playwright e2e tests AND take screenshots before reporting completion. **The test IS the verification** — screenshots without tests are not reproducible and become stale. Use **Playwright CLI** with a named session for manual exploration, then codify what you verified into a Playwright spec file.
     0. **Pre-check**: Before opening Playwright, check if the target page has permission gates and verify seed data supports the test user. Missing permissions = blank page and wasted time.
-    1. **Start the Vite dev server**: Check if one is already running for this worktree with `lsof -i -P | grep node | grep LISTEN`. If not, start it: `cd apps/web && npm start &`. Use the worktree's configured port.
+    1. **Start the Vite dev server**: Check if one is already running for this worktree with `lsof -i -P | grep node | grep LISTEN`. If not, start it: `cd apps/web && npx vite --config vite.config.worktree.mts --host &`. This uses the worktree's unique port (31xx) and proxies APIs to the main stack (500x) by default.
     1b. **Verify you're on the right dev server**: Run `lsof -i :<port> | grep node` and confirm the process path contains your worktree directory (e.g., `/Documents/PROJ-1801/`), not another open worktree. Testing against the wrong server means testing old code silently.
     2. **Figure out the path**: Use the verified route paths from Amara's architecture report. If not provided, check the router config (`apps/web/src/routes/`). If the page requires authentication, check `.env.local` or mock data for test credentials.
     3. **Write a Playwright e2e test FIRST (or alongside screenshots)**:
@@ -527,6 +562,7 @@ Based on the tech-architect's scope assessment, spawn the needed agents. **Use t
        - On first run, use `--update-snapshots` to generate baselines. Future runs compare pixel-by-pixel.
        - Test both positive and negative cases (e.g., with permission → tab visible, without permission → tab hidden)
        - The test file is the reproducible proof — anyone can re-run it to regenerate and verify screenshots
+    3b. **Scroll to the relevant element before screenshots**: Before calling `page.screenshot()`, ensure the changed element is visible and centered in the viewport. Use `await page.locator('<selector>').scrollIntoViewIfNeeded()` before the screenshot call. Screenshots taken from the top of the page that don't show the actual change are useless for verification.
     4. **Run the tests**: `npx playwright test tests/e2e/<feature-area>/ --headed` to verify they pass and screenshots are generated
     5. **Manual exploration** (optional, for complex UI): Open Playwright CLI for additional manual checking: `playwright-cli -s=ingrid open http://localhost:<port>/<path> --headed`
     6. **Compare against the design**: If the ticket has a Figma link or Jira image attachment, compare layout, colors, spacing, and typography against the design reference.
@@ -713,12 +749,14 @@ Once implementation agents complete their work, spawn:
     - **Data exposure**: Sensitive fields (SSN, email, salary) returned in API responses that shouldn't have them, PII in log statements, secrets/tokens in code or config files committed to git
     - **Path traversal**: User-controlled file paths without sanitization (../../../etc/passwd patterns)
     - **Hardcoded secrets**: API keys, connection strings, passwords, tokens in source code (should be in env/config)
+    - **Test file secrets**: Scan all new `.spec.ts` and test files for hardcoded credentials, passwords, or test user secrets in comments or string literals. Even commented-out credentials are flagged by GitGuardian/secrets scanners. Flag as MUST FIX.
     - **Insecure defaults**: CORS set to *, missing HTTPS enforcement, overly permissive RBAC roles
   - **Verify formatting was done**: Check that backend code has been formatted with CSharpier and frontend code with Prettier. If not, flag it as MUST FIX.
   - **Stale RTK Query types check**: If backend DTOs were modified, verify the generated RTK Query types (`src/store/rtk-apis/`) include the new fields. Look for `as Parameters<`, `as unknown as`, or manual type assertions in RTK Query trigger calls — these are red flags that types were NOT regenerated from the updated swagger. Flag as MUST FIX with instruction: "Regenerate RTK Query types from worktree Docker service."
   - **Dead redirect files**: If types/classes were moved between projects or namespaces, check that the old file was DELETED — not left as a comment-only redirect (e.g., "// Moved to X"). Flag as MUST FIX: "Delete the old file and fix using statements."
   - **Business defaults at wrong layer**: Check for magic number defaults (`?? 30`, `?? 100`, etc.) buried in repository/data-access code. These should be visible at the controller or service layer. Flag as SUGGESTION: "Move default to controller for visibility — repos can keep as defensive fallback."
   - **TSDoc on new components**: Check that new React components and hooks have a TSDoc comment explaining intent/usage. Missing TSDoc on meaningful components = SUGGESTION (not blocking, but flag it).
+  - **Shared utility impact analysis**: When changes touch shared functions (in `shared/`, `utils/`, `helpers/`, or any module imported by 3+ consumers), verify all callers were checked. Run `grep -r "functionName" --include="*.ts" --include="*.cs"` to find consumers. If the PR modifies a shared function without evidence of caller analysis, flag as MUST FIX: "Shared function modified — verify all callers handle the change."
   - **Design intent check**: Verify the implementation matches the ticket's stated purpose — not just code quality. If the solution solves a different problem than what was described, flag as MUST FIX.
   - **Access control rendering**: When backend changes affect frontend data shape (e.g., masking/filtering by role), verify frontend tests or visual checks cover BOTH masked and unmasked rendering paths.
   - For each issue found, categorize as: MUST FIX (blocking) or SUGGESTION (nice-to-have)
@@ -1485,6 +1523,17 @@ When backend changes need to be tested against a running API (not just unit test
 - The main stack must be running: `cd ~/Documents/Repo && docker compose up -d`
 - The worktree must have a `.env` file with unique ports (generated by `/workspace-launch` via `bash ~/.claude/scripts/allocate-ports.sh <TICKET_ID>`)
 
+### Env var validation before starting services
+Before running `worktree-service.sh up`, verify the worktree's `.env` file exists and has the required ports:
+```bash
+# Check .env exists
+if [ ! -f .env ]; then echo "ERROR: .env missing — run: bash ~/.claude/scripts/allocate-ports.sh <TICKET_ID>"; fi
+
+# Verify required port vars are set (not empty)
+grep -E "^(ServiceB|ServiceC|ABSENCE|STATISTICS|MESSENGER)_API_PORT=" .env
+```
+If `.env` is missing or incomplete (common after resume — ports were allocated in the original session), re-run `bash ~/.claude/scripts/allocate-ports.sh <TICKET_ID>` to regenerate. Also verify `apps/web/.env.local` has the correct `VITE_DEV_PORT` — a mismatch means the Vite dev server starts on the wrong port.
+
 ### How to rebuild a service after code changes
 
 ```bash
@@ -1524,12 +1573,7 @@ grep _API_PORT .env
 
 After rebuilding a service, update the commented-out line in `apps/web/.env.local` to proxy the frontend to the worktree port:
 
-```bash
-# In apps/web/.env.local, uncomment and set the port for the rebuilt service:
-VITE_ServiceB_API_PORT=15805
-```
-
-Then restart the Vite dev server (`npm start` in `apps/web/`). Only override the port for the service(s) you rebuilt — leave others pointing at the main stack (500x).
+**`worktree-service.sh up` now auto-updates `vite.config.worktree.mts`** — it switches the rebuilt service's proxy from 500x to the worktree port (10xxx). No manual `.env.local` editing needed. On `worktree-service.sh down`, all proxies revert to 500x.
 
 ### RTK Query API generation from worktree service
 
@@ -1543,18 +1587,21 @@ This reads ports from `apps/web/.env.local` automatically. When no override is s
 
 ### When agents should rebuild
 
-- **Kenji / Diego**: After making API changes that need testing, run `bash ~/.claude/scripts/worktree-service.sh up <service>`. Read the port from `.env` and share it with other agents.
-- **Ingrid**: If Kenji rebuilt a service, uncomment the `VITE_*_API_PORT` line in `apps/web/.env.local` with the worktree port, then restart Vite. For API generation: `bash ~/.claude/scripts/generate-api.sh service-b`
+- **Kenji / Diego**: After making API changes that need testing, run `bash ~/.claude/scripts/worktree-service.sh up <service>`. This builds the container AND updates the Vite proxy automatically. Share the port with Ingrid so she can regenerate types.
+- **Ingrid**: After Kenji rebuilds, restart Vite (`npx vite --config vite.config.worktree.mts --host`) to pick up the proxy change. For API generation: `bash ~/.claude/scripts/generate-api.sh service-b`
 - **Amara**: When verifying API contracts or debugging, use the worktree service to test changes in isolation
 
 ### Running the frontend dev server
 
-Each worktree has its own Vite port (configured in `apps/web/.env.local` as `VITE_DEV_PORT`):
+Each worktree has its own Vite port baked into `vite.config.worktree.mts` (generated by `allocate-ports.sh`):
 
 ```bash
-cd apps/web && npm start
-# Runs on http://localhost:<VITE_DEV_PORT>
+cd apps/web && npx vite --config vite.config.worktree.mts --host
+# Runs on http://localhost:<unique-port> (e.g., 3103)
+# API proxies → main stack (500x) unless worktree-service.sh switched one
 ```
+
+**Do NOT use `npm start` in worktrees** — it uses `vite.config.mts` which hardcodes port 3000 and would conflict with other worktrees.
 
 Multiple worktrees can each run their own frontend and backend independently.
 
