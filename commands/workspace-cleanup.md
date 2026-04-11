@@ -66,6 +66,23 @@ If the worktree has a `docker-compose.worktree.yml`, stop any running worktree c
 cd ~/Documents/<TICKET_ID> && docker compose -f docker-compose.worktree.yml down 2>/dev/null || true
 ```
 
+### Step 3.5: Remove Worktree Docker Containers & Images
+
+Worktree services create Docker images named `repo-<ticket-lowercase>-<service>-wt` (e.g., `repo-proj-1234-service-c-api-wt`). Clean these up to reclaim disk space.
+
+```bash
+# Convert ticket ID to lowercase for Docker naming (e.g., PROJ-1234 → proj-1234)
+TICKET_LOWER=$(echo "<TICKET_ID>" | tr '[:upper:]' '[:lower:]')
+
+# Remove any stopped containers matching this worktree
+docker ps -a --format '{{.Names}}' | grep "$TICKET_LOWER" | xargs -r docker rm -f 2>/dev/null || true
+
+# Remove images matching this worktree
+docker images --format '{{.Repository}}:{{.Tag}}' | grep "$TICKET_LOWER" | xargs -r docker rmi 2>/dev/null || true
+```
+
+Report how many images were removed and how much space was reclaimed. If none found, skip silently.
+
 ### Step 4: Kill Vite Dev Server & tmux Session
 
 Before removing the worktree, check if there's a Vite dev server running on its allocated port and ask the user whether to kill it.

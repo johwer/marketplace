@@ -27,6 +27,46 @@ unset CLAUDECODE
 # Kill existing tmux session if any (stale from previous day)
 tmux kill-session -t "$TICKET_ID" 2>/dev/null
 
+# === Validate worktree environment ===
+ENV_WARNINGS=""
+
+# Check .env exists with port allocations
+if [ ! -f ".env" ]; then
+  ENV_WARNINGS="${ENV_WARNINGS}\n⚠️  .env missing — regenerating ports..."
+  bash "$(dirname "$0")/allocate-ports.sh" "$TICKET_ID" 2>/dev/null
+  if [ ! -f ".env" ]; then
+    ENV_WARNINGS="${ENV_WARNINGS}\n❌ Port allocation failed. Run manually: bash ~/.claude/scripts/allocate-ports.sh $TICKET_ID"
+  fi
+elif ! grep -qE "^(ServiceB|ServiceC|ABSENCE|STATISTICS|MESSENGER)_API_PORT=" .env 2>/dev/null; then
+  ENV_WARNINGS="${ENV_WARNINGS}\n⚠️  .env exists but missing API port vars — regenerating..."
+  bash "$(dirname "$0")/allocate-ports.sh" "$TICKET_ID" 2>/dev/null
+fi
+
+# Check apps/web/.env.local exists
+if [ ! -f "apps/web/.env.local" ]; then
+  ENV_WARNINGS="${ENV_WARNINGS}\n⚠️  apps/web/.env.local missing — Vite dev server may use wrong port"
+fi
+
+# Check for stale Docker containers on worktree ports
+if [ -f ".env" ]; then
+  STALE_PORTS=""
+  while IFS='=' read -r key val; do
+    if [[ "$key" == *_API_PORT ]] && [ -n "$val" ]; then
+      PID=$(lsof -ti :"$val" 2>/dev/null)
+      if [ -n "$PID" ]; then
+        STALE_PORTS="${STALE_PORTS}\n  Port $val ($key) in use by PID $PID"
+      fi
+    fi
+  done < <(grep "_API_PORT=" .env 2>/dev/null)
+  if [ -n "$STALE_PORTS" ]; then
+    ENV_WARNINGS="${ENV_WARNINGS}\n⚠️  Ports already in use (stale containers?):${STALE_PORTS}"
+  fi
+fi
+
+if [ -n "$ENV_WARNINGS" ]; then
+  echo -e "\n=== Worktree Environment Check ===${ENV_WARNINGS}\n"
+fi
+
 # Gather context for the resume prompt
 PR_INFO=$(cd "$MONOREPO" && gh pr list --head "$TICKET_ID" --json number,title,state,url --jq '.[0] // empty' 2>/dev/null)
 GIT_STATUS=$(git status --short 2>/dev/null)

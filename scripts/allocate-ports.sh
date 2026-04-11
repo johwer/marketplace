@@ -148,41 +148,34 @@ VITE_MESSENGER_API_PORT=5006
 # --- WORKTREE PORTS END ---
 EOF
 
-# --- Generate vite.config.worktree.mts (Phase 1 fallback) ---
-# Standalone Vite config with worktree ports baked in.
-# Used before the vite.config.mts env var PR merges.
+# --- Generate vite.config.worktree.mts ---
+# Standalone Vite config with unique dev server port but API proxies
+# pointing to the main stack (500x). When worktree-service.sh starts a
+# Docker container, it updates the specific service proxy to the worktree port.
 VITE_WORKTREE_CONFIG="$WORKTREE_DIR/apps/web/vite.config.worktree.mts"
 
 if [ -f "$WORKTREE_DIR/apps/web/vite.config.mts" ]; then
     sed \
-        -e "s#process.env.VITE_DEV_PORT || \"3000\"#\"$VITE_PORT\"#g" \
-        -e "s#process.env.VITE_ServiceC_API_PORT || \"5001\"#\"$ServiceC_PORT\"#g" \
-        -e "s#process.env.VITE_ABSENCE_API_PORT || \"5002\"#\"$ABSENCE_PORT\"#g" \
-        -e "s#process.env.VITE_STATISTICS_API_PORT || \"5003\"#\"$STATISTICS_PORT\"#g" \
-        -e "s#process.env.VITE_ServiceB_API_PORT || \"5005\"#\"$ServiceB_PORT\"#g" \
-        -e "s#process.env.VITE_MESSENGER_API_PORT || \"5006\"#\"$MESSENGER_PORT\"#g" \
         -e "s#port: 3000,#port: $VITE_PORT,#" \
-        -e "s#\"http://localhost:5001\"#\"http://localhost:$ServiceC_PORT\"#g" \
-        -e "s#\"http://localhost:5002\"#\"http://localhost:$ABSENCE_PORT\"#g" \
-        -e "s#\"http://localhost:5003\"#\"http://localhost:$STATISTICS_PORT\"#g" \
-        -e "s#\"http://localhost:5005\"#\"http://localhost:$ServiceB_PORT\"#g" \
-        -e "s#\"http://localhost:5006\"#\"http://localhost:$MESSENGER_PORT\"#g" \
         "$WORKTREE_DIR/apps/web/vite.config.mts" > "$VITE_WORKTREE_CONFIG"
-    echo "Generated vite.config.worktree.mts with worktree ports"
+    echo "Generated vite.config.worktree.mts (port $VITE_PORT, APIs → main stack 500x)"
 fi
 
 echo ""
 echo "Ports allocated for $TICKET_ID (slot $SLOT):"
 echo ""
 echo "  Vite dev server   http://localhost:$VITE_PORT"
-echo "  ServiceC API           http://localhost:$ServiceC_PORT"
-echo "  ServiceA API       http://localhost:$ABSENCE_PORT"
-echo "  ServiceE API    http://localhost:$STATISTICS_PORT"
-echo "  ServiceB API           http://localhost:$ServiceB_PORT"
-echo "  ServiceD API     http://localhost:$MESSENGER_PORT"
+echo "  API proxies       → main stack (500x) by default"
 echo ""
-echo "To start the frontend with worktree ports:"
-echo "  cd apps/web && npx vite --config vite.config.worktree.mts"
+echo "  Docker ports (used when worktree-service.sh up <service>):"
+echo "    ServiceC API           http://localhost:$ServiceC_PORT"
+echo "    ServiceA API       http://localhost:$ABSENCE_PORT"
+echo "    ServiceE API    http://localhost:$STATISTICS_PORT"
+echo "    ServiceB API           http://localhost:$ServiceB_PORT"
+echo "    ServiceD API     http://localhost:$MESSENGER_PORT"
 echo ""
-echo "To proxy frontend through a rebuilt service, edit apps/web/.env.local:"
-echo "  VITE_ServiceB_API_PORT=$ServiceB_PORT"
+echo "To start the frontend:"
+echo "  cd apps/web && npx vite --config vite.config.worktree.mts --host"
+echo ""
+echo "To rebuild a backend service and auto-switch the proxy:"
+echo "  bash ~/.claude/scripts/worktree-service.sh up service-b-api"
