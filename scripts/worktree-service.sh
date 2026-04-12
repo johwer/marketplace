@@ -151,6 +151,17 @@ worktree_port() {
     grep "^${env_key}=" "$WORKTREE_DIR/.env" 2>/dev/null | cut -d= -f2
 }
 
+# Map service name → VITE env var name in .env.local
+vite_env_var() {
+    case "$1" in
+        service-c-api)        echo "VITE_ServiceC_API_PORT" ;;
+        service-a-api)    echo "VITE_ABSENCE_API_PORT" ;;
+        service-e-api) echo "VITE_STATISTICS_API_PORT" ;;
+        service-b-api)        echo "VITE_ServiceB_API_PORT" ;;
+        service-d-api)  echo "VITE_MESSENGER_API_PORT" ;;
+    esac
+}
+
 # Switch a service's proxy in vite.config.worktree.mts to the given port
 switch_vite_proxy() {
     local service="$1" new_port="$2"
@@ -166,6 +177,19 @@ switch_vite_proxy() {
         -e "s#http://localhost:${wt_port}\"#http://localhost:${new_port}\"#g" \
         "$vite_config"
     echo "Updated vite proxy: $service → localhost:$new_port"
+}
+
+# Update VITE_*_API_PORT in .env.local so generate-api.sh picks up the right port
+switch_env_local_port() {
+    local service="$1" new_port="$2"
+    local env_local="$WORKTREE_DIR/apps/web/.env.local"
+    [ -f "$env_local" ] || return 0
+    local var_name
+    var_name=$(vite_env_var "$service")
+    [ -n "$var_name" ] || return 0
+    if grep -q "^${var_name}=" "$env_local" 2>/dev/null; then
+        sed -i '' "s|^${var_name}=.*|${var_name}=${new_port}|" "$env_local"
+    fi
 }
 
 # Map user-facing service name to compose service name.
@@ -214,14 +238,17 @@ case "${1:-help}" in
         echo "Building and starting $SERVICE from worktree ($WORKTREE_DIR)..."
         compose up --build -d "$COMPOSE_NAME"
 
-        # Switch vite proxy for this service to the worktree port
+        # Switch vite proxy and .env.local port for this service to the worktree port
         WT_PORT=$(worktree_port "$SERVICE")
         if [ -n "$WT_PORT" ]; then
             switch_vite_proxy "$SERVICE" "$WT_PORT"
+            switch_env_local_port "$SERVICE" "$WT_PORT"
             echo ""
             echo "⚡ Vite proxy updated: $SERVICE → localhost:$WT_PORT"
+            echo "⚡ .env.local updated: $(vite_env_var "$SERVICE")=$WT_PORT"
             echo "  Restart Vite to pick up the change:"
             echo "  cd apps/web && npx vite --config vite.config.worktree.mts --host"
+            echo "  Generate API types: bash ~/.claude/scripts/generate-api.sh ${SERVICE%-api}"
         fi
 
         echo ""
@@ -234,12 +261,13 @@ case "${1:-help}" in
         # Reset ServiceC host to main stack when stopping
         sed -i '' 's/^ServiceC_SERVICE_HOST=.*/ServiceC_SERVICE_HOST=service-c-api/' "$WORKTREE_DIR/.env" 2>/dev/null || true
 
-        # Revert all vite proxies back to main stack (500x)
+        # Revert all vite proxies and .env.local ports back to main stack (500x)
         for svc in $SERVICES; do
             MAIN_PORT=$(main_stack_port "$svc")
             switch_vite_proxy "$svc" "$MAIN_PORT" 2>/dev/null
+            switch_env_local_port "$svc" "$MAIN_PORT" 2>/dev/null
         done
-        echo "Vite proxies reverted to main stack (500x)"
+        echo "Vite proxies and .env.local reverted to main stack (500x)"
 
         compose down
         ;;

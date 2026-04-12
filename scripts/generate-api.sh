@@ -87,29 +87,38 @@ if [ ! -d "$WEB_DIR" ]; then
     exit 1
 fi
 
-# Default ports (same as main stack)
-declare -A DEFAULT_PORTS=(
-    [service-c]=5001
-    [service-a]=5002
-    [service-e]=5003
-    [service-b]=5005
-    [service-d]=5006
-)
+# Available services
+SERVICES="service-c service-a service-e service-b service-d"
 
-# Map service name to env var name in .env.local
-declare -A ENV_VAR_NAMES=(
-    [service-c]=VITE_ServiceC_API_PORT
-    [service-a]=VITE_ABSENCE_API_PORT
-    [service-e]=VITE_STATISTICS_API_PORT
-    [service-b]=VITE_ServiceB_API_PORT
-    [service-d]=VITE_MESSENGER_API_PORT
-)
+# Map service name → default port (main stack 500x)
+default_port() {
+    case "$1" in
+        service-c)        echo 5001 ;;
+        service-a)    echo 5002 ;;
+        service-e) echo 5003 ;;
+        service-b)        echo 5005 ;;
+        service-d)  echo 5006 ;;
+    esac
+}
+
+# Map service name → VITE env var name in .env.local
+env_var_name() {
+    case "$1" in
+        service-c)        echo "VITE_ServiceC_API_PORT" ;;
+        service-a)    echo "VITE_ABSENCE_API_PORT" ;;
+        service-e) echo "VITE_STATISTICS_API_PORT" ;;
+        service-b)        echo "VITE_ServiceB_API_PORT" ;;
+        service-d)  echo "VITE_MESSENGER_API_PORT" ;;
+    esac
+}
 
 # Read port for a service (from .env.local or default)
 get_port() {
     local service=$1
-    local var_name="${ENV_VAR_NAMES[$service]}"
-    local default="${DEFAULT_PORTS[$service]}"
+    local var_name
+    var_name=$(env_var_name "$service")
+    local fallback
+    fallback=$(default_port "$service")
 
     if [ -f "$ENV_FILE" ]; then
         local port
@@ -119,7 +128,7 @@ get_port() {
             return
         fi
     fi
-    echo "$default"
+    echo "$fallback"
 }
 
 # Generate API client for a single service
@@ -134,9 +143,10 @@ generate_service() {
         return 1
     fi
 
-    local default_port="${DEFAULT_PORTS[$service]}"
+    local def_port
+    def_port=$(default_port "$service")
 
-    if [ "$port" = "$default_port" ]; then
+    if [ "$port" = "$def_port" ]; then
         echo "Generating $service API client (port $port)..."
         cd "$WEB_DIR" && npx @rtk-query/codegen-openapi "src/api/openapi-config-${service}.ts"
     else
@@ -145,7 +155,7 @@ generate_service() {
 
         trap "rm -f '$temp_config'" EXIT
 
-        sed "/schemaFile:/ s|localhost:${default_port}|localhost:${port}|" "$config_file" > "$temp_config"
+        sed "/schemaFile:/ s|localhost:${def_port}|localhost:${port}|" "$config_file" > "$temp_config"
 
         cd "$WEB_DIR" && npx @rtk-query/codegen-openapi "src/api/.openapi-config-${service}-worktree.ts"
 
@@ -163,9 +173,9 @@ if [ "$SERVICE" = "all" ]; then
         generate_service "$svc"
     done
 else
-    if [ -z "${DEFAULT_PORTS[$SERVICE]+x}" ]; then
+    if ! echo "$SERVICES" | grep -qw "$SERVICE"; then
         echo "Unknown service: $SERVICE"
-        echo "Available: service-c, service-a, service-e, service-b, service-d"
+        echo "Available: $SERVICES"
         exit 1
     fi
     generate_service "$SERVICE"
