@@ -67,6 +67,11 @@ if [ -n "$ENV_WARNINGS" ]; then
   echo -e "\n=== Worktree Environment Check ===${ENV_WARNINGS}\n"
 fi
 
+# Ensure worktree CLAUDE.md exists (prevents DTF amnesia in spawned sessions)
+if [ ! -f "$WORKTREE/CLAUDE.md" ] || ! grep -q "DTF Worktree" "$WORKTREE/CLAUDE.md" 2>/dev/null; then
+  bash "$(dirname "$0")/write-worktree-claude-md.sh" "$TICKET_ID" 2>/dev/null || true
+fi
+
 # Gather context for the resume prompt
 PR_INFO=$(cd "$MONOREPO" && gh pr list --head "$TICKET_ID" --json number,title,state,url --jq '.[0] // empty' 2>/dev/null)
 GIT_STATUS=$(git status --short 2>/dev/null)

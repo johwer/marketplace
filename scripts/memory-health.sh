@@ -124,6 +124,31 @@ if [[ -f "$LEARNINGS" ]] && [[ $(wc -l < "$LEARNINGS") -gt 500 ]]; then
   echo "  💡 $SUGGESTIONS. Run /retro-proposals then archive old learnings"
 fi
 
+# Check for stale worktree project dirs (no matching active worktree)
+MONOREPO_PATH=$(jq -r '.paths.monorepo // empty' ~/.claude/dtf-config.json 2>/dev/null)
+WORKTREE_PARENT=$(jq -r '.paths.worktreeParent // empty' ~/.claude/dtf-config.json 2>/dev/null)
+if [[ -n "$MONOREPO_PATH" ]] && [[ -d "$MONOREPO_PATH" ]]; then
+  ACTIVE_BRANCHES=$(cd "$MONOREPO_PATH" && git worktree list --porcelain 2>/dev/null | grep 'branch refs/heads/' | sed 's|branch refs/heads/||')
+  SAFE_PARENT=$(echo "${WORKTREE_PARENT:-$HOME/Documents}" | sed 's|^/||' | sed 's|/|-|g')
+  STALE_WORKTREE_DIRS=0
+  for dir in "$HOME/.claude/projects/-${SAFE_PARENT}-PROJ-"* "$HOME/.claude/projects/-${SAFE_PARENT}-NOVA-"*; do
+    [ -d "$dir" ] || continue
+    base=$(basename "$dir" | sed "s|-${SAFE_PARENT}-||" | sed 's|-apps-web$||')
+    is_active=false
+    while IFS= read -r branch; do
+      if [ "$branch" = "$base" ]; then
+        is_active=true
+        break
+      fi
+    done <<< "$ACTIVE_BRANCHES"
+    $is_active || STALE_WORKTREE_DIRS=$((STALE_WORKTREE_DIRS + 1))
+  done
+  if [[ $STALE_WORKTREE_DIRS -gt 0 ]]; then
+    SUGGESTIONS=$((SUGGESTIONS + 1))
+    echo "  💡 $SUGGESTIONS. $STALE_WORKTREE_DIRS stale worktree project dir(s) — run: bash ~/.claude/scripts/cleanup-stale-projects.sh"
+  fi
+fi
+
 # Check for potentially stale project memories
 STALE=0
 for f in "$MEMORY_DIR"/*.md; do

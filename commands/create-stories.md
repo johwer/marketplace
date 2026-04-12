@@ -105,11 +105,16 @@ Before creating new workspaces, check if any existing worktrees have merged/clos
 
 6. **Also kill any orphan tmux sessions** that don't have a matching worktree:
    ```bash
-   tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^PROJ-'
+   tmux list-sessions -F '#{session_name}' 2>/dev/null | grep -E '^PROJ-|^NOVA-'
    ```
    For each session without a matching worktree, kill it:
    ```bash
    tmux kill-session -t <SESSION_NAME> 2>/dev/null || true
+   ```
+
+7. **Clean up stale project memory dirs** (worktrees that no longer exist leave orphaned `~/.claude/projects/` dirs):
+   ```bash
+   bash ~/.claude/scripts/cleanup-stale-projects.sh
    ```
 
 ---
@@ -409,6 +414,16 @@ playwright-cli -s=lena close
 Login sequence: click "More login options" → "Username and password" → fill username (gunner/anna) → fill password (tolvan) → submit.
 Screenshots go to `~/Downloads/<TICKET_ID>-*.png`. This is NOT optional for UI changes.
 ```
+
+#### Step 6.5: Write Worktree CLAUDE.md
+
+Generate a `CLAUDE.md` in the worktree root so the spawned Claude session knows it's in a DTF worktree, what ports to use, and which scripts are available. This prevents "DTF amnesia" where Claude forgets the workflow.
+
+```bash
+bash ~/.claude/scripts/write-worktree-claude-md.sh <TICKET_ID>
+```
+
+This copies the monorepo's base `CLAUDE.md` and appends DTF-specific context (ports, scripts, workflow rules). Every Claude session in the worktree will see this automatically.
 
 #### Step 7: Launch Based on User's Choice (from Step 5)
 
