@@ -1,20 +1,37 @@
 ---
 name: aws-setup
-description: Set up AWS CLI SSO for Repo and sync TranslationService translations to S3
+description: Set up AWS CLI SSO and sync TranslationService translations to S3
 user_invocable: true
 ---
 
-# AWS Setup — Repo CLI Authentication & Translation Sync
+# AWS Setup — CLI Authentication & Translation Sync
 
 Use this skill when AWS CLI credentials are needed (e.g., syncing translations to S3, accessing S3 buckets, or any `aws` command).
+
+## Step 0: Read company config
+
+```bash
+cat ~/.claude/company-config.json 2>/dev/null | jq '.aws // empty'
+```
+
+Extract values into variables for use in subsequent steps:
+- `profileName` — the AWS CLI profile name (default: `repo`)
+- `ssoStartUrl` — SSO portal URL
+- `ssoRegion` — SSO region
+- `accountId` — AWS account ID
+- `roleName` — SSO role name
+- `defaultRegion` — default AWS region for services
+- `s3TranslationsBucket` — S3 bucket for translations
+
+If `company-config.json` is missing or has no `aws` section, ask the user for these values.
 
 ## Step 1: Check if AWS CLI is authenticated
 
 ```bash
-aws sts get-caller-identity 2>&1
+bash ~/.claude/scripts/aws-check.sh
 ```
 
-If this returns credentials, skip to the task. If "Unable to locate credentials", proceed to Step 2.
+If this passes, skip to the task. If it fails, proceed to Step 2.
 
 ## Step 2: Check if `~/.aws/config` exists
 
@@ -22,38 +39,46 @@ If this returns credentials, skip to the task. If "Unable to locate credentials"
 cat ~/.aws/config 2>/dev/null
 ```
 
-If missing, create it:
+If missing or the profile doesn't exist, create it using values from Step 0:
 
 ```ini
-[sso-session repo]
-sso_start_url = https://d-9367b997a7.awsapps.com/start
-sso_region = eu-north-1
+[sso-session <profileName>]
+sso_start_url = <ssoStartUrl>
+sso_region = <ssoRegion>
 sso_registration_scopes = sso:account:access
 
-[profile repo]
-sso_session = repo
-sso_account_id = 107311625882
-sso_role_name = Frontend-Developer
-region = eu-west-1
+[profile <profileName>]
+sso_session = <profileName>
+sso_account_id = <accountId>
+sso_role_name = <roleName>
+region = <defaultRegion>
 ```
 
 ## Step 3: Authenticate
 
 Try SSO login first:
 ```bash
-aws sso login --profile repo
+aws sso login --profile <profileName>
 ```
 
 If SSO login fails (common with some SSO configurations), use the **temporary credentials method**:
 
-1. Tell the user: "Open https://d-9367b997a7.awsapps.com/start in your browser"
-2. Click **Repo** → **Frontend-Developer** → **"Command line or programmatic access"**
+1. Tell the user: "Open <ssoStartUrl> in your browser"
+2. Click the account → role → **"Command line or programmatic access"**
 3. Copy the 3 `export` lines (Option 1: environment variables)
-4. User pastes them, you run them
+4. User pastes them via `! export AWS_ACCESS_KEY_ID=...` etc.
 
 Then verify:
 ```bash
-aws sts get-caller-identity
+aws sts get-caller-identity --profile <profileName>
+```
+
+## Step 4: Set up persistent profile
+
+Suggest adding to `~/.zshrc` (or equivalent) so all terminals use the right profile:
+
+```bash
+echo 'export AWS_PROFILE=<profileName>' >> ~/.zshrc
 ```
 
 ## Common Tasks
@@ -66,7 +91,7 @@ TRANSLATION_SERVICE_KEY=$(grep TRANSLATION_SERVICE_API_KEY apps/web/.env.local |
 python3 scripts/sync_lokalise_translations.py \
   --project-id 3907704568ac1345097c75.30587214 \
   --api-key "$TRANSLATION_SERVICE_KEY" \
-  --s3-location repo-translations
+  --s3-location <s3TranslationsBucket>
 ```
 
 **Important:** The AWS env vars don't persist between shell invocations. If using temporary credentials, prepend them to the command or export them in the same `&&` chain.
@@ -74,7 +99,7 @@ python3 scripts/sync_lokalise_translations.py \
 ### Verify a translation key exists in S3
 
 ```bash
-curl -s "https://repo-translations.s3.eu-west-1.amazonaws.com/en/en.json" | python3 -c "
+curl -s "https://<s3TranslationsBucket>.s3.<defaultRegion>.amazonaws.com/en/en.json" | python3 -c "
 import sys,json
 d=json.load(sys.stdin)
 key='YOUR_KEY_HERE'
@@ -84,11 +109,4 @@ print(f'{key}: \"{d.get(key, \"NOT FOUND\")}\"')
 
 ## Key Details
 
-| Item | Value |
-|------|-------|
-| SSO Portal | https://d-9367b997a7.awsapps.com/start |
-| Account | Repo (107311625882) |
-| Role | Frontend-Developer |
-| S3 Bucket | repo-translations |
-| S3 Region | eu-west-1 |
-| Confluence Guide | https://your-company.atlassian.net/wiki/spaces/MEDHELP/pages/8151334915 |
+Values come from `~/.claude/company-config.json` under the `aws` key. If not present, ask the user or check `~/.aws/config` for existing profiles.

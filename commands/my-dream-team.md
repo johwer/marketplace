@@ -142,6 +142,12 @@ This phase runs instead of the normal Phase 1-7 workflow when `--resume` is dete
 
 1. **Determine ticket ID** from the arguments or current directory.
 
+1.5. **AWS session check** — SSO tokens can expire between sessions:
+   ```bash
+   bash ~/.claude/scripts/aws-check.sh
+   ```
+   If it fails, show the output and suggest: `! aws sso login --profile repo`. Wait for authentication, then re-check.
+
 2. **Verify working directory** — confirm you are running from the worktree, not the main repo:
    ```bash
    pwd  # Should be ~/Documents/<TICKET_ID>, NOT ~/Documents/Repo
