@@ -59,7 +59,20 @@ bash ~/.claude/scripts/phase-cost-tracker.sh log "<TICKET_ID>" "pre-hydration" "
 
 ---
 
-### Step 0: Clean Up Stale Worktrees
+### Step 0: AWS Session Check
+
+Before starting any work, verify the AWS session is active. Translations are fetched from S3 at runtime, so an expired session will cause issues during verification.
+
+```bash
+bash ~/.claude/scripts/aws-check.sh
+```
+
+- If it **passes** (exit 0): continue to Step 0.5.
+- If it **fails** (exit 1): show the user the output and suggest they run `! aws sso login --profile repo` (the `!` prefix runs it in this session). Wait for them to authenticate, then re-run the check.
+
+This step also runs on `--resume` — sessions can outlast the SSO token lifetime.
+
+### Step 0.5: Clean Up Stale Worktrees
 
 Before creating new workspaces, check if any existing worktrees have merged/closed PRs that can be cleaned up. This prevents worktree buildup over time.
 

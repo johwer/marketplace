@@ -351,6 +351,57 @@ This way the skill lives in the repo and worktrees inherit it. DTF's copy become
 
 ---
 
+### AWS SSO (S3 Translations)
+
+**Status:** Active
+**Location:** `~/.aws/config`, `~/.claude/scripts/aws-check.sh`
+
+The frontend loads translations from S3 at runtime. AWS credentials are needed for:
+- Syncing TranslationService translations to S3 (`/aws-setup`)
+- Verifying translation keys exist in S3
+- Any `aws` CLI command
+
+**How it works:**
+
+AWS SSO credentials are stored in `~/.aws/` (home directory) — they persist across all worktrees and terminal sessions automatically. No per-worktree setup needed.
+
+**First-time setup:**
+
+1. AWS config should already exist at `~/.aws/config` (created by `/aws-setup` or manually). If not, run `/aws-setup`.
+
+2. Login once:
+   ```bash
+   aws sso login --profile repo
+   ```
+
+3. (Optional) Set the default profile so all terminals use it:
+   ```bash
+   echo 'export AWS_PROFILE=repo' >> ~/.zshrc
+   ```
+
+**Session lifecycle:**
+
+SSO tokens last ~8 hours (depends on org settings). When they expire:
+- `/create-stories` and `/my-dream-team --resume` check automatically (Step 0 / Phase Resume 1.5)
+- The check script guides the user to re-authenticate
+- Run `! aws sso login --profile repo` from within Claude Code to authenticate inline
+
+**Company-specific values:**
+
+All AWS config (SSO URL, account ID, role, S3 bucket, region) lives in `company-config.json` under the `aws` key. The `aws-check.sh` script and `/aws-setup` skill read from this config — no hardcoded values in scripts.
+
+**Files:**
+
+| File | Purpose |
+|------|---------|
+| `~/.aws/config` | AWS CLI SSO profile config (shared across worktrees) |
+| `~/.aws/sso/cache/` | Cached SSO tokens (auto-managed by `aws sso login`) |
+| `~/.claude/scripts/aws-check.sh` | Session check script (called by DTF commands) |
+| `~/.claude/skills/aws-setup/SKILL.md` | Full setup + translation sync skill |
+| `~/.claude/company-config.json` → `aws` | Company-specific AWS values |
+
+---
+
 ## Requires External Setup
 
 ### Slack Integration

@@ -161,7 +161,7 @@ services:
       Microsoft__AppId: ee85bc57-6040-42c9-a58f-46bff132c327
       PasswordReset__ExpiryMinutes: 20
       PasswordReset__MaxActiveSessions: 3
-      PasswordReset__PasswordResetUrl: "http://localhost:3000/reset-password?Id={ID}&Token={TOKEN}"
+      PasswordReset__PasswordResetPath: "/reset-password?Id={ID}&Token={TOKEN}"
       RateLimiting__Policies__login__PermitLimit: 10
       RateLimiting__Policies__login__WindowSeconds: 60
       RateLimiting__Policies__ssoLogin__PermitLimit: 30
