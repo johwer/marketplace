@@ -56,22 +56,24 @@ region = <defaultRegion>
 
 ## Step 3: Authenticate
 
-Try SSO login first:
-```bash
-aws sso login --profile <profileName>
-```
+Tell the user:
 
-If SSO login fails (common with some SSO configurations), use the **temporary credentials method**:
-
-1. Tell the user: "Open <ssoStartUrl> in your browser"
+1. Open `<ssoStartUrl>` in your browser
 2. Click the account → role → **"Command line or programmatic access"**
-3. Copy the 3 `export` lines (Option 1: environment variables)
-4. User pastes them via `! export AWS_ACCESS_KEY_ID=...` etc.
+3. Copy the 3 values: **Access key ID**, **Secret access key**, **Session token**
 
-Then verify:
+Then run the credential helper — it writes to `~/.aws/credentials` which **persists across all terminals and worktrees**:
+
 ```bash
-aws sts get-caller-identity --profile <profileName>
+bash ~/.claude/scripts/aws-set-credentials.sh "<ACCESS_KEY_ID>" "<SECRET_ACCESS_KEY>" "<SESSION_TOKEN>"
 ```
+
+Verify:
+```bash
+bash ~/.claude/scripts/aws-check.sh
+```
+
+**Note:** `aws sso login` is the standard approach but fails for some SSO configurations. The credentials-file method works reliably. Credentials expire after ~8 hours — re-run when needed.
 
 ## Step 4: Set up persistent profile
 

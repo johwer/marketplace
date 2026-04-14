@@ -48,13 +48,16 @@ fi
 # --- Session expired — guide user ---
 echo "⚠ AWS session expired or not authenticated."
 echo ""
-echo "Run this command to authenticate:"
-echo ""
-echo "  aws sso login --profile ${AWS_PROFILE_NAME}"
-echo ""
 if [[ -n "$SSO_URL" ]]; then
-  echo "Or open the SSO portal manually: ${SSO_URL}"
+  echo "1. Open ${SSO_URL} in your browser"
+  echo "2. Click your account → role → 'Command line or programmatic access'"
+  echo "3. Copy the Access key ID, Secret access key, and Session token"
+  echo "4. Run:"
   echo ""
+  echo '   bash ~/.claude/scripts/aws-set-credentials.sh "<ACCESS_KEY>" "<SECRET_KEY>" "<SESSION_TOKEN>"'
+  echo ""
+  echo "This writes credentials to ~/.aws/credentials — persists across all terminals and worktrees."
+else
+  echo "Run: aws sso login --profile ${AWS_PROFILE_NAME}"
 fi
-echo "Tip: Add 'export AWS_PROFILE=${AWS_PROFILE_NAME}' to ~/.zshrc so all terminals use the right profile."
 exit 1
