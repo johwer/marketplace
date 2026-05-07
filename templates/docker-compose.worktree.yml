@@ -154,7 +154,8 @@ services:
       JWT__IssuerUrl: http://localhost:5001/api/service-c/v1/
       JWT__AccessExpiryMinutes: 60
       JWT__PartialExpiryMinutes: 15
-      JWT__RefreshExpiryDays: 7
+      JWT__RefreshExpiryHours: 168
+      JWT__AbsoluteExpiryHours: 720
       JWT__PrimaryCertificatePath: certs/jwt-dev-a.pfx
       JWT__SecondaryCertificatePath: certs/jwt-dev-b.pfx
       OpenTelemetry__ServiceName: ServiceC-API-Worktree
