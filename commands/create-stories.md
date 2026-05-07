@@ -183,7 +183,8 @@ Ask the user with AskUserQuestion:
 - **GO** — Pre-hydrate and launch (default)
 - **SKIP** — Don't pre-hydrate, don't launch. Ticket stays as-is.
 - **JUST WORKTREE** — Create worktree only, skip pre-hydration. For tickets the user already knows are trivial.
-- **REFINE FIRST** — Ticket needs work before implementation. Optionally run `/ticket-refine` on it.
+- **GRILL FIRST** — Idea is too vague to even refine yet. Run `/grill-me` on the ticket idea to flesh out the design through interview before any ticket text is written. Output feeds into `/ticket-refine`.
+- **REFINE FIRST** — Ticket text exists but has gaps (missing AC, unclear UX). Run `/ticket-refine` to push back on missing info.
 
 **Why this matters:**
 - Pre-hydration costs 30-50k tokens per ticket on Sonnet
@@ -191,7 +192,11 @@ Ask the user with AskUserQuestion:
 - A ticket the user knows is a 2-line fix = 50k wasted tokens (just create a worktree)
 - The user may have context about dependencies, priorities, or blockers that aren't in Jira
 
-**Only proceed with GO tickets to Step 2.** SKIP tickets are removed from the pipeline. JUST WORKTREE tickets skip to Phase B Step 6 directly. REFINE FIRST tickets are queued for `/ticket-refine` after the session.
+**GRILL FIRST vs REFINE FIRST:** Grill is for *upstream* design exploration — when the idea itself isn't fleshed out (e.g., "we should add OTP login" with no decisions on resend/expiry/error UX). Refine is for *downstream* ticket polishing — when there's a written ticket but it has gaps. If unsure, GRILL FIRST when AC is missing entirely; REFINE FIRST when AC exists but is incomplete.
+
+**AskUserQuestion limit:** That tool caps at 4 options per question. If all 5 semantic options (GO / SKIP / JUST WORKTREE / GRILL FIRST / REFINE FIRST) feel relevant for a ticket, drop SKIP from the visible list — the user can always pick "Other" and type "skip" if needed. For tickets where GO is split into Dream Team vs Lite (two GO variants), pick the 4 most relevant options based on ticket clarity.
+
+**Only proceed with GO tickets to Step 2.** SKIP tickets are removed from the pipeline. JUST WORKTREE tickets skip to Phase B Step 6 directly. GRILL FIRST tickets are routed to `/grill-me` first (synchronous, no worktree yet) — when grilling completes, ask the user whether to also run `/ticket-refine` to update Jira before proceeding. REFINE FIRST tickets are queued for `/ticket-refine` after the session.
 
 ---
 
