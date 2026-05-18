@@ -53,6 +53,18 @@ make_tmpscript() {
   echo "$tmp"
 }
 
+# Bring the terminal window to the foreground after launching it.
+# Cross-platform terminals (Alacritty, Kitty, WezTerm, Ghostty) spawn detached
+# and stay behind other windows on macOS — this raises them so the user sees
+# the new tmux session without alt-tabbing. No-op on Linux/Windows.
+raise_terminal_app() {
+  local app="$1"
+  [ "$OS" != "Darwin" ] && return 0
+  # Small delay so the app process is registered with the WindowServer
+  # before we try to activate it.
+  ( sleep 0.4 && osascript -e "tell application \"$app\" to activate" >/dev/null 2>&1 ) &
+}
+
 case "$TERMINAL_APP" in
 
   # --- Cross-platform ---
@@ -60,6 +72,7 @@ case "$TERMINAL_APP" in
   Alacritty)
     TMPSCRIPT="$(make_tmpscript)"
     alacritty -e "$TMPSCRIPT" &
+    raise_terminal_app "Alacritty"
     ;;
 
   Warp)
@@ -86,16 +99,19 @@ end tell"
   Kitty)
     TMPSCRIPT="$(make_tmpscript)"
     kitty --detach "$TMPSCRIPT"
+    raise_terminal_app "kitty"
     ;;
 
   WezTerm)
     TMPSCRIPT="$(make_tmpscript)"
     wezterm start -- "$TMPSCRIPT" &
+    raise_terminal_app "WezTerm"
     ;;
 
   Ghostty)
     TMPSCRIPT="$(make_tmpscript)"
     ghostty -e "$TMPSCRIPT" &
+    raise_terminal_app "Ghostty"
     ;;
 
   # --- macOS only ---
