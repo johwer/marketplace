@@ -1088,6 +1088,26 @@ After AI review and CI are clean, enter a feedback loop with the user:
 
 **The team stays alive until the user explicitly says "done" or "ship it".**
 
+### Phase 6.4: Tester Handoff — Generate Test Guide (auto)
+
+**Runs automatically** as soon as the user confirms "ship it" / "done" in Phase 6, BEFORE the final summary. Goal: every PR that goes ready also has a tester-friendly test guide attached to the Jira ticket so QA doesn't have to ask "how do I test this?".
+
+**Why here:** implementation is locked, visual verification is done (screenshots exist in `~/Downloads/<TICKET_ID>/`), and PR hasn't gone ready yet — so the test guide is attached to Jira BEFORE the tester sees the ticket transition.
+
+**How:** invoke the `tester-handoff` skill against the current PR. The skill:
+1. Reads the PR diff + Jira ticket + existing comments
+2. Checks skip-conditions (backend-only / docs / deps / test-only / i18n-only) — if matched, just posts a short Jira comment explaining no walkthrough is needed and EXITS
+3. Reads `qaEnvironment` from `~/.claude/dtf-config.json` silently (no prompts; soft-warns in the file if missing)
+4. Generates `howtotest-<TICKET_ID>.txt` at the worktree root with three parts: A) tester-can-verify-themselves, B) needs-developer-tools, C) not-testable
+5. Uploads the file to Jira as an attachment
+6. Posts a short Jira comment pointing to the attachment
+
+**Applies to both lite and team mode.** Lite users especially benefit — small UI fixes are the ones a tester most often doesn't know how to test.
+
+**Do NOT prompt the user during this step.** If `qaEnvironment` is missing, generate the file with placeholder URLs + a soft warning at the top, attach anyway, and continue.
+
+If the skill exits because of a skip-condition, that's success — no file generated, just a short Jira comment, and you proceed to Phase 6.5.
+
 ### Phase 6.5: Final Summary
 
 Only after the user approves, spawn Tane again for the **final** summary (updated with any changes from the review cycle). If no changes were made since Phase 5, skip re-spawning Tane.
