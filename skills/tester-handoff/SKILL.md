@@ -76,7 +76,25 @@ Pull these data points:
 - File diff (`gh pr view <N> --json files` or `git diff origin/main`)
 - Existing Jira comments (read with `acli jira workitem comment list --key <ID> --json` — they often have prior test instructions to extend, not replace)
 
-### Step 2 — Load QA environment config
+### Step 1.5 — Check skip conditions (avoid generating useless guides)
+
+Before generating a full guide, check the PR diff. If ALL changed files match one of the categories below, **skip the full guide** and instead post a one-line Jira comment explaining why no tester walkthrough is needed.
+
+| Category | Match rule | Jira comment to post instead |
+|---|---|---|
+| Backend-only | No files under `apps/web/src/**` changed | "Backend-only PR — verified via API tests and regression suite. No tester walkthrough needed." |
+| Docs-only | Only `*.md`, `docs/**`, `*.txt`, `README*` changed | "Documentation update — no functional test needed." |
+| Deps-only | Only `package.json`, `package-lock.json`, `*.csproj`, `Directory.Packages.props` changed | "Dependency bump — covered by CI build + existing test suite." |
+| Test-only | Only `*.test.ts*`, `*.spec.ts*`, `*Test.cs`, `*IntegrationTests.cs` changed | "Test-only change — covered by the test suite itself." |
+| i18n-only | Only translation/TranslationService files (`*.json` under translation paths) | "Translation update — verify in the target language(s) at the affected pages." |
+
+Localize the comment to the configured `qaEnvironment.defaultLanguage`.
+
+If the PR has a mix (e.g., backend + some frontend), DO generate the guide — but scope only to the frontend-visible surface.
+
+If the PR is **manually invoked** (user said "write a test guide" explicitly), do NOT auto-skip — the user has overridden the heuristic.
+
+### Step 2 — Load QA environment config (SILENT)
 
 Read `~/.claude/dtf-config.json`. Look for a `qaEnvironment` block:
 
@@ -90,15 +108,29 @@ Read `~/.claude/dtf-config.json`. Look for a `qaEnvironment` block:
 }
 ```
 
-If the block is missing or incomplete, ask the user (one batched AskUserQuestion) for the missing fields with sensible defaults. Then offer to save it back to `dtf-config.json` so future invocations skip the prompt.
+**Do NOT prompt the user mid-flow.** This skill is typically invoked automatically by DTF — interrupting with config questions breaks the flow.
+
+If the block is missing or incomplete:
+- Fill missing fields with `<TODO: set in ~/.claude/dtf-config.json qaEnvironment.<field>>` placeholders in URLs
+- Add a soft warning to the TOP of the generated file:
+  ```
+  ⚠️  QA environment config is incomplete in ~/.claude/dtf-config.json.
+  URLs contain placeholders. To fix permanently, add a `qaEnvironment` block:
+    "qaEnvironment": {
+      "baseUrl": "https://your-qa-env.example.com",
+      "testUser": "TestUser",
+      "customerId": "<your-test-customer-uuid>"
+    }
+  ```
+- Continue and write the file anyway — placeholder URLs are still useful as a structural reference.
 
 URL template: `<baseUrl>/<customerId>/<route>` (and `<baseUrl>/<public-route>` for pre-login screens like `/login/oneTimePass`).
 
-### Step 3 — Ask language
+### Step 3 — Language (silent default)
 
-Default: **English**.
+Read `qaEnvironment.defaultLanguage` from `~/.claude/dtf-config.json`. Default: **English**.
 
-Ask once: "Language? (English / Swedish / other)" — and remember the choice for this invocation. Future invocations can store a default at `qaEnvironment.defaultLanguage` if the user picks something non-English.
+**Do NOT prompt mid-flow.** If the user explicitly asks for a specific language ("write the test guide in Swedish"), honor that — otherwise use the configured default. To change the default permanently, the user edits `~/.claude/dtf-config.json` `qaEnvironment.defaultLanguage`.
 
 All scenario text — titles, "What this is about", steps, expected/possible bugs — is generated in the chosen language. The structural labels (PART A/B/C, scenario template field names) are also localized: e.g., Swedish uses "Vad detta handlar om", "Steg-för-steg", "Vad ska hända", "Vad kan vara fel".
 
