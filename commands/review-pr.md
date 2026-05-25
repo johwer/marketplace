@@ -21,7 +21,7 @@ $ARGUMENTS
 ## Flags
 
 - `--full` — Full mode: check out branch locally into a worktree, run builds/type checks/linting, review with full codebase context. Without this flag, review uses GitHub API only (fast mode).
-- `--deep` — Multi-agent review with validation. Launches 4 parallel review agents (2x convention, 2x bug/security), then validates each finding with independent agents. Only verified issues survive. Can be combined with `--full` for maximum depth. Significantly more thorough but uses more tokens.
+- `--deep` — Multi-agent review with validation. Launches 5 parallel review agents (2x convention, 2x bug/security, 1x historical context via git log + prior PR comments), then validates each finding with independent agents. Only verified issues survive. Can be combined with `--full` for maximum depth. Significantly more thorough but uses more tokens.
 - `--skip <pattern>` — Skip files matching the glob pattern (can be repeated). Examples: `--skip "*.generated.ts"`, `--skip "package-lock.json"`
 - `--skip-large <N>` — Skip files with more than N lines changed (default: no limit)
 - `--no-approve` — Never approve, only leave comments (advisory mode)
@@ -299,11 +299,24 @@ Split the changed files into two halves (by file count). Launch 4 agents **in pa
 - Prompt: "You are a security and correctness reviewer. Focus on: (a) auth/authz issues — missing permission checks, broken access control, privilege escalation, (b) data exposure — sensitive fields in API responses, PII in logs, (c) injection vectors — SQL, XSS, command injection, path traversal. Also check: are there new API endpoints without `[Authorize]`? New `UserAction` values without backend enforcement? For each issue, return: `{file, line, category: 'MUST FIX', description, evidence}`."
 - Include: diff patches for all files
 
-**Wait for all 4 to complete.** Collect their findings into a combined issue list.
+**Agent 5: Historical Context Reviewer** (Sonnet)
+- Reviews ALL changed files through the lens of prior history (not just the current diff)
+- Prompt: "You are a historical context reviewer. For each changed file, investigate prior work and review history. Your job is to catch patterns that were already rejected or fixes that this PR is silently undoing — things the diff-only reviewers cannot see.
+  - For each file, run: `gh api repos/{owner}/{repo}/commits?path=<file>&per_page=5 --jq '.[] | {sha, message: .commit.message, date: .commit.author.date}'` to see the last 5 commits touching it.
+  - Then: `gh search prs --repo {owner}/{repo} <file path> --state merged --limit 5 --json number,title,url` to find prior merged PRs touching it.
+  - For the top 2–3 prior PRs, run: `gh pr view <num> --comments` and scan the review threads.
+  - Flag MUST FIX only if you find concrete evidence: (a) this PR reverts a deliberate prior fix without explanation in the PR description/commit message, or (b) this PR repeats a pattern that was explicitly pushed back on in a prior PR review. Quote the prior commit message or review comment as evidence.
+  - Known recurring patterns to look for (cite these by name if you find them): action-based REST routes (should be resource-based), upsert misuse on user-preference tables, exception-as-flow control, cross-service responsibility leaks (ServiceC concerns edited in ServiceB/ServiceA), missing HTML encoding before email template substitution, CompanyPermission vs UserPermission misuse on company-level actions, missing multi-tenancy validation (companyIds belonging to customerId), EF Core SetValues() on entities with immutable fields.
+  - Do NOT flag stylistic regressions, formatter-catchable issues, or patterns that were merely discussed but not concluded. Only flag if there is a clear prior decision being violated.
+  - For each issue return: `{file, line, category: 'MUST FIX'|'SUGGESTION', description, evidence: 'PR#<num>: \"<quoted comment>\"' or 'Commit <sha>: \"<commit msg>\"'}`."
+- Include: list of changed file paths, repo owner/name (parse from `gh repo view --json owner,name`)
+- Works in both fast mode and `--full` mode — all queries go through `gh` API, no local worktree required
+
+**Wait for all 5 to complete.** Collect their findings into a combined issue list.
 
 #### 6d. Deduplicate
 
-Merge the 4 agents' issue lists:
+Merge the 5 agents' issue lists:
 - If two agents flagged the same file:line with the same concern → keep one, note "flagged by 2 agents" (higher confidence)
 - If issues overlap but aren't identical → keep both, they may be different aspects
 
@@ -325,7 +338,7 @@ Remove all issues where the validation agent returned `REJECTED`. Keep only `CON
 
 Report to the user how many were filtered:
 ```
-Deep review: 4 agents found 12 issues → validation confirmed 7, rejected 5 false positives
+Deep review: 5 agents found 12 issues → validation confirmed 7, rejected 5 false positives
 ```
 
 #### 6g. Merge with Build Results
