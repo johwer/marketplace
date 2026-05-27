@@ -12,6 +12,13 @@ COST=$(echo "$input" | jq -r '.cost.total_cost_usd // 0')
 AGENT=$(echo "$input" | jq -r '.agent.name // empty')
 SESSION_ID=$(echo "$input" | jq -r '.session_id // empty')
 
+# Working directory for git lookups (falls back to $PWD)
+WORK_DIR=$(echo "$input" | jq -r '.workspace.current_dir // .cwd // empty')
+[ -z "$WORK_DIR" ] && WORK_DIR="$PWD"
+
+# Current git branch (empty if not a repo / detached HEAD)
+BRANCH=$(git -C "$WORK_DIR" symbolic-ref --quiet --short HEAD 2>/dev/null)
+
 # Write context state to shared file for hooks to read
 CONTEXT_FILE="/tmp/claude-context-${SESSION_ID:-default}.json"
 echo "$input" | jq '{
@@ -42,6 +49,10 @@ OUT="$OUT  |  \$${COST_FMT}"
 
 if [ -n "$AGENT" ]; then
   OUT="$OUT  |  ${AGENT}"
+fi
+
+if [ -n "$BRANCH" ]; then
+  OUT="$OUT  |  ⎇ ${BRANCH}"
 fi
 
 echo "$OUT"
