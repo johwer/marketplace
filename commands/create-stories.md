@@ -130,6 +130,33 @@ Before creating new workspaces, check if any existing worktrees have merged/clos
    bash ~/.claude/scripts/cleanup-stale-projects.sh
    ```
 
+### Step 0.6: Docker Stack Health Check
+
+Quick sanity sweep of the Repo docker stack before spawning agents. Catches stuck or zombie containers that would derail later verification work (e.g. a worker pegged at 100% CPU silently for hours, or a service reporting unhealthy).
+
+```bash
+bash ~/.claude/scripts/docker-health-check.sh
+```
+
+The script flags any `repo-*` container that is:
+- not running (or recently exited within the last hour)
+- reporting healthcheck status `unhealthy`
+- over 80% CPU in a single snapshot
+- restarted ≥ 5 times
+
+Every issue is appended to `~/.claude/data/docker-health-log.jsonl` with a timestamp (machine-readable, for recurrence counting). On each run, the script also reports **recurring** issues — same container + same symptom seen in the last 7 days — so a flaky service stops looking like a one-off.
+
+**Evidence collection.** Separately, `~/.claude/data/docker-health-findings.md` is a human-readable log where we accumulate investigations and root-cause hypotheses. When the check surfaces something worth understanding — especially a recurring issue — append a curated entry using the template at the top of that file (symptom, evidence, suspected trigger, root cause, corroboration, workaround, real fix, status). Promote a confirmed mechanism into the file's "Known root causes" section. This is how we build the case toward a structural fix instead of re-diagnosing the same thing every time. (Known cause so far: **R1 — concurrent EF migrations racing on `docker compose up --build`**, which can leave a worker zombied at 100% CPU.)
+
+**How to react:**
+- **Exit 0 (all healthy):** continue silently to Phase A.
+- **Exit 1 (issues found):** show the script output to the user. Ask with AskUserQuestion whether to (a) investigate and fix before proceeding, (b) proceed anyway (e.g. `repo-pgadmin` may be intentionally idle), or (c) abort. Never auto-restart containers — another worktree session may depend on current state ([feedback_never_rebuild_main.md]).
+- **Exit 2 (docker not running):** tell the user and stop — they need to start Docker Desktop before any DTF work.
+
+**Recurring issues take priority.** If the same container has been flagged before in the last 7 days, mention it explicitly and suggest filing a Jira ticket if it keeps coming back.
+
+**Mid-session / ad-hoc use:** the script is callable standalone any time (`bash ~/.claude/scripts/docker-health-check.sh`) and writes to the same log file, so recurrence detection works whether the check ran at setup time or mid-flow. Consider running it from `/my-dream-team` at the start of the verification phase, or any time a verification step behaves strangely.
+
 ---
 
 ### Phase A: Parallel Pre-Hydration (All Tickets)
