@@ -105,7 +105,7 @@ Check if the arguments contain `--lite`. If present:
   - **Phase 4.75**: Visual verification hard gate (if UI changes)
   - **Phase 4.9**: De-sloppify pass (cleanup over-engineering, dead code, defensive bloat)
   - **Phase 5**: Commit, push, drift detection, rebase
-  - **Phase 5.5**: Full GitHub review cycle — trigger AI bot reviews (Gemini `/gemini review`), poll for AI feedback, fix any issues, poll CI checks, mark PR ready only after user confirms, then assign reviewers from `reviewers.json`
+  - **Phase 5.5**: Full GitHub review cycle — trigger AI bot reviews (Gemini `/gemini review`), poll for AI feedback, fix any issues, poll CI checks, mark PR ready only after user confirms. Human reviewers are auto-assigned by `.github/CODEOWNERS` on ready — do NOT manually assign from `reviewers.json` (use the opt-in `/reviewers` command only if extra reviewers are explicitly wanted)
   - **Phase 6**: User review loop — ask user for feedback, route fixes, iterate until "ship it"
   - **Phase 6.5**: Summary (write it yourself instead of spawning Tane)
   - **Phase 4.75 (Visual verification)**: **Write Playwright e2e tests that generate reproducible screenshots** — the test IS the verification. Create spec files at `apps/web/tests/e2e/<feature-area>/` using seed data IDs from `scripts/database-init/` for deterministic navigation. For permission tests, use `page.route()` to mock ServiceC responses. Each test takes screenshots co-located with the component: `<component-dir>/__screenshots__/<ComponentName>-<state>.png`. Run tests with `npx playwright test`. Use Playwright CLI (`playwright-cli -s=<agent>`) for manual exploration only. See `~/.claude/skills/playwright-cli/SKILL.md` for CLI reference.
@@ -1036,12 +1036,12 @@ The script exits early on first failure — no waiting for remaining checks. If 
 
 Only after both AI review and CI are clean:
 1. **Do NOT mark the PR as ready yet.** The PR stays as a draft until the user explicitly confirms in Phase 6.
-2. **Do NOT assign human reviewers.** Reviewers are only assigned after user says "Done — assign reviewers & ship it" in Phase 6.
+2. **Do NOT manually assign human reviewers — ever.** When the PR is marked ready in Phase 6, `.github/CODEOWNERS` auto-requests reviewers. Manual assignment is redundant; only the opt-in `/reviewers` command should add extras, and only if explicitly asked.
 3. **Move ticket to Under granskning** (In Review):
    ```bash
    acli jira workitem transition --key "<TICKET_ID>" --status "Under granskning"
    ```
-4. **Notify the user** that AI review and CI are clean, and the PR is ready for their review. The PR is still a draft — it will be marked ready and reviewers assigned once they confirm.
+4. **Notify the user** that AI review and CI are clean, and the PR is ready for their review. The PR is still a draft — it will be marked ready (and CODEOWNERS will auto-assign reviewers) once they confirm.
 5. See `~/.claude/docs/dev-workflow-checklist.md` Section 4 for the full PR lifecycle.
 
 ### Phase 6: User Review Loop
@@ -1054,27 +1054,11 @@ After AI review and CI are clean, enter a feedback loop with the user:
    - Options: "Done — assign reviewers & ship it" / "I have feedback" / "Let me test first"
 3. **If "Done — assign reviewers & ship it":**
    - **Mark the PR as ready**: `gh pr ready <PR_NUMBER>`
-   - **Working-hours gate** — before assigning real reviewers, check the current local time:
+   - **Do NOT manually assign reviewers.** The repo's `.github/CODEOWNERS` auto-requests the right reviewers the moment the PR goes ready — manual assignment from `reviewers.json` is redundant and risks over-pinging. After `gh pr ready`, confirm who CODEOWNERS picked:
      ```bash
-     current_hour=$(date +%H)
+     gh pr view <PR_NUMBER> --json reviewRequests --jq '.reviewRequests[]?.login'
      ```
-     - If the hour is **>= 08 and < 18** (working hours): proceed with reviewer assignment below
-     - If **outside working hours** (before 08:00 or 18:00+): do NOT assign reviewers. Instead:
-       - Tell the user: "It's currently outside working hours (08:00–18:00). Reviewers will not be pinged now to respect their off-hours."
-       - Print the command they can run manually tomorrow:
-         ```
-         gh pr edit <PR_NUMBER> --add-reviewer "user1,user2"
-         ```
-       - Skip the assignment step and proceed to Phase 6.5
-   - **Now assign reviewers** (only during working hours) from `~/.claude/reviewers.json` based on Amara's scope assessment:
-     - Map scope to category: `frontend-only` → `frontend`, `backend-only` → `backend`, `full-stack` → `fullstack`, `infra-only` → `infra`, `data` → `data`
-     - Read the reviewers config and get the list for that category
-     - If reviewers exist for the category, assign them:
-       ```bash
-       gh pr edit <PR_NUMBER> --add-reviewer "user1,user2"
-       ```
-     - If no reviewers configured for that category, skip silently
-     - Tell the user which reviewers were assigned (or that none were configured)
+     Tell the user which reviewers were auto-assigned. If they want *extra/specific* reviewers beyond CODEOWNERS, that's the opt-in [`/reviewers`](commands.md#reviewers) command — do not assign automatically here.
    - **Monitor for human reviewer comments** — The user may relay feedback from colleagues, or you can check:
      ```bash
      gh api repos/<OWNER>/<REPO>/pulls/<PR_NUMBER>/reviews --jq '.[] | select(.user.type != "Bot") | "Reviewer: \(.user.login) | State: \(.state)\nBody: \(.body)\n"'

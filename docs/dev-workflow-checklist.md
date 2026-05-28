@@ -199,13 +199,12 @@ Before proceeding to the next step (CI polling, marking ready, etc.):
 2. **AI review + CI**: PR stays as draft throughout
 3. **User review**: After AI review and CI are green, notify the user. PR is still a draft.
 4. **Tester handoff (auto, before going ready)**: When the user confirms "ship it", invoke the `tester-handoff` skill BEFORE marking the PR ready. The skill auto-skips for backend-only / docs / deps / test-only / i18n-only PRs (posts a short Jira comment instead). For everything else, it generates `howtotest-<TICKET-ID>.txt`, attaches it to Jira, and posts a pointer comment. This is mandatory in both lite and team mode — applies to every user-facing change.
-5. **User confirms ready**: Only when user says "Done — assign reviewers & ship it":
+5. **User confirms ready**: Only when user says "Done — ship it":
    - Mark PR ready: `gh pr ready <PR_NUMBER>`
-   - Assign reviewers from `~/.claude/reviewers.json` based on scope category
-   - `gh pr edit <PR_NUMBER> --add-reviewer "user1,user2"`
-6. **Never auto-assign reviewers** before user confirmation
+   - **Reviewers are auto-assigned by `.github/CODEOWNERS` on ready — do NOT manually assign.** Confirm who was picked: `gh pr view <PR_NUMBER> --json reviewRequests --jq '.reviewRequests[]?.login'` and report to the user.
+6. **Never manually assign reviewers from `reviewers.json` in the flow.** CODEOWNERS handles it. The opt-in [`/reviewers`](#) command exists only for explicitly adding *extra* reviewers beyond CODEOWNERS, when the user asks.
 
-### Reviewer Category Mapping
+### Reviewer Category Mapping (for the opt-in `/reviewers` command only — NOT the default flow)
 
 | Scope | Category |
 |-------|----------|
