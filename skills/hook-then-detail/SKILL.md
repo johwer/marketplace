@@ -17,11 +17,22 @@ People scroll. A long technical writeup posted cold gets ignored. The trick: lea
 
 This skill produces both pieces from a single input.
 
-## Input
+## Input — resolve the source text in this order
 
-$ARGUMENTS
+1. **Explicit text in `$ARGUMENTS`.** If the user pasted a writeup right after invoking the skill, use that verbatim.
 
-If `$ARGUMENTS` is empty, ask: "Paste the writeup you want shortened, and tell me where it's going (Slack / Jira / GitHub PR / other)."
+2. **Referenced text in recent conversation.** If `$ARGUMENTS` is empty OR is a short reference like "on the summary", "på den där writeup-en ovan", "on what you just wrote", "on the auth thing above" — scan the recent conversation for the obvious candidate and use it. Look for, in order:
+   - A summary, writeup, or draft you (the assistant) generated in the last 1-3 turns.
+   - A long block of text the user pasted in the last 1-3 turns (usually fenced, indented, or noticeably longer than a normal chat message).
+   - A document/file content shown in a recent tool result (Read, WebFetch, etc.).
+
+   When you pick a candidate, **state it in one line before producing output**: e.g. *"Using the summary I drafted two turns ago as source."* — so the user can correct you if you grabbed the wrong block.
+
+3. **Destination hint.** Also scan the user's message and recent context for a destination signal: "Slack", "Jira-kommentar", "PR comment", "GitHub". If found, format the FOLLOW-UP accordingly (see destination rules below). If not, default to GitHub-flavored markdown.
+
+4. **Only ask if nothing fits.** If no candidate text exists in the conversation at all, then ask: "Paste the writeup you want shortened, and tell me where it's going (Slack / Jira / GitHub PR / other)."
+
+**Do not ask for paste when the text is clearly already in the conversation.** Picking the right block and stating which one you picked is the desired behavior.
 
 ## Output — exactly two blocks
 
