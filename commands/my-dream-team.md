@@ -104,6 +104,7 @@ Check if the arguments contain `--lite`. If present:
   - **Phase 4.5**: Functional testing (if flagged)
   - **Phase 4.75**: Visual verification hard gate (if UI changes)
   - **Phase 4.9**: De-sloppify pass (cleanup over-engineering, dead code, defensive bloat)
+  - **Phase 4.95**: Feature flag gating (if Amara set `needs_feature_flag: true`) — create the PostHog flag via `posthog-create-flag.sh` and verify the FE guards are wired. Applies in lite mode too.
   - **Phase 5**: Commit, push, drift detection, rebase
   - **Phase 5.5**: Full GitHub review cycle — trigger AI bot reviews (Gemini `/gemini review`), poll for AI feedback, fix any issues, poll CI checks, mark PR ready only after user confirms. Human reviewers are auto-assigned by `.github/CODEOWNERS` on ready — do NOT manually assign from `reviewers.json` (use the opt-in `/reviewers` command only if extra reviewers are explicitly wanted)
   - **Phase 6**: User review loop — ask user for feedback, route fixes, iterate until "ship it"
@@ -308,7 +309,7 @@ bash ~/.claude/scripts/phase-cost-tracker.sh log "<TICKET_ID>" "<phase-name>" "<
      - **Check main for partial implementations**: Run `git diff origin/main -- <key-files>` to see if main already has partial work from previous PRs. Report any overlap to avoid duplicating existing changes.
 - Determine if there are infrastructure concerns (new migrations, Docker changes, new services)
      - **Seed data check**: If the ticket involves UI that displays specific data (files, attachments, linked records, specific entity states), verify that seed data exists in `scripts/database-init/` for testing. If not, flag it in your report: "Seed data missing for [X] — needs to be added before manual testing."
-     - Report back with: (a) scope assessment, (b) which agents are needed, (c) **verified key files to modify** (see below), (d) any architectural concerns, (e) whether functional testing is needed (flag `needs_testing: true/false` — say yes for: API behavior changes, migrations, complex frontend interactions, multi-service flows; say no for: simple CRUD, styling-only changes, copy/i18n updates), (f) whether Docker service rebuild is needed (flag `needs_docker_rebuild: true/false` with which service(s) — e.g., `service-b-api`). If true, note that Kenji must rebuild and notify Ingrid before she can run API code generation.
+     - Report back with: (a) scope assessment, (b) which agents are needed, (c) **verified key files to modify** (see below), (d) any architectural concerns, (e) whether functional testing is needed (flag `needs_testing: true/false` — say yes for: API behavior changes, migrations, complex frontend interactions, multi-service flows; say no for: simple CRUD, styling-only changes, copy/i18n updates), (f) whether Docker service rebuild is needed (flag `needs_docker_rebuild: true/false` with which service(s) — e.g., `service-b-api`). If true, note that Kenji must rebuild and notify Ingrid before she can run API code generation. (g) whether a **PostHog feature flag** is needed to gate this feature (flag `needs_feature_flag: true/false`) — say yes for net-new user-facing features that should roll out gradually. If yes, propose a kebab-case key containing the ticket id (e.g. `nova-2526-service-a-log-notifications`) and list the FE fetch/render sites to gate. Note: in this codebase **feature-flagging is frontend-only** — the backend does not evaluate PostHog flags. Even when a feature adds backend endpoints, those just exist and gating the **frontend fetch** hides the whole feature (precedent: the `export-tags-and-users-excel` flag, whose own description states "backend are only new endpoints so we only need to enable the frontend"). Only flag a backend need if data must not be *served* at all until GA (rare; raise with the team lead).
      - **Verified file paths**: For every key file you reference in your report, verify the path exists using Read or Glob. Include the full resolved path (e.g., `apps/web/src/pages/employees/pages/employeecard/pages/medicalcertificate/components/CertificateAttachments.tsx`), not just the filename. Downstream agents will use these paths directly — wrong paths cause silent Read failures and wasted round-trips.
      - **If both backend and frontend are needed**, define the API contract upfront: endpoint paths, HTTP methods, request/response DTOs with field names and types, **and sample JSON payloads** (not just field lists — exact shapes including nested objects and arrays). This allows frontend and backend to work in parallel — Ingrid builds components against the contract while Kenji implements the API. When `needs_docker_rebuild: true`, Ingrid should use manual types from the contract first, then swap to generated types after Kenji's Docker service is ready.
      - **Response contract completeness**: For every endpoint in the API contract, explicitly include: (a) **pagination metadata** if the response is a list (`offset`, `limit`, `totalCount`, `hasMore`), (b) **display name resolution targets** — any ID field that the frontend will need to resolve to a human-readable name (e.g., "userId resolves to user.displayName via /api/service-c/users/{id}"). Missing pagination metadata forces frontend to guess, and missing resolution targets cause extra API calls or blank labels.
@@ -894,6 +895,27 @@ Before committing, run a cleanup pass on ALL changed files. This catches over-en
 - Only fix clear-cut slop, don't refactor working code
 - Run `dotnet build` / `npx tsc --noEmit` after cleanup to verify nothing broke
 - If you find 0 issues, great — move on. Not every session produces slop.
+
+### Phase 4.95: Feature Flag Gating (PostHog)
+
+**Run only if Amara set `needs_feature_flag: true` in Phase 1.** Skip otherwise. **Applies in BOTH lite and team flows** — in lite mode the team lead does all of it; in team mode the frontend dev wires the guards and the team lead creates the flag.
+
+In this codebase **feature-flagging is frontend-only** (the backend does not evaluate PostHog flags — see the `export-tags-and-users-excel` precedent). So gating means: read the flag on the frontend and skip the data fetch / hide the render when it's off.
+
+1. **Wire the frontend guard** (frontend dev): use `useFeatureFlagEnabled("<flag-key>")` from `@posthog/react` (pattern: `payroll-notes` in `PayrollTable.tsx`). Prefer gating at the data-fetch boundary — pass `skipToken` to the RTK Query when the flag is off, which also hides the render (no data → nothing to show). No backend changes.
+
+2. **Create the flag in PostHog** (team lead) using the DTF handler — idempotent, applies the team-standard config (Boolean, accept+staging hosts OR'd, 100%, active), and reuses the API key from the keychain (no re-paste):
+   ```bash
+   ~/.claude/scripts/posthog-create-flag.sh \
+     --key "<ticket-id-flag-key>" \
+     --description "<TICKET-ID>: <short feature description>"
+   ```
+   - If the key isn't set up yet, the script prompts for it (and offers to store it). First-time setup can also be run explicitly: `~/.claude/scripts/posthog-setup-key.sh`.
+   - The flag key in PostHog must match the code **exactly**, or the feature silently stays hidden. Verify the script's output key == the string in `useFeatureFlagEnabled(...)`.
+
+3. **Confirm with the user** which environments/rollout they want (the standard is accept + staging at 100%, prod off). Adjust `--hosts` / `--rollout` if they want something different.
+
+4. The feature ships **flag-off in prod by default** — safe. The user enables/rolls out via PostHog after merge.
 
 ### Phase 5: Commit, Push & Initial Summary
 
