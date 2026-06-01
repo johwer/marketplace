@@ -106,6 +106,13 @@ resolve_key() {
       echo "$k"; return
     fi
   fi
+  # No key in env or keychain. Only prompt if we actually have a TTY — otherwise
+  # (headless DTF agent / piped) fail with clear guidance instead of hanging.
+  if [ ! -r /dev/tty ]; then
+    echo "ERROR: no PostHog key in \$POSTHOG_PERSONAL_API_KEY or keychain (service: posthog-personal-api-key), and no TTY to prompt." >&2
+    echo "       Fix: run ~/.claude/scripts/posthog-setup-key.sh once, or export POSTHOG_PERSONAL_API_KEY." >&2
+    exit 1
+  fi
   echo "→ no key in env or keychain — prompting (run posthog-setup-key.sh to store it for reuse)" >&2
   # Interactive prompt
   local k
