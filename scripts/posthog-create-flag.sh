@@ -95,11 +95,18 @@ echo "$KEY" | grep -Eq '[a-z]+-[0-9]+' || echo "WARNING: flag key '$KEY' has no 
 
 # --- Resolve API key ---
 resolve_key() {
-  if [ -n "${POSTHOG_PERSONAL_API_KEY:-}" ]; then echo "$POSTHOG_PERSONAL_API_KEY"; return; fi
+  if [ -n "${POSTHOG_PERSONAL_API_KEY:-}" ]; then
+    echo "→ using PostHog key from \$POSTHOG_PERSONAL_API_KEY env var" >&2
+    echo "$POSTHOG_PERSONAL_API_KEY"; return
+  fi
   if command -v security >/dev/null 2>&1; then
     local k; k=$(security find-generic-password -s posthog-personal-api-key -w 2>/dev/null || true)
-    if [ -n "$k" ]; then echo "$k"; return; fi
+    if [ -n "$k" ]; then
+      echo "→ using PostHog key from macOS keychain (service: posthog-personal-api-key)" >&2
+      echo "$k"; return
+    fi
   fi
+  echo "→ no key in env or keychain — prompting (run posthog-setup-key.sh to store it for reuse)" >&2
   # Interactive prompt
   local k
   read -rs -p "PostHog personal API key (phx_...): " k < /dev/tty; echo >&2
