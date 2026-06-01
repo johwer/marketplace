@@ -37,8 +37,10 @@ read -r -p "PostHog project id [42565]: " PROJECT < /dev/tty; PROJECT="${PROJECT
 read -r -p "PostHog API host [$DEFAULT_API_HOST]: " API_HOST < /dev/tty; API_HOST="${API_HOST:-$DEFAULT_API_HOST}"
 
 # Store the secret in keychain only.
-security add-generic-password -U -s "$KEYCHAIN_SERVICE" -a "$USER" -w "$APIKEY" >/dev/null 2>&1 \
-  && echo "✓ API key stored in keychain (service: $KEYCHAIN_SERVICE)"
+# -A = readable by any app without a GUI prompt, so it works from any terminal /
+# headless DTF agent session (not just the process that created it).
+security add-generic-password -U -A -s "$KEYCHAIN_SERVICE" -a "$USER" -w "$APIKEY" >/dev/null 2>&1 \
+  && echo "✓ API key stored in keychain (service: $KEYCHAIN_SERVICE, readable from any terminal)"
 
 # Store non-secret config in dtf-config.json.
 python3 - "$CONFIG" "$PROJECT" "$API_HOST" "$KEYCHAIN_SERVICE" <<'PY'
