@@ -914,7 +914,7 @@ In this codebase **feature-flagging is frontend-only** (the backend does not eva
                                        #   -> nova-2831-legacy-user-redirect
    ```
    - Key convention is always `<ticket-lowercased>-<kebab-slug>` (e.g. `nova-2831-legacy-user-redirect`) — the script enforces it and warns if the resulting key has no ticket number.
-   - If the API key isn't set up yet, the script prompts for it (and offers to store it). First-time setup can also be run explicitly: `~/.claude/scripts/posthog-setup-key.sh`.
+   - **Where the API key comes from** (the script resolves it automatically, in this order): (1) `$POSTHOG_PERSONAL_API_KEY` env var, (2) the **macOS keychain** — service `posthog-personal-api-key` (read it manually with `security find-generic-password -s posthog-personal-api-key -w`), (3) interactive prompt. It prints which source it used. If it's not stored yet, run `~/.claude/scripts/posthog-setup-key.sh` once to capture a scoped key into the keychain (+ project id into `dtf-config.json`). The non-secret config (projectId/apiHost) lives in `dtf-config.json` under `posthog`.
    - Use this **exact derived key** in the code's `useFeatureFlagEnabled("<derived-key>")` — they must match or the feature silently stays hidden.
 
 3. **Confirm with the user** which environments/rollout they want (the standard is accept + staging at 100%, prod off). Adjust `--hosts` / `--rollout` if they want something different.
