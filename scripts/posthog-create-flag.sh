@@ -7,14 +7,21 @@
 # shape as the `payroll-notes` flag. Idempotent: if the key already exists it
 # PATCHes it to the standard config instead of failing.
 #
-# Usage:
-#   posthog-create-flag.sh --key <flag-key> --description "<text>" [options]
+# Usage (preferred — let it derive the standard key shape <ticket>-<slug>):
+#   posthog-create-flag.sh --ticket NOVA-2831 --key "Legacy user redirect"
+#       -> key: nova-2831-legacy-user-redirect
+#   posthog-create-flag.sh --ticket NOVA-2831 --description "NOVA-2831: Legacy user redirect"
+#       -> key: nova-2831-legacy-user-redirect  (slug derived from description)
 #
-# Required:
-#   --key           Flag key, kebab-case. Convention: include the ticket id,
-#                   e.g. nova-2526-service-a-log-notifications
-#   --description   Human description. Convention: start with the ticket id,
-#                   e.g. "NOVA-2526: Log SMS/email notifications in ServiceA event log"
+# Or pass an explicit --key:
+#   posthog-create-flag.sh --key nova-2526-service-a-log-notifications --description "..."
+#
+# Key/description:
+#   --ticket        Ticket id (e.g. NOVA-2831). Used to build/prefix the key as
+#                   <ticket-lowercased>-<kebab-slug>, guaranteeing the ticket number is in the key.
+#   --key           Either the full kebab-case key, OR (with --ticket) the slug portion.
+#   --description   Human description. Convention: start with the ticket id.
+#                   Auto-derived from --ticket + slug if omitted.
 #
 # Options:
 #   --hosts h1,h2   Comma-separated $host values to enable for.
@@ -36,7 +43,7 @@
 #
 set -euo pipefail
 
-KEY="" ; DESC="" ; HOSTS="polaris-accept.repo.se,leo-stg.terveystalo.com"
+KEY="" ; DESC="" ; TICKET="" ; HOSTS="polaris-accept.repo.se,leo-stg.terveystalo.com"
 ROLLOUT=100 ; ACTIVE=true ; DRY_RUN=false
 
 # Project id / API host default from dtf-config.json (posthog section), else built-in.
@@ -50,6 +57,7 @@ fi
 while [ $# -gt 0 ]; do
   case "$1" in
     --key)         KEY="$2"; shift 2 ;;
+    --ticket)      TICKET="$2"; shift 2 ;;
     --description) DESC="$2"; shift 2 ;;
     --hosts)       HOSTS="$2"; shift 2 ;;
     --rollout)     ROLLOUT="$2"; shift 2 ;;
@@ -61,8 +69,29 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-[ -n "$KEY" ]  || { echo "ERROR: --key is required" >&2; exit 2; }
-[ -n "$DESC" ] || { echo "ERROR: --description is required" >&2; exit 2; }
+# --- Derive the flag key in the standard shape: <ticket-lowercased>-<kebab-slug> ---
+# e.g. --ticket NOVA-2831 --key "Legacy user redirect"  ->  nova-2831-legacy-user-redirect
+#      --ticket NOVA-2831 (no --key) -> slug derived from --description (ticket prefix stripped)
+slugify() { python3 -c "import re,sys; s=re.sub(r'[^a-z0-9]+','-',sys.argv[1].lower()).strip('-'); print(re.sub(r'-+','-',s))" "$1"; }
+
+if [ -n "$TICKET" ]; then
+  TICKET_LC=$(printf '%s' "$TICKET" | tr '[:upper:]' '[:lower:]')        # NOVA-2831 -> nova-2831
+  if [ -n "$KEY" ]; then SLUG_SRC="$KEY"
+  else SLUG_SRC=$(printf '%s' "$DESC" | sed -E 's/^[A-Za-z]+-?[0-9]+:?[[:space:]]*//'); fi  # strip leading "NOVA-2831:" from desc
+  SLUG=$(slugify "$SLUG_SRC")
+  case "$SLUG" in
+    "$TICKET_LC"-*) KEY="$SLUG" ;;        # already prefixed
+    *)              KEY="${TICKET_LC}-${SLUG}" ;;
+  esac
+  # Default the description to "<TICKET>: <Slug words>" if none given.
+  [ -n "$DESC" ] || DESC="$TICKET: ${SLUG_SRC}"
+fi
+
+[ -n "$KEY" ]  || { echo "ERROR: provide --key, or --ticket (+ --key slug or --description) to derive it" >&2; exit 2; }
+[ -n "$DESC" ] || { echo "ERROR: --description is required (or pass --ticket to derive it)" >&2; exit 2; }
+
+# Guard the convention: a derived/standard key must carry a ticket number.
+echo "$KEY" | grep -Eq '[a-z]+-[0-9]+' || echo "WARNING: flag key '$KEY' has no ticket number — convention is <ticket>-<slug>, e.g. nova-2831-legacy-user-redirect" >&2
 
 # --- Resolve API key ---
 resolve_key() {
