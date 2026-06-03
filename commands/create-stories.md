@@ -221,6 +221,8 @@ Ask the user with AskUserQuestion:
 
 **GRILL FIRST vs REFINE FIRST:** Grill is for *upstream* design exploration — when the idea itself isn't fleshed out (e.g., "we should add OTP login" with no decisions on resend/expiry/error UX). Refine is for *downstream* ticket polishing — when there's a written ticket but it has gaps. If unsure, GRILL FIRST when AC is missing entirely; REFINE FIRST when AC exists but is incomplete.
 
+**Note — GRILL FIRST always routes to `/grill-me` (the broad, pre-ticket design interview).** The narrower implementation-time grills (`/grill-fe` for frontend, `/grill-with-docs` for backend) are NOT triage options — they run *during* implementation and are suggested by `/my-dream-team`'s pre-flight step on a ticket that already exists. So the 4-option cap below is unaffected by them; this triage stays a single GRILL FIRST entry.
+
 **AskUserQuestion limit:** That tool caps at 4 options per question. If all 5 semantic options (GO / SKIP / JUST WORKTREE / GRILL FIRST / REFINE FIRST) feel relevant for a ticket, drop SKIP from the visible list — the user can always pick "Other" and type "skip" if needed. For tickets where GO is split into Dream Team vs Lite (two GO variants), pick the 4 most relevant options based on ticket clarity.
 
 **Only proceed with GO tickets to Step 2.** SKIP tickets are removed from the pipeline. JUST WORKTREE tickets skip to Phase B Step 6 directly. GRILL FIRST tickets are routed to `/grill-me` first (synchronous, no worktree yet) — when grilling completes, ask the user whether to also run `/ticket-refine` to update Jira before proceeding. REFINE FIRST tickets are queued for `/ticket-refine` after the session.

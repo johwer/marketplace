@@ -69,6 +69,14 @@ Before starting Phase 1, check the ticket type and suggest the right skill if ap
 **New service/API tickets** (ticket describes a brand-new endpoint, service, or module with no existing code to extend):
 > "This involves designing a new interface from scratch. Want me to run `/design-an-interface` first? It generates 3 radically different designs in parallel so you can pick the best shape before implementation starts. Or say 'just build it' to let Amara decide the interface in Phase 1."
 
+**Frontend tickets** (Jira label `frontend`, or the work touches `apps/web/`) where the approach has open UI/state/reuse questions:
+> "This is a frontend ticket with some open calls (which component to reuse, what states to handle, where the data comes from). Want me to run `/grill-fe` first? It reads the frontend conventions + repo, then grills you on data source, loading/empty/error states, reuse, i18n, and tokens before we build — decisions go back into the ticket. Or say 'just build it' to go straight to Phase 1."
+
+**Backend tickets** (Jira label `backend`, or the work touches `services/` or `shared/`) where the plan touches the domain model or terminology:
+> "This is a backend ticket touching the domain model. Want me to run `/grill-with-docs` first? It stress-tests the plan against the existing language and decisions, sharpening terminology before implementation. Or say 'just build it' to go straight to Phase 1."
+
+(These are upstream-vs-implementation distinct from `create-stories` GRILL FIRST → `/grill-me`, which is for fleshing out a *vague idea before the ticket exists*. `grill-fe`/`grill-with-docs` run here, during implementation, on a ticket that already exists.)
+
 ## Flags
 
 Check if the arguments contain `--local`. If present:
