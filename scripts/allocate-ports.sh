@@ -161,6 +161,19 @@ if [ -f "$WORKTREE_DIR/apps/web/vite.config.mts" ]; then
     echo "Generated vite.config.worktree.mts (port $VITE_PORT, APIs → main stack 500x)"
 fi
 
+# Mark per-worktree local-state files skip-worktree so they can NEVER be
+# accidentally committed (e.g. a broad `git add -A`). These files are tracked
+# in the repo but are rewritten per-worktree: vite.config.worktree.mts is
+# generated above and re-proxied by worktree-service.sh; AGENTS.md/CLAUDE.md get
+# a DTF section appended. DTF scripts still edit them on disk — git just ignores
+# the local modifications. Recurring-leak fix (see dream-team-learnings NOVA-2961).
+for _wt_local in apps/web/vite.config.worktree.mts AGENTS.md CLAUDE.md; do
+    if git -C "$WORKTREE_DIR" ls-files --error-unmatch "$_wt_local" >/dev/null 2>&1; then
+        git -C "$WORKTREE_DIR" update-index --skip-worktree "$_wt_local" 2>/dev/null \
+            && echo "Marked $_wt_local skip-worktree (per-worktree local state — never committed)"
+    fi
+done
+
 echo ""
 echo "Ports allocated for $TICKET_ID (slot $SLOT):"
 echo ""
