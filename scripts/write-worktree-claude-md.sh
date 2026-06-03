@@ -60,6 +60,13 @@ cat >> "$WORKTREE/CLAUDE.md" << EOF
 - ServiceB API (if started): http://localhost:${ServiceB_PORT:-UNKNOWN}
 - All other APIs proxy to the main stack (500x) by default
 
+### Run the dev server (worktree)
+- Use: \`cd apps/web && npx vite --config vite.config.worktree.mts --host\`
+- Do **NOT** use \`npm start\` — it loads \`vite.config.mts\` (port 3000) and conflicts with other worktrees.
+
+### Per-worktree local-state files — NEVER commit
+\`apps/web/vite.config.worktree.mts\`, \`AGENTS.md\`, and \`CLAUDE.md\` are **per-worktree local state**, not code changes. They are generated/rewritten by DTF scripts — \`allocate-ports.sh\` generates the Vite config, \`worktree-service.sh up/down\` rewrites its proxy targets via \`sed\`, and worktree setup appends a DTF section to AGENTS.md/CLAUDE.md. Running Vite does **not** modify them; only the scripts do. \`allocate-ports.sh\` marks them \`git update-index --skip-worktree\` so git ignores the local edits — they will not appear in \`git status\` and cannot be staged. **Never** \`git update-index --no-skip-worktree\` them, and never \`git add\` them by path. Always stage your changes by **explicit path** (never \`git add -A\`/glob), and run \`prettier\`/\`eslint\` on your **named changed files only** (never \`--write .\`).
+
 ### Key DTF Scripts
 \`\`\`bash
 # Start a backend service (builds Docker, runs on worktree ports)
