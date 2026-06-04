@@ -9,8 +9,9 @@
 #   bash ~/.claude/scripts/allocate-ports.sh <TICKET_ID>
 #
 # Port scheme:
-#   Vite:  31xx  (e.g., PROJ-1657 -> 3174)
-#   APIs:  base = 10000 + (slot * 100), then +1 through +8 per service
+#   Vite:    31xx  (e.g., PROJ-1657 -> 3174)
+#   Cosmos:  UI 39xx + renderer 38xx (e.g. slot 74 -> 3974 / 3874)
+#   APIs:    base = 10000 + (slot * 100), then +1 through +8 per service
 #
 # Non-worktree users are NOT affected — all configs fall back to
 # hardcoded defaults (500x) when no env vars are set.
@@ -81,6 +82,12 @@ done
 
 # Calculate ports from slot
 VITE_PORT=$((3100 + 10#$SLOT))
+# React Cosmos needs TWO ports: the UI server and the renderer (vite) dev server.
+# Renderer port is derived from rendererUrl in the cosmos config (no CLI flag).
+# Two clean bands mirroring the Vite formula; slot 99 lands on the upstream
+# defaults (UI 3999 / renderer 3998-ish) so single-worktree behaviour is familiar.
+COSMOS_UI_PORT=$((3900 + 10#$SLOT))
+COSMOS_RENDERER_PORT=$((3800 + 10#$SLOT))
 API_BASE=$((10000 + 10#$SLOT * 100))
 ServiceC_PORT=$((API_BASE + 1))
 ABSENCE_PORT=$((API_BASE + 2))
@@ -137,6 +144,11 @@ cat >> "$WEB_ENV" << EOF
 # Worktree-specific ports ($TICKET_ID, slot $SLOT)
 VITE_DEV_PORT=$VITE_PORT
 
+# React Cosmos (component sandbox) — unique per slot so parallel worktrees
+# don't fight over 3998/3999. Used by cosmos.worktree.config.json below.
+COSMOS_UI_PORT=$COSMOS_UI_PORT
+COSMOS_RENDERER_PORT=$COSMOS_RENDERER_PORT
+
 # API proxy targets — default to main stack (500x).
 # Override ONLY the service(s) you rebuild from this worktree:
 #   VITE_ServiceB_API_PORT=$ServiceB_PORT
@@ -161,13 +173,33 @@ if [ -f "$WORKTREE_DIR/apps/web/vite.config.mts" ]; then
     echo "Generated vite.config.worktree.mts (port $VITE_PORT, APIs → main stack 500x)"
 fi
 
+# --- Generate cosmos.worktree.config.json ---
+# React Cosmos hardcodes port 3999 (UI) and rendererUrl :3998 (renderer) in
+# cosmos.config.json. Patch both to the slot's ports so `cosmos` can run in
+# parallel worktrees. Run it with:
+#   npx cosmos --config cosmos.worktree.config.json
+COSMOS_SRC="$WORKTREE_DIR/apps/web/cosmos.config.json"
+COSMOS_WORKTREE_CONFIG="$WORKTREE_DIR/apps/web/cosmos.worktree.config.json"
+
+if [ -f "$COSMOS_SRC" ]; then
+    if command -v jq &>/dev/null; then
+        jq --argjson ui "$COSMOS_UI_PORT" \
+           --arg renderer "http://localhost:$COSMOS_RENDERER_PORT" \
+           '.port = $ui | .rendererUrl = $renderer' \
+           "$COSMOS_SRC" > "$COSMOS_WORKTREE_CONFIG"
+        echo "Generated cosmos.worktree.config.json (UI $COSMOS_UI_PORT, renderer $COSMOS_RENDERER_PORT)"
+    else
+        echo "WARN: jq not found — skipped cosmos.worktree.config.json (Cosmos will use default 3998/3999)" >&2
+    fi
+fi
+
 # Mark per-worktree local-state files skip-worktree so they can NEVER be
 # accidentally committed (e.g. a broad `git add -A`). These files are tracked
 # in the repo but are rewritten per-worktree: vite.config.worktree.mts is
 # generated above and re-proxied by worktree-service.sh; AGENTS.md/CLAUDE.md get
 # a DTF section appended. DTF scripts still edit them on disk — git just ignores
 # the local modifications. Recurring-leak fix (see dream-team-learnings NOVA-2961).
-for _wt_local in apps/web/vite.config.worktree.mts AGENTS.md CLAUDE.md; do
+for _wt_local in apps/web/vite.config.worktree.mts apps/web/cosmos.worktree.config.json AGENTS.md CLAUDE.md; do
     if git -C "$WORKTREE_DIR" ls-files --error-unmatch "$_wt_local" >/dev/null 2>&1; then
         git -C "$WORKTREE_DIR" update-index --skip-worktree "$_wt_local" 2>/dev/null \
             && echo "Marked $_wt_local skip-worktree (per-worktree local state — never committed)"
@@ -178,6 +210,7 @@ echo ""
 echo "Ports allocated for $TICKET_ID (slot $SLOT):"
 echo ""
 echo "  Vite dev server   http://localhost:$VITE_PORT"
+echo "  Cosmos UI         http://localhost:$COSMOS_UI_PORT (renderer :$COSMOS_RENDERER_PORT)"
 echo "  API proxies       → main stack (500x) by default"
 echo ""
 echo "  Docker ports (used when worktree-service.sh up <service>):"
@@ -189,6 +222,9 @@ echo "    ServiceD API     http://localhost:$MESSENGER_PORT"
 echo ""
 echo "To start the frontend:"
 echo "  cd apps/web && npx vite --config vite.config.worktree.mts --host"
+echo ""
+echo "To start React Cosmos:"
+echo "  cd apps/web && npx cosmos --config cosmos.worktree.config.json"
 echo ""
 echo "To rebuild a backend service and auto-switch the proxy:"
 echo "  bash ~/.claude/scripts/worktree-service.sh up service-b-api"
