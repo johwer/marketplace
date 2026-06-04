@@ -11,6 +11,8 @@ Each worktree gets a unique **slot** (derived from ticket number mod 99):
 | Component | Slot 07 (NOVA-2580) | Slot 08 (NOVA-2581) | Main stack |
 |-----------|---------------------|---------------------|------------|
 | Vite dev server | 3107 | 3108 | 3000 |
+| Cosmos UI | 3907 | 3908 | 3999 |
+| Cosmos renderer | 3807 | 3808 | 3998 |
 | ServiceC API | 10701 | 10801 | 5001 |
 | ServiceA API | 10702 | 10802 | 5002 |
 | ServiceE API | 10703 | 10803 | 5003 |
@@ -19,9 +21,54 @@ Each worktree gets a unique **slot** (derived from ticket number mod 99):
 
 **Port formula:**
 - Vite: `3100 + slot`
+- Cosmos UI: `3900 + slot` / Cosmos renderer: `3800 + slot`
 - API services: `10000 + (slot * 100) + service_offset`
 
 Collision detection: if two tickets hash to the same slot, the second one increments until free.
+
+## How dev-server ports ACTUALLY resolve (read this when a port looks wrong)
+
+A worktree allocates ports, but each dev server resolves its port differently. Knowing
+which mechanism is *honored* is the difference between "it just works" and "why is it on
+3000 again." The short version:
+
+| Server | What allocate-ports.sh writes | What the tool ACTUALLY reads at runtime | Command that uses the right port |
+|--------|-------------------------------|-----------------------------------------|----------------------------------|
+| **Vite dev** | `VITE_DEV_PORT` in `.env.local` **(dead — nothing reads it)** + `vite.config.worktree.mts` (port baked in by `sed`) | the `port:` literal in whichever config file is loaded | `npx vite --config vite.config.worktree.mts --host` |
+| **Cosmos** | `cosmos.worktree.config.json` (`port` + `rendererUrl` patched) | `port` + `rendererUrl` straight from the config file it's given | `npx cosmos --config cosmos.worktree.config.json` |
+
+### Vite — the gotcha
+`apps/web/vite.config.mts` calls `loadEnv()` (so `.env.local` *is* loaded into
+`process.env`) **but then hardcodes `server.port: 3000`** and hardcodes the proxy targets
+to `5001–5006`. It never reads `VITE_DEV_PORT`. Consequences:
+
+- **`npm start` in a worktree silently runs on 3000** — it uses the default config. To get
+  the worktree port you MUST run `npx vite --config vite.config.worktree.mts --host`.
+- `VITE_DEV_PORT` in `.env.local` is vestigial. It looks like it sets the port; it does not.
+- The only thing that moves the Vite port is the `sed`-generated `vite.config.worktree.mts`.
+- API proxies are switched by `worktree-service.sh` editing `vite.config.worktree.mts`
+  directly (`switch_vite_proxy`), **not** by env vars. The `VITE_*_API_PORT` vars in
+  `.env.local` are read only by `generate-api.sh` (to pick the codegen source port).
+
+> Cleaner long-term fix (NOT done — it's a committed Repo repo file, so it needs a
+> ticket / DTF, not an ad-hoc edit): make `vite.config.mts` read
+> `Number(process.env.VITE_DEV_PORT) || 3000` and read proxy targets from
+> `VITE_*_API_PORT`. Then `npm start` would honor the worktree port and
+> `vite.config.worktree.mts` could be retired — one honored mechanism, like Cosmos.
+
+### Cosmos — why it's more robust
+react-cosmos reads `port` and `rendererUrl` *directly from the config file at runtime*
+(`viteDevServerPlugin.js` binds the renderer to `new URL(rendererUrl).port`). There is no
+env-var layer to drift out of sync. We pass `--config cosmos.worktree.config.json` and it
+binds exactly those ports. The renderer port has **no CLI flag** — it can only come from
+`rendererUrl` — which is why we generate a patched config file instead of passing a flag.
+
+### Outside a worktree (main repo / non-DTF teammate)
+`allocate-ports.sh` generates `vite.config.worktree.mts` and `cosmos.worktree.config.json`
+**only inside worktrees**. The main repo never has them, so you just run the stock commands
+(`npm start` → 3000, `npm run cosmos` → 3999/3998) against the committed configs. The
+override files are additive, opt-in, and marked `skip-worktree`, so they never get committed
+and never affect anyone not using DTF. The fallback is always "use the hardcoded defaults."
 
 ## File Structure Per Worktree
 
@@ -32,8 +79,9 @@ Collision detection: if two tickets hash to the same slot, the second one increm
     context.md                  # Pre-hydrated analysis
     jira-ticket.md              # Full Jira ticket text
   apps/web/
-    .env.local                  # VITE_DEV_PORT, VITE_*_API_PORT
+    .env.local                  # VITE_DEV_PORT, COSMOS_*_PORT, VITE_*_API_PORT
     vite.config.worktree.mts    # Vite config with unique port
+    cosmos.worktree.config.json # React Cosmos config with unique UI + renderer ports
 ```
 
 ## How Services Run in Parallel
