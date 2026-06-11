@@ -315,6 +315,7 @@ bash ~/.claude/scripts/phase-cost-tracker.sh log "<TICKET_ID>" "<phase-name>" "<
      - **Independent candidate discovery**: Do NOT limit your exploration to files mentioned in the ticket or pre-hydrated context. Independently grep the codebase for the pattern/anti-pattern being addressed — there may be additional instances the ticket author missed. Report any extra candidates you find so the team lead can decide whether to include them in scope.
      - Determine if the ticket needs: backend-only, frontend-only, or both
      - **Check main for partial implementations**: Run `git diff origin/main -- <key-files>` to see if main already has partial work from previous PRs. Report any overlap to avoid duplicating existing changes.
+     - **Setter-provenance check (refactor/state tickets)**: For every effect or state-write you propose converting (derive-during-render, move-to-handler, setState-during-render), trace the setter to its OWNER before recommending a bucket. If the write targets router state (`setSearchParams`/`useNavigate` wrappers), a parent (`onChange` prop), or a context setter, it is **render-illegal** ("Cannot update X while rendering Y") — default it to keep-as-effect with a documented exemption. setState-during-render is only legal for the SAME component's own `useState`. Settling feasibility in the architecture pass prevents implement-revert round-trips (NOVA-3039 had two).
 - Determine if there are infrastructure concerns (new migrations, Docker changes, new services)
      - **Seed data check**: If the ticket involves UI that displays specific data (files, attachments, linked records, specific entity states), verify that seed data exists in `scripts/database-init/` for testing. If not, flag it in your report: "Seed data missing for [X] — needs to be added before manual testing."
      - Report back with: (a) scope assessment, (b) which agents are needed, (c) **verified key files to modify** (see below), (d) any architectural concerns, (e) whether functional testing is needed (flag `needs_testing: true/false` — say yes for: API behavior changes, migrations, complex frontend interactions, multi-service flows; say no for: simple CRUD, styling-only changes, copy/i18n updates), (f) whether Docker service rebuild is needed (flag `needs_docker_rebuild: true/false` with which service(s) — e.g., `service-b-api`). If true, note that Kenji must rebuild and notify Ingrid before she can run API code generation. (g) whether a **PostHog feature flag** is needed to gate this feature (flag `needs_feature_flag: true/false`) — say yes for net-new user-facing features that should roll out gradually. If yes, propose a key in the standard shape `<ticket-lowercased>-<kebab-slug>` (e.g. `nova-2831-legacy-user-redirect`) — always containing the ticket number — and list the FE fetch/render sites to gate. Note: in this codebase **feature-flagging is frontend-only** — the backend does not evaluate PostHog flags. Even when a feature adds backend endpoints, those just exist and gating the **frontend fetch** hides the whole feature (precedent: the `export-tags-and-users-excel` flag, whose own description states "backend are only new endpoints so we only need to enable the frontend"). Only flag a backend need if data must not be *served* at all until GA (rare; raise with the team lead).
@@ -774,6 +775,7 @@ Once implementation agents complete their work, spawn:
     - **Test file secrets**: Scan all new `.spec.ts` and test files for hardcoded credentials, passwords, or test user secrets in comments or string literals. Even commented-out credentials are flagged by GitGuardian/secrets scanners. Flag as MUST FIX.
     - **Insecure defaults**: CORS set to *, missing HTTPS enforcement, overly permissive RBAC roles
   - **Verify formatting was done**: Check that backend code has been formatted with CSharpier and frontend code with Prettier. If not, flag it as MUST FIX.
+  - **Setter-provenance gate (run BEFORE any convergence/loop-safety analysis)**: For each setState-during-render block (`if (cond) { setX(...) }` in a render body), grep the setter's declaration site. If `setX` is anything other than the same component's own `useState` dispatcher — a wrapper over `useSearchParams`/`useNavigate`/Router primitives, a parent callback (`onChange` prop), or a context setter — flag MUST FIX: illegal cross-component update during render, regardless of how convergent the guard is. Convergence analysis is irrelevant if the call is illegal (NOVA-3039 round-1 approval missed exactly this; the check is one grep per setter).
   - **Stale RTK Query types check**: If backend DTOs were modified, verify the generated RTK Query types (`src/store/rtk-apis/`) include the new fields. Look for `as Parameters<`, `as unknown as`, or manual type assertions in RTK Query trigger calls — these are red flags that types were NOT regenerated from the updated swagger. Flag as MUST FIX with instruction: "Regenerate RTK Query types from worktree Docker service."
   - **Dead redirect files**: If types/classes were moved between projects or namespaces, check that the old file was DELETED — not left as a comment-only redirect (e.g., "// Moved to X"). Flag as MUST FIX: "Delete the old file and fix using statements."
   - **Redirect-vs-rewrite (CloudFront / SPA-function review)**: When a CloudFront Function or SPA fallback internally rewrites an extension-less URI to a subdirectory index (e.g. `/cosmos` → `/cosmos/index.html`), confirm the browser base-URL matches the asset root. If the served HTML uses relative asset paths (no `<base>`), an internal rewrite of the no-trailing-slash URL breaks assets — require a **301 redirect to the trailing-slash URL** instead. Don't review the function logic in isolation; trace "what does the client see?" for each branch. (NOVA-2951: bare `/cosmos` shipped broken until a 301 was added.)
@@ -1087,11 +1089,13 @@ Only after both AI review and CI are clean:
 
 After AI review and CI are clean, enter a feedback loop with the user:
 
+The decision is split into TWO user-confirmable steps (NOVA-3039 retro, user-mandated): **"Mark ready"** runs the publication work (PR ready + tester handoff + final summary + retro) while human review is still pending; **"Ship"** runs the closeout (Jira → Klart + shutdown) and is asked later, typically after human review/merge readiness.
+
 1. Present the current PR status to the user (AI review done, CI green, no human reviewers assigned yet)
 2. Ask the user for feedback using AskUserQuestion:
    - **"How does the implementation look?"**
-   - Options: "Done — assign reviewers & ship it" / "I have feedback" / "Let me test first"
-3. **If "Done — assign reviewers & ship it":**
+   - Options: "Mark ready — reviewers + handoff + summary + retro" / "I have feedback" / "Let me test first"
+3. **If "Mark ready":**
    - **Mark the PR as ready**: `gh pr ready <PR_NUMBER>`
    - **Do NOT manually assign reviewers.** The repo's `.github/CODEOWNERS` auto-requests the right reviewers the moment the PR goes ready — manual assignment from `reviewers.json` is redundant and risks over-pinging. After `gh pr ready`, confirm who CODEOWNERS picked:
      ```bash
@@ -1102,7 +1106,8 @@ After AI review and CI are clean, enter a feedback loop with the user:
      ```bash
      gh api repos/<OWNER>/<REPO>/pulls/<PR_NUMBER>/reviews --jq '.[] | select(.user.type != "Bot") | "Reviewer: \(.user.login) | State: \(.state)\nBody: \(.body)\n"'
      ```
-   - Proceed to Phase 6.5 (Final Summary), then Phase 7 (Cleanup)
+   - Proceed to Phase 6.4 (Tester Handoff), Phase 6.5 (Final Summary), and Phase 6.75 (Retrospective) — all part of "mark ready"
+   - Then **ask the user separately** before shipping: "Ship it? (moves Jira to Klart and shuts the team down)" — Phase 7 (Cleanup) runs only on that second confirmation
 4. **If "I have feedback":** Ask the user to describe what needs to change, then:
    - Route the feedback to **Maya** (PR reviewer) for assessment
    - Maya categorizes each item and identifies which agent(s) should handle it
@@ -1117,7 +1122,7 @@ After AI review and CI are clean, enter a feedback loop with the user:
 
 ### Phase 6.4: Tester Handoff — Generate Test Guide (auto)
 
-**Runs automatically** as soon as the user confirms "ship it" / "done" in Phase 6, BEFORE the final summary. Goal: every PR that goes ready also has a tester-friendly test guide attached to the Jira ticket so QA doesn't have to ask "how do I test this?".
+**Runs automatically** as soon as the user confirms "mark ready" in Phase 6, BEFORE the final summary. Goal: every PR that goes ready also has a tester-friendly test guide attached to the Jira ticket so QA doesn't have to ask "how do I test this?".
 
 **Why here:** implementation is locked, visual verification is done (screenshots exist in `~/Downloads/<TICKET_ID>/`), and PR hasn't gone ready yet — so the test guide is attached to Jira BEFORE the tester sees the ticket transition.
 
@@ -1781,6 +1786,8 @@ The PreCompact hook automatically saves a CHECKPOINT.md file. Subagents have the
 
 ## Communication Protocol
 
+**YOUR TEXT OUTPUT IS NOT VISIBLE TO TEAMMATES.** Any answer to a teammate's question, any handoff, any retro answer, any status update = SendMessage, no exceptions. Plain-text replies are silently lost (this has eaten retro answers in real sessions — NOVA-3039).
+
 ### When to message directly vs escalate to team lead
 - **Message directly**: Technical questions to a specific teammate (API shape, file location, shared interface), status about shared work, notifying a teammate that their dependency is ready.
 - **Escalate to team lead**: Requirement ambiguity (team lead asks the user), blocking disagreements, scope questions, anything that needs user input.
@@ -1791,6 +1798,9 @@ Send the team lead a brief status message at these moments only:
 - **Blocked** waiting for another agent: "Blocked on [agent]: [what I need]"
 - **Completed** a sub-task: "Done: [what]. Next: [what]"
 - Do NOT send status for every file edit — one update per meaningful milestone.
+
+### CLAIM before unplanned fixes
+Before the FIRST edit of any **unplanned fix** — a code change not on the pre-assigned task list (review finding, gap you spotted, scope creep) — SendMessage the team lead: `CLAIM: <file> — <problem>, starting now.` Name the specific file, not just the problem. This prevents two agents (or agent + team lead) from fixing the same thing in parallel with crossed commits (happened in NOVA-3039: a tag-clear fix was implemented twice simultaneously and one stash was discarded). Pre-assigned task work needs no CLAIM — task ownership already covers it.
 
 ### Structured handoff messages
 
