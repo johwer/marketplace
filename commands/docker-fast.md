@@ -13,6 +13,7 @@ $ARGUMENTS
 Modes (first token):
 - *(empty)* / `up` — ensure infra is up, then start **all backend** services detached, **no build** (reuses existing images). The everyday "just run it" + the recovery I'd reach for first.
 - `recover` / `restart` — `docker compose down --remove-orphans` then `up -d` (no build). Fixes a broken half-up state (e.g. infra SIGKILLed overnight, workers crash-looping). **Volumes/data preserved** (never `-v`).
+- `rebuild` / `pull` — **THE everyday command after `git pull`.** Warm `up -d --build` (bake + parallel cap) of infra + backend: only the services whose files changed recompile, the rest hit cache (seconds when little changed). Brings the stack up. Add `--no-cache` to force a full cold rebuild.
 - `infra` — only `postgres redis rabbitmq localstack localstack-init` (+ `tools` if `--tools`).
 - `<domain>` — one or more of `service-c service-a service-b service-d service-e` → starts that domain's api+workers **plus infra** (no build unless `--build`).
 - `<service> [<service>…]` — exact compose service name(s) → ensure infra, then start just those.
@@ -62,6 +63,14 @@ docker compose down --remove-orphans          # NEVER -v (keeps postgres/redis d
 export COMPOSE_PARALLEL_LIMIT=${PARALLEL:-4}
 docker compose up -d "${INFRA[@]}" "${BACKEND[@]}"
 ```
+
+### `rebuild` / `pull` — everyday post-`git pull` warm rebuild
+```bash
+export COMPOSE_PARALLEL_LIMIT=${PARALLEL:-4}
+export COMPOSE_BAKE=${BAKE:-true}
+docker compose up -d --build "${INFRA[@]}" "${BACKEND[@]}"   # warm: only changed services recompile
+```
+Unchanged services are fully cached and skipped → seconds when a pull touched little. Add `--no-cache` only for a deliberate cold rebuild.
 
 ### `infra`
 ```bash
