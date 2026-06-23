@@ -123,6 +123,29 @@ By default, API proxies point to the **main stack** (500x ports). Only services 
 - Everything else uses the shared running services
 - Zero overhead for services you don't touch
 
+## Adding an API service to the worktree compose
+
+When you add a new `*-wt` service to `~/.claude/templates/docker-compose.worktree.yml`, it
+**must** carry the full env contract or it will boot-crash in confusing ways (a container can
+report `Up` while the .NET host crash-loops at 100% CPU — see the NOVA-3183 incident, where
+`service-c-api-wt` was missing the S3 endpoint and `AddRepoS3()` fell through to the real AWS
+credential chain and threw on startup).
+
+Checklist for every new api service:
+- [ ] Inherit the shared anchor: `<<: [*common-api-environment, *jwt-client-config]` (or just
+      `*common-api-environment` if it doesn't validate JWTs). The anchor already provides
+      RabbitMQ, OTLP, logging, JWT audience, **and the localstack S3 endpoints**
+      (`AwsConfig__ServiceUrl` / `AwsConfig__OverridePublicEndpoint`) — never re-declare these
+      per-service; let the anchor own them so a new service can't drift and miss them.
+- [ ] Set `ASPNETCORE_URLS` and the port mapping (`"${<SVC>_API_PORT:-60xx}:50xx"`).
+- [ ] Set its DB connection string: `ConnectionStrings__DefaultConnection: Host=postgres;Database=repo_<svc>;...`
+- [ ] If it issues tokens (ServiceC), set `JWT__IssuerUrl` to match the main ServiceC issuer.
+- [ ] Set only its **service-specific** S3 buckets + `FileServiceConfig__FileStorage: aws`
+      (the endpoints come from the anchor).
+- [ ] Add the service to the `SERVICES` list and the port maps in `worktree-service.sh`.
+- [ ] Run `bash ~/.claude/scripts/worktree-service.sh up <svc>` — the post-up smoke check
+      will fail loudly if the app didn't start listening.
+
 ## Lifecycle Commands
 
 ### Create

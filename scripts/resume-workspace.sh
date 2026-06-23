@@ -86,6 +86,9 @@ RESUME_PROMPT="/my-dream-team --resume $TICKET_ID"
 
 # Start tmux detached in the worktree directory, send claude, wait, send resume command, then attach
 tmux new-session -d -s "$TICKET_ID" -c "$WORKTREE"
+# Select the project's pinned Node (apps/web/.nvmrc) before starting Claude, so the
+# session and anything Claude spawns match the repo's version — not the nvm default.
+tmux send-keys -t "$TICKET_ID" 'source "${NVM_DIR:-$HOME/.nvm}/nvm.sh" >/dev/null 2>&1; [ -f apps/web/.nvmrc ] && nvm use "$(cat apps/web/.nvmrc)" >/dev/null 2>&1' Enter
 tmux send-keys -t "$TICKET_ID" "claude --dangerously-skip-permissions --chrome" Enter
 
 echo "Waiting for Claude to start..."
