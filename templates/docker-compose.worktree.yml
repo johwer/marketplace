@@ -43,6 +43,11 @@ x-common-api-environment: &common-api-environment
   Serilog__WriteTo__0__Name: Console
   ForwardedHeaders__ForwardLimit: "1"
   JWT__Audience: Repo.Platform
+  # localstack S3 endpoints — universal to every api service (each still sets its own
+  # buckets + FileStorage below). Kept in the anchor so a newly-added service can't drift
+  # and miss them, which crash-loops the .NET host at 100% CPU on boot (see NOVA-3183).
+  AwsConfig__ServiceUrl: http://localstack:4566
+  AwsConfig__OverridePublicEndpoint: http://localhost:${LOCALSTACK_PORT:-4566}
 
 # JWT config: IssuerUrl MUST match the token issuer (main ServiceC at port 5001).
 # OpenIdConfiguration: uses main ServiceC for JWT key validation.
@@ -67,8 +72,6 @@ services:
       ASPNETCORE_URLS: http://+:5005
       ConnectionStrings__DefaultConnection: Host=postgres;Database=repo_service-b;Username=postgres;Password=postgres
       OpenTelemetry__ServiceName: HealthCaseManagement-API-Worktree
-      AwsConfig__ServiceUrl: http://localstack:4566
-      AwsConfig__OverridePublicEndpoint: http://localhost:${LOCALSTACK_PORT:-4566}
       FileServiceConfig__HealthcaseDocumentS3Bucket: repo-service-b-healthcase-documents
       FileServiceConfig__TemplateDocumentS3Bucket: repo-service-b-template-documents
       FileServiceConfig__RoutineDocumentS3Bucket: repo-service-b-routine-documents
@@ -88,8 +91,6 @@ services:
       ASPNETCORE_URLS: http://+:5002
       ConnectionStrings__DefaultConnection: Host=postgres;Database=repo_service-a;Username=postgres;Password=postgres
       OpenTelemetry__ServiceName: ServiceA-API-Worktree
-      AwsConfig__ServiceUrl: http://localstack:4566
-      AwsConfig__OverridePublicEndpoint: http://localhost:${LOCALSTACK_PORT:-4566}
       FileServiceConfig__MedicalCertificateS3Bucket: repo-medical-certificates
       FileServiceConfig__ExcelExportS3Bucket: repo-service-d-inbox-files
       FileServiceConfig__FileStorage: aws
@@ -122,8 +123,6 @@ services:
       ASPNETCORE_URLS: http://+:5006
       ConnectionStrings__DefaultConnection: Host=postgres;Database=repo_service-d;Username=postgres;Password=postgres
       OpenTelemetry__ServiceName: ServiceD-API-Worktree
-      AwsConfig__ServiceUrl: http://localstack:4566
-      AwsConfig__OverridePublicEndpoint: http://localhost:${LOCALSTACK_PORT:-4566}
       ProviderConfiguration__MockEmail: true
       ProviderConfiguration__DefaultFromEmailAddress: no-reply@polaris-accept.repo.se
       ProviderConfiguration__RetailerFromEmailAddresses__0__RetailerType: Terveystalo
@@ -147,6 +146,11 @@ services:
       - "${ServiceC_API_PORT:-6001}:5001"
     environment:
       <<: *common-api-environment
+      # AwsConfig S3 endpoints come from *common-api-environment. service-c still needs its bucket +
+      # FileStorage mode, or AddRepoS3() falls through to real AWS creds and crash-loops
+      # the host at 100% CPU on boot (NOVA-3183).
+      FileServiceConfig__ExcelExportS3Bucket: repo-service-d-inbox-files
+      FileServiceConfig__FileStorage: aws
       ASPNETCORE_URLS: http://+:5001
       ConnectionStrings__DefaultConnection: Host=postgres;Database=repo_service-c;Username=postgres;Password=postgres
       ConnectionStrings__Redis: redis:6379

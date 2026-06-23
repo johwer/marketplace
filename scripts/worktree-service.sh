@@ -238,6 +238,36 @@ case "${1:-help}" in
         echo "Building and starting $SERVICE from worktree ($WORKTREE_DIR)..."
         compose up --build -d "$COMPOSE_NAME"
 
+        # Post-up smoke check. A container reports "Up" even when the .NET app crashed on
+        # boot (e.g. missing S3 env → AddRepoS3() throws → host crash-loops at 100% CPU,
+        # see NOVA-3183). Poll briefly and fail loudly with logs instead of reporting success
+        # on a dead app.
+        echo "Waiting for $SERVICE to start listening..."
+        UP_OK=""
+        STATE=""
+        for _ in $(seq 1 15); do
+            if compose logs "$COMPOSE_NAME" 2>/dev/null | grep -q "Now listening on"; then
+                UP_OK="yes"; break
+            fi
+            STATE=$(compose ps --format '{{.State}}' "$COMPOSE_NAME" 2>/dev/null | head -1)
+            case "$STATE" in
+                exited|restarting|dead)
+                    break ;;
+            esac
+            sleep 1
+        done
+        if [ -z "$UP_OK" ]; then
+            echo ""
+            echo "❌ $SERVICE did not start listening (container state: ${STATE:-unknown})."
+            echo "   A crash-looping .NET app still shows 'Up' — last 30 log lines:"
+            echo "   ----------------------------------------------------------------"
+            compose logs --tail 30 "$COMPOSE_NAME" 2>&1 || true
+            echo "   ----------------------------------------------------------------"
+            echo "   Fix the boot error above, then re-run: bash ~/.claude/scripts/worktree-service.sh up $SERVICE"
+            exit 1
+        fi
+        echo "✅ $SERVICE is listening."
+
         # Switch vite proxy and .env.local port for this service to the worktree port
         WT_PORT=$(worktree_port "$SERVICE")
         if [ -n "$WT_PORT" ]; then
