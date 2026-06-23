@@ -28,16 +28,39 @@ for arg in "$@"; do
   esac
 done
 
-# If no flags, auto-detect from changed files
+# Compute the set of files THIS branch changed, once, for both auto-detect and the
+# prettier/eslint file scoping below. Imprecise detection is the root cause of two
+# bugs: (1) `git diff HEAD` alone misses committed changes, so a fully-committed
+# frontend-only branch falls back to "run both" and spuriously runs backend checks;
+# (2) formatting/linting the whole tree reformats files never clean on main.
+#
+# Changed set = committed-since-main (origin/main...HEAD) ∪ working-tree (vs HEAD)
+# ∪ untracked, excluding deletions. Paths are relative to the worktree root.
+BASE_REF=""
+if (cd "$WORKTREE" && git rev-parse --verify --quiet origin/main >/dev/null 2>&1); then
+  BASE_REF="origin/main"
+fi
+collect_changed() {
+  cd "$WORKTREE" || return
+  if [[ -n "$BASE_REF" ]]; then
+    git diff --name-only --diff-filter=d "$BASE_REF"...HEAD 2>/dev/null
+  fi
+  git diff --name-only --diff-filter=d HEAD 2>/dev/null
+  git ls-files --others --exclude-standard 2>/dev/null
+}
+CHANGED=$(collect_changed | sort -u)
+
+# If no flags, auto-detect from changed files. Detect by AREA (path), not just
+# extension — a frontend-only branch that touches config/docs (e.g. eslint.config.mjs,
+# *.md) has no .tsx/.jsx file but is still frontend-only and must not trigger backend.
 if [[ "$RUN_BACKEND" == "false" && "$RUN_FRONTEND" == "false" ]]; then
-  CHANGED=$(cd "$WORKTREE" && git diff --name-only HEAD 2>/dev/null || git diff --name-only 2>/dev/null || echo "")
-  if echo "$CHANGED" | grep -q '\.cs$'; then
+  if echo "$CHANGED" | grep -qE '\.cs$|^services/|^shared/'; then
     RUN_BACKEND=true
   fi
-  if echo "$CHANGED" | grep -qE '\.(tsx?|jsx?)$'; then
+  if echo "$CHANGED" | grep -q '^apps/web/'; then
     RUN_FRONTEND=true
   fi
-  # If still nothing detected, run both
+  # If still nothing detected (no recognizable area changed), run both.
   if [[ "$RUN_BACKEND" == "false" && "$RUN_FRONTEND" == "false" ]]; then
     RUN_BACKEND=true
     RUN_FRONTEND=true
@@ -112,10 +135,34 @@ if [[ "$RUN_FRONTEND" == "true" ]]; then
     export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
     [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh" 2>/dev/null
 
-    # Prettier formatting
+    # Scope prettier/eslint to THIS branch's changed files only (CHANGED, computed
+    # above) — never the whole tree. Running `prettier --write .` / `eslint --fix .`
+    # reformats files that were never clean on main and lints paths CI never touches
+    # (e.g. scripts/*.mjs outside src), producing collateral diffs the dev then has to
+    # revert. We mirror the "stage by explicit path" policy: only touch what changed.
+    #
+    # Web files relative to apps/web (for the cd "$WEB_DIR" context below).
+    # bash 3.2-compatible (no mapfile): read newline-separated paths into arrays.
+    PRETTIER_TARGETS=()
+    ESLINT_TARGETS=()
+    while IFS= read -r f; do
+      [[ -z "$f" ]] && continue
+      # Prettier: any changed web file (--ignore-unknown skips unsupported types).
+      PRETTIER_TARGETS+=("$f")
+      # ESLint: changed web files under src/ with a lintable extension — matches
+      # CI's `eslint src` scope and avoids erroring on non-JS/TS paths.
+      if [[ "$f" == src/* && "$f" =~ \.(tsx?|jsx?|mjs|cjs)$ ]]; then
+        ESLINT_TARGETS+=("$f")
+      fi
+    done < <(echo "$CHANGED" | grep '^apps/web/' | sed 's#^apps/web/##')
+
+    # Prettier formatting (changed files only)
     echo "  → Prettier format..."
-    if (cd "$WEB_DIR" && npx prettier --write . 2>&1) > /tmp/qg-prettier.log 2>&1; then
-      add_result "Prettier formatting" "PASS" ""
+    if [[ ${#PRETTIER_TARGETS[@]} -eq 0 ]]; then
+      echo "skipped — no changed web files" > /tmp/qg-prettier.log
+      add_result "Prettier formatting" "PASS" "no changed web files"
+    elif (cd "$WEB_DIR" && npx prettier --write --ignore-unknown "${PRETTIER_TARGETS[@]}" 2>&1) > /tmp/qg-prettier.log 2>&1; then
+      add_result "Prettier formatting" "PASS" "${#PRETTIER_TARGETS[@]} changed file(s)"
     else
       add_result "Prettier formatting" "FAIL" "$(tail -3 /tmp/qg-prettier.log)"
     fi
@@ -127,8 +174,11 @@ if [[ "$RUN_FRONTEND" == "true" ]]; then
     else
       ESLINT_CMD="npx eslint"
     fi
-    if (cd "$WEB_DIR" && $ESLINT_CMD --fix . 2>&1) > /tmp/qg-eslint.log 2>&1; then
-      add_result "ESLint" "PASS" "($ESLINT_CMD)"
+    if [[ ${#ESLINT_TARGETS[@]} -eq 0 ]]; then
+      echo "skipped — no changed src files" > /tmp/qg-eslint.log
+      add_result "ESLint" "PASS" "no changed src files"
+    elif (cd "$WEB_DIR" && $ESLINT_CMD --fix "${ESLINT_TARGETS[@]}" 2>&1) > /tmp/qg-eslint.log 2>&1; then
+      add_result "ESLint" "PASS" "$ESLINT_CMD, ${#ESLINT_TARGETS[@]} changed file(s)"
     else
       ESLINT_ERRORS=$(grep -c "error" /tmp/qg-eslint.log 2>/dev/null || echo "?")
       add_result "ESLint" "FAIL" "$ESLINT_ERRORS errors (see /tmp/qg-eslint.log)"

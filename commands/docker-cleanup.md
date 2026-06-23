@@ -15,10 +15,20 @@ Running `/workspace-cleanup` on every worktree does NOT reclaim build cache or d
 
 $ARGUMENTS
 
-Flags:
-- `--aggressive` — also remove unused images (`docker image prune -a`) and all build cache (`builder prune -a`). Default is conservative (dangling only).
-- `--volumes` — also prune unused volumes. **Off by default** because dev databases (Postgres, Redis data) can live in volumes. Only pass this if you're sure.
+**Implementation:** this command runs the deterministic script `~/.claude/scripts/docker-cleanup.sh` (zero LLM tokens). Prefer the script over ad-hoc `docker prune` commands.
+
+```bash
+bash ~/.claude/scripts/docker-cleanup.sh [flags]
+```
+
+Flags (passed straight to the script):
+- (default, no flags) — stopped containers + dangling images + unused build cache + **orphaned ANONYMOUS volumes** (64-hex, used by no container). All safe; never touches named volumes or in-use resources.
+- `--aggressive` — also remove ALL unused images (`image prune -a`) and ALL build cache (`builder prune -a`).
+- `--no-volumes` — skip the orphaned-anonymous-volume sweep.
 - `--dry-run` — show what would be reclaimed, change nothing.
+- `--auto [--threshold N]` — only act if host disk usage ≥ N% (default 85). For scheduled/unattended prevention runs.
+
+**Why volumes are now safe by default:** the script removes ONLY anonymous orphaned volumes (64-hex names referenced by no container) and defensively protects any named volume (Postgres/Redis/RabbitMQ/seed DB data). The old blanket `docker volume prune` risk — deleting a stopped stack's DB volume — is gone, so no `--volumes` flag is needed.
 
 ## Safety model
 
@@ -59,49 +69,28 @@ done
 
 If any warnings printed, ask the user to confirm before proceeding. Images can always be rebuilt, but rebuilds can take several minutes per worktree.
 
-### Step 3: Prune
-
-**Conservative (default):**
+### Step 3: Run the cleanup script
 
 ```bash
-docker container prune -f
-docker image prune -f        # dangling only (untagged)
-docker builder prune -f      # dangling cache only
+bash ~/.claude/scripts/docker-cleanup.sh [--aggressive] [--no-volumes] [--dry-run]
 ```
 
-**Aggressive (`--aggressive`):**
-
-```bash
-docker container prune -f
-docker image prune -a -f     # unused images too
-docker builder prune -a -f   # all build cache
-```
-
-**Volumes (`--volumes`, only if explicitly requested):**
-
-```bash
-# Show first, confirm, then prune
-docker volume ls --filter dangling=true
-docker volume prune -f
-```
-
-**Dry run (`--dry-run`):**
-
-Skip the actual prune commands. Instead, show what each would reclaim:
-
-```bash
-docker system df -v | head -60
-docker container ls -a --filter status=exited --filter status=created
-docker images --filter dangling=true
-```
+The script prints before/after `docker system df` and the host-disk delta itself — no need to wrap it. For `--aggressive` with a worktree whose stack is **down**, surface the Step 2 warning and confirm first.
 
 ### Step 4: Report reclaimed space
 
+The script's after/before `docker system df` output is the report. Summarize the delta to the user, e.g., "Reclaimed 6.3 GB (images 5.1 GB, anonymous volumes 1.2 GB); host disk 85% → 81%."
+
+## Preventing recurrence (don't have this again)
+
+Disk exhaustion (build cache + dangling images + orphaned volumes) once filled the host disk and made Postgres fail `CREATE TABLE` with `PG 53100: No space left on device`, hot-looping the service-a workers to 100% CPU. To keep ahead of it, run the safe sweep on a schedule:
+
 ```bash
-docker system df
+# only acts when host disk >= 85%; safe to run unattended
+bash ~/.claude/scripts/docker-cleanup.sh --auto
 ```
 
-Compare to the Step 1 baseline and report: e.g., "Reclaimed 27.3 GB (images: 10.2 GB, build cache: 20.5 GB, containers: trivial)."
+Wire this via `/schedule` (e.g. daily) or call `--auto` from `docker-health-check.sh`. The default sweep never touches named/DB volumes.
 
 ## Important rules
 

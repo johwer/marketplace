@@ -79,9 +79,16 @@ docker ps -a --format '{{.Names}}' | grep "$TICKET_LOWER" | xargs -r docker rm -
 
 # Remove images matching this worktree
 docker images --format '{{.Repository}}:{{.Tag}}' | grep "$TICKET_LOWER" | xargs -r docker rmi 2>/dev/null || true
+
+# Remove this worktree's NAMED volumes (repo-<ticket>_postgres_data, _redis_data, etc.).
+# Safe here: the worktree (and its DB) is being torn down. Prevents dead-worktree
+# volumes from accumulating (the disk-exhaustion source). Only this ticket's volumes.
+docker volume ls -q | grep "^repo-$TICKET_LOWER""_" | xargs -r docker volume rm 2>/dev/null || true
 ```
 
-Report how many images were removed and how much space was reclaimed. If none found, skip silently.
+Report how many images and volumes were removed and how much space was reclaimed. If none found, skip silently.
+
+> Belt-and-suspenders: a periodic `bash ~/.claude/scripts/docker-cleanup.sh --orphan-worktrees` reclaims named volumes from any worktrees that were removed without this step.
 
 ### Step 4: Kill Vite Dev Server & tmux Session
 
