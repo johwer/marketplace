@@ -132,7 +132,13 @@ After the health report, route deferred learnings to the right destination files
 | `agents-md:<path>` | Repo AGENTS.md | `<monorepo>/<path>` | Agent-specific operational gotchas only (commands, auth, db names, ports) |
 | `global-claude` | Global CLAUDE.md | `~/.claude/CLAUDE.md` | Every Claude session everywhere |
 | `repo-docs` | Repo docs | `docs/<file>.md` | Team-wide coding standards and conventions |
-| `memory` | Memory file | Project memory directory | Notes for future reference only |
+| `memory` | Memory file | Project memory directory | **Fallback only** — a learning with NO skill/doc/code/command home (local-env gotchas, cross-cutting process reminders) |
+
+### ONE canonical home — never route to memory AND elsewhere
+
+Each learning gets **exactly one** destination. If it can be *implemented right away* — added to a skill (`/ghost-review`, `/owl-review`, …), a repo doc, a command, code, or CLAUDE.md — that is its home, and it must **NOT also be written to a memory file**. Memory is the fallback for learnings that have no such home, not a second copy.
+
+Why: duplication rots. A reviewer pattern lived in BOTH `/ghost-review` AND `feedback_cachpachios_*` memory files; the skill is richer and data-backed, so the memory copies were pure noise that later had to be hunted down and deleted. When a memory entry already exists for something you're routing to a skill/doc, **delete the memory entry as part of the route** (and drop its MEMORY.md line). If unsure whether a code/skill home exists, grep for it before defaulting to memory.
 
 ### Repo File Decision Tree (Repo)
 
