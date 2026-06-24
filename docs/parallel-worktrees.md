@@ -77,10 +77,17 @@ the browser requests a stale `?v=<hash>` and gets `504 (Outdated Optimize Dep)`:
 Fix (NOVA-3105): `allocate-ports.sh` now generates `cosmos.vite.config.worktree.mts` (extends
 the committed `cosmos.vite.config.mts`, sets `cacheDir: node_modules/.vite-cosmos`) and points
 `cosmos.worktree.config.json`'s `vite.configPath` at it — so the two servers no longer share a
-cache. If you hit a stale state mid-session (e.g. after a config change), kill the dev ports and
-restart; `rm -rf node_modules/.vite node_modules/.vite-cosmos` forces a fully clean optimize.
-A reliable cold boot always works — the breakage only comes from a mid-session re-optimize or a
-zombie process still holding the renderer port (kill it before restarting).
+cache. To recover from a stale state, just run the clean (re)start helper:
+
+```bash
+bash ~/.claude/scripts/worktree-dev.sh          # clean (re)start of Vite + Cosmos
+bash ~/.claude/scripts/worktree-dev.sh --hard   # also wipes node_modules/.vite + .vite-cosmos
+```
+
+It auto-detects the worktree, reads the ports from the worktree config files, kills any zombie
+holding a dev port, restarts both servers, and warms up the Cosmos renderer. A reliable cold
+boot always works — the breakage only comes from a mid-session re-optimize or a zombie process
+still holding the renderer port.
 
 ### Outside a worktree (main repo / non-DTF teammate)
 `allocate-ports.sh` generates `vite.config.worktree.mts` and `cosmos.worktree.config.json`

@@ -63,13 +63,16 @@ cat >> "$WORKTREE/CLAUDE.md" << EOF
 ### Run the dev server (worktree)
 - Use: \`cd apps/web && npx vite --config vite.config.worktree.mts --host\`
 - Do **NOT** use \`npm start\` — it loads \`vite.config.mts\` (port 3000) and conflicts with other worktrees.
-- **App goes white/blank, or Cosmos shows "Multiple script paths"?** That's a Vite dep-optimize cache clash or a zombie holding a dev port. Fix: kill the dev ports and restart; for a fully clean optimize \`rm -rf node_modules/.vite node_modules/.vite-cosmos\` first. A cold boot always works. (Cosmos uses its own \`cacheDir\` via the generated \`cosmos.vite.config.worktree.mts\` so it no longer fights the app's cache.) Full explanation: \`~/.claude/docs/parallel-worktrees.md\` → Troubleshooting.
+- **App goes white/blank, or Cosmos shows "Multiple script paths"?** Vite dep-optimize cache clash or a zombie holding a dev port. Fix: \`bash ~/.claude/scripts/worktree-dev.sh\` (clean (re)start of Vite + Cosmos; add \`--hard\` to also wipe the optimize caches). A cold boot always works. (Cosmos uses its own \`cacheDir\` via the generated \`cosmos.vite.config.worktree.mts\` so it no longer fights the app's cache.) Full explanation: \`~/.claude/docs/parallel-worktrees.md\` → Troubleshooting.
 
 ### Per-worktree local-state files — NEVER commit
 \`apps/web/vite.config.worktree.mts\`, \`AGENTS.md\`, and \`CLAUDE.md\` are **per-worktree local state**, not code changes. They are generated/rewritten by DTF scripts — \`allocate-ports.sh\` generates the Vite config, \`worktree-service.sh up/down\` rewrites its proxy targets via \`sed\`, and worktree setup appends a DTF section to AGENTS.md/CLAUDE.md. Running Vite does **not** modify them; only the scripts do. \`allocate-ports.sh\` marks them \`git update-index --skip-worktree\` so git ignores the local edits — they will not appear in \`git status\` and cannot be staged. **Never** \`git update-index --no-skip-worktree\` them, and never \`git add\` them by path. Always stage your changes by **explicit path** (never \`git add -A\`/glob), and run \`prettier\`/\`eslint\` on your **named changed files only** (never \`--write .\`).
 
 ### Key DTF Scripts
 \`\`\`bash
+# (Re)start the dev servers cleanly (Vite app + Cosmos) — fixes white app / stale Cosmos
+bash ~/.claude/scripts/worktree-dev.sh           # add --hard to wipe optimize caches
+
 # Start a backend service (builds Docker, runs on worktree ports)
 bash ~/.claude/scripts/worktree-service.sh up service-b-api
 
