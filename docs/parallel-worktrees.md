@@ -63,6 +63,25 @@ env-var layer to drift out of sync. We pass `--config cosmos.worktree.config.jso
 binds exactly those ports. The renderer port has **no CLI flag** — it can only come from
 `rendererUrl` — which is why we generate a patched config file instead of passing a flag.
 
+### Troubleshooting: white/blank app, or Cosmos "Multiple script paths"
+Both symptoms have the same root cause: the **app dev server** (Vite on 31xx) and the
+**Cosmos renderer** (its own Vite on 38xx) both default to `node_modules/.vite` for the
+dep-optimize cache. When one re-optimizes, it invalidates the other's cached dep hashes →
+the browser requests a stale `?v=<hash>` and gets `504 (Outdated Optimize Dep)`:
+- App: the JS chunks 504 → **white/blank page**.
+- Cosmos: after re-optimize the entry `<script>` gets a query appended, which breaks
+  react-cosmos's `findMainScriptUrl` regex → **"Multiple script paths found in index.html"**
+  (a 500 on the renderer). Pinning `vite.mainScriptUrl` does NOT help — the exact match also
+  fails on the query.
+
+Fix (NOVA-3105): `allocate-ports.sh` now generates `cosmos.vite.config.worktree.mts` (extends
+the committed `cosmos.vite.config.mts`, sets `cacheDir: node_modules/.vite-cosmos`) and points
+`cosmos.worktree.config.json`'s `vite.configPath` at it — so the two servers no longer share a
+cache. If you hit a stale state mid-session (e.g. after a config change), kill the dev ports and
+restart; `rm -rf node_modules/.vite node_modules/.vite-cosmos` forces a fully clean optimize.
+A reliable cold boot always works — the breakage only comes from a mid-session re-optimize or a
+zombie process still holding the renderer port (kill it before restarting).
+
 ### Outside a worktree (main repo / non-DTF teammate)
 `allocate-ports.sh` generates `vite.config.worktree.mts` and `cosmos.worktree.config.json`
 **only inside worktrees**. The main repo never has them, so you just run the stock commands
