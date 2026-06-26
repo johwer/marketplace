@@ -189,10 +189,13 @@ Use the section dividers exactly as in the template (`═══` for major secti
 
 ### Step 7 — Offer Jira attach
 
-After writing the file, **ask** if the user wants to attach it to the related Jira ticket. If yes, upload via the Atlassian REST API:
+After writing the file, **ask** if the user wants to attach it to the related Jira ticket. If yes, upload via the Atlassian REST API. **`acli` cannot upload attachments** (only `attachment list`/`delete`), so the REST call is the only path.
+
+**REQUIRED first: warm up the token.** The `access_token` in the keychain expires, and a stale one returns **401 Unauthorized** on the attachment POST. Running any `acli` command first forces acli to refresh the keychain token — do the `acli … view` line BELOW immediately before extracting, never skip it. (Confirmed NOVA-3062: skipping the warm-up → 401; warming up → 200.) If the POST still 401s after a warm-up, the acli session itself is expired — tell the user to re-auth acli, and fall back to posting the guide's 3-part summary as an inline Jira comment (which always works via `acli jira workitem comment create`).
 
 ```bash
 # Token from ACLI keychain (same pattern as ~/.claude/scripts/jira-download-attachments.sh)
+# The view call is NOT optional — it refreshes the keychain token so the POST won't 401.
 acli jira workitem view <TICKET> --fields summary > /dev/null 2>&1
 ACCESS_TOKEN=$(security find-generic-password -s "acli" -w 2>/dev/null | python3 -c "
 import sys, base64, gzip, json
