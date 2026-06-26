@@ -240,12 +240,20 @@ case "${1:-help}" in
 
         # Post-up smoke check. A container reports "Up" even when the .NET app crashed on
         # boot (e.g. missing S3 env → AddRepoS3() throws → host crash-loops at 100% CPU,
-        # see NOVA-3183). Poll briefly and fail loudly with logs instead of reporting success
-        # on a dead app.
-        echo "Waiting for $SERVICE to start listening..."
+        # see NOVA-3183). Poll the /health endpoint (robust across ASP.NET log-format
+        # differences — the old "Now listening on" grep false-negatived on service-a-api and
+        # the script bailed BEFORE switching the Vite proxy, NOVA-2590). Cold .NET boots can
+        # exceed 15s, so allow ~45s. Fail loudly with logs instead of reporting success on a dead app.
+        echo "Waiting for $SERVICE to become healthy..."
+        WT_PORT=$(worktree_port "$SERVICE")
         UP_OK=""
         STATE=""
-        for _ in $(seq 1 15); do
+        for _ in $(seq 1 45); do
+            if [ -n "$WT_PORT" ] && \
+               [ "$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:$WT_PORT/health" 2>/dev/null)" = "200" ]; then
+                UP_OK="yes"; break
+            fi
+            # Fallback signal in case a service exposes health on a non-standard path.
             if compose logs "$COMPOSE_NAME" 2>/dev/null | grep -q "Now listening on"; then
                 UP_OK="yes"; break
             fi
@@ -258,7 +266,7 @@ case "${1:-help}" in
         done
         if [ -z "$UP_OK" ]; then
             echo ""
-            echo "❌ $SERVICE did not start listening (container state: ${STATE:-unknown})."
+            echo "❌ $SERVICE did not become healthy (container state: ${STATE:-unknown})."
             echo "   A crash-looping .NET app still shows 'Up' — last 30 log lines:"
             echo "   ----------------------------------------------------------------"
             compose logs --tail 30 "$COMPOSE_NAME" 2>&1 || true
@@ -266,7 +274,7 @@ case "${1:-help}" in
             echo "   Fix the boot error above, then re-run: bash ~/.claude/scripts/worktree-service.sh up $SERVICE"
             exit 1
         fi
-        echo "✅ $SERVICE is listening."
+        echo "✅ $SERVICE is healthy."
 
         # Switch vite proxy and .env.local port for this service to the worktree port
         WT_PORT=$(worktree_port "$SERVICE")
