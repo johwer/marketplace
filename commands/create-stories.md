@@ -332,7 +332,10 @@ cd ~/Documents/Repo && git worktree add ~/Documents/<TICKET_ID> <TICKET_ID>
 
 ```bash
 # For each worktree (run these in parallel with &):
-(cd ~/Documents/<TICKET_ID>/apps/web && source ~/.nvm/nvm.sh && nvm use && npm i) &
+# Use `nvm exec "$(cat .nvmrc)" npm i` — it runs npm under the exact pinned Node
+# regardless of PATH. Do NOT pipe `nvm use` (e.g. `nvm use | tail`): the pipe runs it
+# in a subshell, the PATH switch is discarded, and npm falls back to the default Node.
+(cd ~/Documents/<TICKET_ID>/apps/web && source ~/.nvm/nvm.sh && nvm exec "$(cat .nvmrc)" npm i) &
 ```
 
 **Copy environment files + allocate ports:**

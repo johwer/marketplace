@@ -95,7 +95,9 @@ git worktree add ~/Documents/<TICKET_ID> <TICKET_ID>
 Run in the new worktree:
 
 ```bash
-cd ~/Documents/<TICKET_ID>/apps/web && source ~/.nvm/nvm.sh && nvm use && npm i
+# `nvm exec "$(cat .nvmrc)" npm i` runs npm under the exact pinned Node regardless of PATH.
+# Don't pipe `nvm use` (e.g. `| tail`) — the subshell discards the PATH switch and npm uses the default Node.
+cd ~/Documents/<TICKET_ID>/apps/web && source ~/.nvm/nvm.sh && nvm exec "$(cat .nvmrc)" npm i
 ```
 
 ### Step 6: Generate Environment Files
