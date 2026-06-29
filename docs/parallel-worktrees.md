@@ -142,6 +142,25 @@ bash ~/.claude/scripts/generate-api.sh service-b
 
 Each worktree gets its own generated TypeScript types matching its own backend changes.
 
+## Backend builds/tests when the local .NET SDK is pinned
+
+`global.json` may pin a newer SDK (e.g. `10.0.300`, `rollForward: latestFeature`) than is installed locally (e.g. `10.0.102`). When that happens, **`dotnet build` / `dotnet test` / `dotnet csharpier` all fail locally** with "A compatible .NET SDK was not found" — and backend regressions stay invisible until CI (e.g. a handler-ctor change breaking a unit test, or a reflection-driven completeness test, or CSharpier formatting).
+
+Run them through the matching SDK Docker image instead, mounting the repo at `/src`:
+
+```bash
+docker run --rm -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:10.0 bash -c "
+  dotnet tool restore                                              # csharpier is a repo-local tool
+  dotnet csharpier check .                                         # or: csharpier format <files>
+  dotnet build services/<Svc>/<Svc>.sln -c Release /warnaserror    # mirrors CI (warnings = errors)
+  dotnet test services/<Svc>/<Svc>.API.Test/<...>.csproj -c Release # unit tests (no DB)
+"
+```
+
+- CI builds with `/warnaserror` — this also flags `CS1573` (a new parameter with no XML-doc `<param>` tag on a documented method).
+- **Integration tests need testcontainers (Docker-in-Docker)** → they can't run in this simple container; rely on CI for those and say so rather than claiming a local pass.
+- Always verify backend changes this way **before pushing** to avoid burning CI rounds.
+
 ## Proxy Strategy
 
 By default, API proxies point to the **main stack** (500x ports). Only services you explicitly `worktree-service.sh up` get redirected to worktree ports. This means:
