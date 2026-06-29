@@ -21,6 +21,9 @@ Key conventions:
 - **Minimal auth mapping for 500 fixes**: When fixing a 500 in an auth check, find the minimal mapping needed (read-only first) rather than mirroring full CRUD.
 - Format with CSharpier: `dotnet csharpier .` before committing
 - Build check: `dotnet build services/<ServiceName>/<ServiceName>.sln`
+- **SDK-pin gotcha (worktrees)**: `global.json` may pin a newer SDK than is installed locally → `dotnet build/test/csharpier` fail with "no compatible .NET SDK". This silently hides regressions until CI. **Verify backend changes via the matching SDK Docker image BEFORE pushing**: `docker run --rm -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:10.0 bash -c "dotnet tool restore; dotnet csharpier check .; dotnet build services/<Svc>/<Svc>.sln -c Release /warnaserror; dotnet test services/<Svc>/<Svc>.API.Test/<...>.csproj -c Release"`. (Integration tests need testcontainers → rely on CI; don't claim they passed locally.) CI builds with `/warnaserror` (catches CS1573 missing XML-doc `<param>` tags when you add a parameter).
+- **Grep ALL consumer tests on a ctor/signature change** — including the **unit-test project** (e.g. `*.API.Test`), not just integration tests. Adding a constructor parameter (e.g. a new injected service to an event handler) breaks every test that constructs the type; missing one = red CI.
+- **Reflection-driven completeness tests**: some suites enumerate a hardcoded list of types/enums (e.g. ServiceA `ExcelTranslationsTests` checks every `ExportType` is in `service-aRelatedExportTypes` and every Excel DTO in `dtoTypes`, with sheet/column keys resolvable per language). Adding a new export type/DTO means **registering it in those test lists too** (English fallback covers non-localized languages for a single-market feature).
 
 Docker workflow for local testing:
 - Rebuild service: `docker compose up --build --force-recreate -d <service>`
