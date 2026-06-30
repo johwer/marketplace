@@ -65,10 +65,41 @@ wc -l ~/.claude/projects/*/memory/dream-team-learnings.md
 
 **Threshold:** > 500 lines
 
-**Action:** Suggest running `/retro-proposals` to process learnings into destination files, then archive old entries:
-1. Run `/retro-proposals` to route unprocessed learnings
-2. Move processed entries to `dream-team-learnings-archive-YYYY-MM.md`
-3. Keep only the last 2-3 sessions in the active file
+**Action:** Run the Archive Step below.
+
+---
+
+## Archive Step (dream-team-learnings.md)
+
+Rolls processed session entries out of the active learnings file into a dated archive, so the file `/retro-proposals` loads on demand stays small. Suggest this whenever section 3's threshold trips; only run it after the user says yes.
+
+### Iron rule — learnings have ONE home, and it is NEVER the recall system
+
+This step moves entries **only between `dream-team-learnings.md` and `dream-team-learnings-archive-YYYY-MM.md`**. It must **NEVER**:
+- write a learning into `MEMORY.md`
+- create or append to any `feedback_*` / `reference_*` / `project_*` recall file
+- add a `MEMORY.md` index line for the archive
+
+Learnings are captured in `dream-team-learnings.md` and routed to their ONE canonical home (skill/doc/code/CLAUDE.md) by `/retro-proposals` — see `retro-proposals.md` ("ONE canonical home — never route to memory AND elsewhere"). Memory recall is a *fallback for learnings with no other home*, never a mirror of the learnings log. Archiving is pure log rotation; it does not touch the recall system at all.
+
+### Procedure
+
+1. **Process first — never archive unprocessed learnings.** Confirm `/retro-proposals` has already routed the entries you're about to move. If there are unrouted learnings, run `/retro-proposals` and stop here — come back to archive afterward.
+
+2. **Keep the tail hot.** Leave the most recent **2–3 sessions** in the active `dream-team-learnings.md`. Everything older is an archive candidate. Session blocks start with `## Session: YYYY-MM-DD — <TICKET>`.
+
+3. **Append older blocks to a dated archive**, grouped by the month the session occurred (`dream-team-learnings-archive-YYYY-MM.md` in the same memory directory). Append — never overwrite an existing archive. Create the archive file with a `# Dream Team Learnings — Archive YYYY-MM` heading if it doesn't exist.
+
+4. **Remove the moved blocks from the active file.** After the move, the active file holds only its `# Dream Team Learnings` heading plus the last 2–3 session blocks.
+
+5. **Verify the rotation (and the iron rule):**
+   ```bash
+   MEM=~/.claude/projects/*/memory
+   wc -l $MEM/dream-team-learnings.md $MEM/dream-team-learnings-archive-*.md
+   # MEMORY.md must be UNCHANGED — archive never adds an index line:
+   grep -c "dream-team-learnings-archive" $MEM/MEMORY.md   # expect 0
+   ```
+   Confirm: active file shrank, archive grew by the same content, `MEMORY.md` untouched, no new recall files created.
 
 ### 4. Token Budget Check
 
@@ -93,21 +124,23 @@ If MEMORY.md exceeds 1,500 tokens, suggest:
 
 ## Output Format
 
-Present findings as a short report:
+Present findings as a short report. **Always fill these in with real measurements** (from the bash checks above) — the layout below is an illustrative template, NOT reference values. Placeholders are shown in `<…>`; replace every one.
 
 ```
 🧹 Memory Health Check
 
-  MEMORY.md:           136 lines / 1,827 tokens (budget: 1,500) ⚠️ slightly over
-  Memory files:        10 files / 14,473 tokens total
-  dream-team-learnings: 615 lines — consider archiving processed entries
+  MEMORY.md:           <N> lines / <N> tokens (budget: 1,500) <✅ ok | ⚠️ over>
+  Memory files:        <N> files / <N> tokens total
+  dream-team-learnings: <N> lines <— consider archiving if over 500>
 
   Suggestions:
-  1. [action] — [why] — saves ~X tokens
-  2. [action] — [why] — saves ~X tokens
+  1. [action] — [why] — saves ~<N> tokens
+  2. [action] — [why] — saves ~<N> tokens
 
   Apply suggestions? (y/N)
 ```
+
+> The `<…>` are placeholders, not data. Never echo them — or any number from this template — as if they were the user's actual figures. Measure first, then report.
 
 ## What NOT to Do
 
