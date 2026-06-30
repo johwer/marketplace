@@ -117,11 +117,11 @@ Check if the arguments contain `--lite`. If present:
   - **Phase 5.5**: Full GitHub review cycle — trigger AI bot reviews (Gemini `/gemini review`), poll for AI feedback, fix any issues, poll CI checks, mark PR ready only after user confirms. Human reviewers are auto-assigned by `.github/CODEOWNERS` on ready — do NOT manually assign from `reviewers.json` (use the opt-in `/reviewers` command only if extra reviewers are explicitly wanted)
   - **Phase 6**: User review loop — ask user for feedback, route fixes, iterate until "ship it"
   - **Phase 6.5**: Summary (write it yourself instead of spawning Tane)
-  - **Phase 4.75 (Visual verification)**: **Write Playwright e2e tests that generate reproducible screenshots** — the test IS the verification. Create spec files at `apps/web/tests/e2e/<feature-area>/` using seed data IDs from `scripts/database-init/` for deterministic navigation. For permission tests, use `page.route()` to mock ServiceC responses. Each test takes screenshots co-located with the component: `<component-dir>/__screenshots__/<ComponentName>-<state>.png`. Run tests with `npx playwright test`. Use Playwright CLI (`playwright-cli -s=<agent>`) for manual exploration only. See `~/.claude/skills/playwright-cli/SKILL.md` for CLI reference.
+  - **Phase 4.75 (Visual verification)**: **Drive the LIVE app in a real browser via `playwright-cli` and save screenshots to `~/Downloads/<TICKET_ID>/`** — that IS the verification. Navigate the worktree dev app (port 31xx), exercise the changed UI, and check network + console (not just the DOM). Save one screenshot per relevant state to `~/Downloads/<TICKET_ID>/` (user-visible folder; NEVER the repo, NEVER `/tmp`). **Do NOT** write committed Playwright e2e specs, `toHaveScreenshot` baselines, `page.screenshot()` artifacts in the repo, or GIF/video by default — that is the wrong default and contradicts how this team verifies (see memory `feedback_dtf_visual_verification_contradiction`, `feedback_real_browser_verification_mandatory`, `feedback_screenshots_user_visible_paths`). **New component → add a Cosmos fixture** (Vite/Cosmos for component states) instead of an e2e spec, plus a unit test if it has interactive logic. A committed `toHaveScreenshot` regression test is the rare EXCEPTION — only when the user explicitly asks for one. See `~/.claude/skills/playwright-cli/SKILL.md`.
   - **Phase 6.75**: Retrospective — write your own retro learnings using the same 4 categories with destination hints: instruction improvements (`dream-team`/`agent:<name>`/`skill:<name>`), convention discoveries (`project-claude`/`agents-md:<path>`/`repo-docs`), doc gaps (`repo-docs`/`agents-md:<path>`), process improvements (`dream-team`/`memory`). Tag each item with a suggested destination so [`/retro-proposals`](commands.md#team-review) can route it later.
-  - **Phase 7**: Cleanup — runs the **Completion Gate** first (see `dev-workflow-checklist.md` Section 7): all PR comments resolved, screenshots in `__screenshots__/` next to components, retro done, CI green, PR description complete. Then posts a **Jira completion comment** with PR link + summary, @mentioning the ticket creator if different from assignee. Then transitions ticket to Klart.
-- **Visual verification applies in lite mode too.** The same Phase 4.75 hard gate (Playwright e2e test file + screenshots must exist before push) applies whether you're in full Dream Team or lite mode. Don't skip it just because you're working solo.
-- **Lead independently re-runs the visual/e2e hard gate.** Never trust a dev agent's "all tests pass" — the team lead (and lite-mode solo) MUST re-run `npx playwright test tests/e2e/<feature-area>/` itself and see the pass output before push. A claimed pass without an independent re-run has shipped a red gate (retro NOVA-3043).
+  - **Phase 7**: Cleanup — runs the **Completion Gate** first (see `dev-workflow-checklist.md` Section 7): all PR comments resolved, visual-verification screenshots present in `~/Downloads/<TICKET_ID>/`, retro done, CI green, PR description complete. Then posts a **Jira completion comment** with PR link + summary, @mentioning the ticket creator if different from assignee. Then transitions ticket to Klart.
+- **Visual verification applies in lite mode too.** The same Phase 4.75 gate (real-browser `playwright-cli` check + `~/Downloads/<TICKET_ID>/` screenshots) applies whether you're in full Dream Team or lite mode. Don't skip it just because you're working solo.
+- **Lead independently re-verifies in the real browser.** Never trust a dev agent's "looks good" — the team lead (and lite-mode solo) MUST personally drive the live app via `playwright-cli` and see the rendered state (+ network/console clean) before push. A claimed pass without an independent real-browser check has shipped user-facing bugs (retro NOVA-3043).
 - **New shared `ui/` primitives with interactive/conditional logic ship a unit test in the SAME PR.** Consumer tests miss the primitive's own logic (e.g. a FormSection collapsible path). Hard gate for any new `ui/` component with behavior, not just static rendering.
 - **Spawn-time prompts are frozen.** A subagent only sees its prompt as it was at spawn — relay any decision made AFTER spawn via `SendMessage`, never by assuming the agent re-reads context. And an agent→lead message may surface only as an `idle_notification`: on idle, the lead verifies progress via files/git/journal rather than waiting for a delivered DONE (retro NOVA-2924).
 - **Phase 6.9 gate is mandatory in lite mode.** Before Phase 7, you MUST output completion markers for both Phase 4.75 and Phase 6.75. No markers = Phase 7 blocked. See Phase 6.9 section.
@@ -307,9 +307,9 @@ bash ~/.claude/scripts/phase-cost-tracker.sh log "<TICKET_ID>" "<phase-name>" "<
      - Read only the docs relevant to the ticket scope in `docs/` — if it's frontend-only, skip backend docs; if backend-only, skip frontend docs. Available docs: SERVICE_ARCHITECTURE.md, CODING_STYLE_BACKEND.md, CODING_STYLE_FRONTEND.md, FRONTEND_COMPONENTS.md, API_CONVENTIONS.md
      - **i18n architecture note**: This project loads translations from S3/TranslationService at runtime — there are no local JSON translation files. When tickets say "hardcode in JSON files," the correct approach is bare `t("key")`. Do NOT use `defaultValue`. Do NOT search for local JSON translation files — they don't exist.
      - **First-visit / empty-state checkpoint**: For every affected page, verify what renders when there's no data (empty lists, null values, new users). Include this in the architecture report so Ingrid can verify it visually.
-     - **Visual test plan for access control tickets**: When the ticket involves permissions/access control, include: (a) which test user to log in as per scenario, (b) expected UI per user/role, (c) whether seed data supports those users, (d) **seed data IDs** (customerId, userId, etc.) from `scripts/database-init/` for direct URL navigation in Playwright e2e tests — every verified flow must have a reproducible test. Pass this to Ingrid and Suki.
-     - **E2e test plan for all UI tickets**: For every UI change, identify: (a) which page paths need Playwright e2e tests, (b) which seed data IDs enable direct navigation, (c) which ServiceC permissions need mocking (if access control), (d) which component `__screenshots__/` directories should contain the test output. Include this in your report — the frontend dev will write the tests alongside the implementation.
-     - **E2e conventions**: customerId is UUID format, not numeric. Tables use `clickableRows`, not `<a>` links — use `row.click()` not `a[href]` for table row navigation in Playwright tests.
+     - **Visual verification plan for access control tickets**: When the ticket involves permissions/access control, include: (a) which test user to log in as per scenario, (b) expected UI per user/role, (c) whether seed data supports those users, (d) **seed data IDs** (customerId, userId, etc.) from `scripts/database-init/` for direct URL navigation when driving the live app via `playwright-cli`. Pass this to Ingrid and Suki. (Verification = real-browser walkthrough + `~/Downloads/<TICKET_ID>/` screenshots — NOT committed e2e specs; see Phase 4.75.)
+     - **Visual verification plan for all UI tickets**: For every UI change, identify: (a) which page paths to drive in the live app, (b) which seed data IDs enable direct navigation, (c) which states to capture, (d) whether a **new component** needs a Cosmos fixture. Include this in your report — the frontend dev verifies in the real browser and saves screenshots to `~/Downloads/<TICKET_ID>/`. Do NOT plan committed Playwright e2e specs/baselines unless the user explicitly asked for a regression test.
+     - **Live-app navigation conventions**: customerId is UUID format, not numeric. Tables use `clickableRows`, not `<a>` links — use `row.click()` not `a[href]` for table row navigation.
      - **Design intent check**: For new features, verify the implementation approach matches the ticket's stated purpose — not just code quality. Flag when the proposed solution solves a different problem than what was described.
      - **If `.dream-team/interview.md` exists** (from `--interview` flag), read it first — the user's answers take priority over assumptions from the ticket text
      - Analyze the ticket/story provided
@@ -434,11 +434,11 @@ _No open questions yet._
 4. **Save the PR number** — you'll need it to update the description later with `gh pr edit <PR_NUMBER> --body "..."`.
 5. **Share the draft PR URL** with the user.
 
-### Phase 1.75: Record "Before" GIF (UI tickets only)
+### Phase 1.75: Capture "Before" screenshot (UI tickets only)
 
-**Skip if the ticket has no UI changes (backend-only, infra-only).**
+**Skip if the ticket has no UI changes (backend-only, infra-only). Skip for trivial UI changes (e.g. a single dropdown/label) where a before shot adds nothing.**
 
-Immediately after creating the draft PR, spawn Lena to record the current (broken) state before any code changes. This gives the frontend dev a visual reference of the bug and provides "before" evidence for the PR.
+Immediately after creating the draft PR, spawn Lena to capture a "before" screenshot of the current (broken) state before any code changes. This gives the frontend dev a visual reference of the bug and provides "before" evidence for the PR. **No GIF/video** — a single screenshot to `~/Downloads/<TICKET_ID>/`, never the repo.
 
 - **Name:** `lena`
 - **Model:** `haiku` (read-only browser work — no file edits)
@@ -455,7 +455,7 @@ Immediately after creating the draft PR, spawn Lena to record the current (broke
   - **Capture "BEFORE" screenshot**:
     1. Navigate to the affected page: `playwright-cli -s=lena goto http://localhost:<port>/<path>`
     2. Walk through the reproduction steps using `playwright-cli` commands (click, fill, etc.)
-    3. Take a screenshot: `mkdir -p <component-dir>/__screenshots__ && playwright-cli -s=lena screenshot --filename=<component-dir>/__screenshots__/<ComponentName>-before.png`
+    3. Take a screenshot: `mkdir -p ~/Downloads/<TICKET_ID> && playwright-cli -s=lena screenshot --filename=~/Downloads/<TICKET_ID>/<ComponentName>-before.png` (user-visible folder — NEVER the repo, NEVER `/tmp`)
   - **Close session**: Run `playwright-cli -s=lena close`
   - **Report to team lead**: Send a message with screenshot path and a brief description of what the bug looks like visually.
   - **IMPORTANT**: Do NOT edit any files. Do NOT run git commit. You are read-only.
@@ -563,40 +563,19 @@ Based on the tech-architect's scope assessment, spawn the needed agents. **Use t
     - `npx eslint --fix .` on your changed files
     - `npx tsc --noEmit` to verify no type errors
     Fix any issues — these will fail the GitHub build if left unfixed.
-  - **Visual verification via Playwright e2e tests (MANDATORY for UI changes)**: If the ticket involves UI changes, you MUST write Playwright e2e tests AND take screenshots before reporting completion. **The test IS the verification** — screenshots without tests are not reproducible and become stale. Use **Playwright CLI** with a named session for manual exploration, then codify what you verified into a Playwright spec file.
-    0. **Pre-check**: Before opening Playwright, check if the target page has permission gates and verify seed data supports the test user. Missing permissions = blank page and wasted time.
-    1. **Start the Vite dev server**: Check if one is already running for this worktree with `lsof -i -P | grep node | grep LISTEN`. If not, start it: `cd apps/web && npx vite --config vite.config.worktree.mts --host &`. This uses the worktree's unique port (31xx) and proxies APIs to the main stack (500x) by default.
-    1b. **Verify you're on the right dev server**: Run `lsof -i :<port> | grep node` and confirm the process path contains your worktree directory (e.g., `/Documents/PROJ-1801/`), not another open worktree. Testing against the wrong server means testing old code silently.
-    2. **Figure out the path**: Use the verified route paths from Amara's architecture report. If not provided, check the router config (`apps/web/src/routes/`). If the page requires authentication, check `.env.local` or mock data for test credentials.
-    3. **Write a Playwright e2e test FIRST (or alongside screenshots)**:
-       - Create a spec file at `apps/web/tests/e2e/<feature-area>/<test-name>.spec.ts`
-       - **Use seed data IDs** from `scripts/database-init/` for deterministic navigation — never rely on text search or fragile UI selectors to find test data
-       - Define `SEED` constants at the top of the file with IDs matching seed SQL files
-       - Navigate directly via URL using seed IDs: `page.goto(\`/\${SEED.customerId}/employees/\${SEED.userId}/case\`)`
-       - For **permission/access control tests**: Use `page.route("**/api/service-c/**", ...)` to intercept ServiceC responses and inject/remove permissions. This is more reliable than depending on seed data having exact permissions configured
-       - Each test scenario saves a screenshot AND asserts visual regression:
-         ```typescript
-         // Save for PR evidence
-         await page.screenshot({ path: `${SCREENSHOT_DIR}/Component-state.png` });
-         // Visual regression — fails if UI changes unexpectedly
-         await expect(page).toHaveScreenshot("Component-state.png", { maxDiffPixelRatio: 0.01 });
-         ```
-       - **Don't use `toHaveScreenshot()`** when TranslationService keys are newly created — translations may not have synced to S3 yet. Use `page.screenshot()` only until translations are confirmed live.
-       - **Screenshot paths**: Co-locate with the component — `<component-dir>/__screenshots__/<ComponentName>-<state>.png`
-       - `toHaveScreenshot()` baselines are stored in `__snapshots__/` next to the test file (managed by Playwright)
-       - On first run, use `--update-snapshots` to generate baselines. Future runs compare pixel-by-pixel.
-       - Test both positive and negative cases (e.g., with permission → tab visible, without permission → tab hidden)
-       - The test file is the reproducible proof — anyone can re-run it to regenerate and verify screenshots
-    3b. **Scroll to the relevant element before screenshots**: Before calling `page.screenshot()`, ensure the changed element is visible and centered in the viewport. Use `await page.locator('<selector>').scrollIntoViewIfNeeded()` before the screenshot call. Screenshots taken from the top of the page that don't show the actual change are useless for verification.
-    4. **Run the tests**: `npx playwright test tests/e2e/<feature-area>/ --headed` to verify they pass and screenshots are generated
-    5. **Manual exploration** (optional, for complex UI): Open Playwright CLI for additional manual checking: `playwright-cli -s=ingrid open http://localhost:<port>/<path> --headed`
-    6. **Compare against the design**: If the ticket has a Figma link or Jira image attachment, compare layout, colors, spacing, and typography against the design reference.
-    7. **Check acceptance criteria**: Walk through the ticket's verification steps. If the fix doesn't match expectations, fix your code and tests immediately and re-verify.
-    8. **Close session**: Run `playwright-cli -s=ingrid close` when done.
-    9. **Verify artifacts**: Both the test file AND screenshots must exist:
-       - `ls apps/web/tests/e2e/<feature-area>/<test-name>.spec.ts` — test file exists
-       - `ls <component-dir>/__screenshots__/<ComponentName>-*.png` — screenshots generated by tests
-    10. **Report visual status**: In your completion message, reference the e2e test file path, the `__screenshots__/` files, and any deviations from the design.
+  - **Visual verification = drive the LIVE app in a real browser (MANDATORY for UI changes)**: If the ticket involves UI changes, verify by driving the real running app with **Playwright CLI** and saving screenshots to `~/Downloads/<TICKET_ID>/` before reporting completion. **Do NOT write committed Playwright e2e specs, `toHaveScreenshot` baselines, `page.screenshot()` artifacts in the repo, or GIF/video** — that contradicts how this team verifies (memory `feedback_dtf_visual_verification_contradiction`, `feedback_real_browser_verification_mandatory`, `feedback_screenshots_user_visible_paths`). A committed visual-regression test is the rare EXCEPTION, only when the user explicitly asks for one.
+    0. **Pre-check**: Check if the target page has permission gates and verify seed data supports the test user. Missing permissions = blank page and wasted time.
+    1. **Start the Vite dev server**: Check if one is already running for this worktree with `lsof -i -P | grep node | grep LISTEN`. If not, start it: `cd apps/web && npx vite --config vite.config.worktree.mts --host &`. Worktree port (31xx), APIs proxy to the main stack (500x) by default.
+    1b. **Verify you're on the right dev server**: Run `lsof -i :<port> | grep node` and confirm the process path contains your worktree directory, not another open worktree — testing the wrong server means testing old code silently.
+    2. **Figure out the path**: Use the verified route paths from Amara's architecture report, or the router config (`apps/web/src/routes/`).
+    3. **Drive the real app** with `playwright-cli -s=ingrid`: open headed, log in, navigate to the page (use seed data IDs from `scripts/database-init/` for deterministic navigation), and exercise the actual interaction (click, select, type). Scroll the changed element into view before capturing.
+    4. **Check what headless can't catch** — `playwright-cli -s=ingrid network` (requests route to the right place, correct ids, no new non-2xx) and `playwright-cli -s=ingrid console error` (no JS/React errors). The browser is the step that catches stale companyId, failed requests, and ErrorBoundary crashes.
+    5. **Capture screenshots to `~/Downloads/<TICKET_ID>/`** (one per relevant state): `mkdir -p ~/Downloads/<TICKET_ID> && playwright-cli -s=ingrid screenshot --filename=~/Downloads/<TICKET_ID>/<state>.png`. NEVER the repo, NEVER `/tmp`. Confirm the rendered text/labels are correct (translations live in S3), not raw i18n keys.
+    6. **New component? Add a Cosmos fixture** (`*.fixture.tsx`) showing its states, run via `npx cosmos --config cosmos.worktree.config.json` — preferred over an e2e spec for component states. If it has interactive/conditional logic, also add a unit test in the same PR.
+    7. **Compare against the design**: If the ticket has a Figma link or Jira image attachment, compare layout, colors, spacing, typography.
+    8. **Check acceptance criteria** against the ticket; if the result doesn't match, fix and re-verify.
+    9. **Close session**: `playwright-cli -s=ingrid close`.
+    10. **Report visual status**: reference the `~/Downloads/<TICKET_ID>/` screenshot paths (and any Cosmos fixture), confirm network/console were clean, and note any deviations from the design.
   - **Context management**: Follow the Context Management Protocol (see below). Create your notes file at `.dream-team/notes/ingrid.md`.
   - **Communication**: Follow the Communication Protocol (see below). Your contacts: `kenji` (backend), `diego` (infra), `amara` (architect). Be proactive — if you find API contract issues, message `kenji` immediately.
   - If the architect provided an API contract, build your RTK Query types and components against it. You don't need to wait for backend — work in parallel.
@@ -865,40 +844,31 @@ After Maya's code review is approved (all MUST FIX items resolved), spawn:
 
 **Skip this phase if:**
 - The ticket has no UI changes, OR
-- Ingrid already recorded an "after" GIF during her visual verification step (check her completion message)
+- Ingrid already did the real-browser verification + saved `~/Downloads/<TICKET_ID>/` screenshots (check her completion message)
 
-**Only run this if Ingrid did NOT visually verify** (e.g., went idle or skipped verification). Spawn Lena to write the Playwright e2e tests and record screenshots as a fallback:
+**Only run this if Ingrid did NOT visually verify** (e.g., went idle or skipped verification). Spawn Lena to drive the live app and capture `~/Downloads/<TICKET_ID>/` screenshots as a fallback:
 
 - **Name:** `lena`
-- **Model:** `sonnet` (needs to write Playwright test files — not read-only)
+- **Model:** `sonnet`
 - **Subagent type:** `general-purpose`
 - **Team:** `dream-team-<TICKET_ID>`
 - **Prompt:** Tell the agent:
   - You are **Lena**, the Visual Verifier for Repo. Your teammates know you by name.
-  - Your job is to **write Playwright e2e tests that generate reproducible screenshots**. The test IS the verification — screenshots without tests are not reproducible.
-  - **Use Playwright CLI** for manual browser exploration to understand the UI, then codify into test specs.
-  - **Dev server**: The Vite dev server should already be running. Check with `lsof -i -P | grep node | grep LISTEN` to find the port. If not running, message the team lead.
-  - **Login**: Open the browser: `playwright-cli -s=lena open http://localhost:<port> --headed`. If you see a login page, use `playwright-cli snapshot` to get element refs, then interact with `click`/`fill` commands. If you cannot enter a password, message the team lead to ask the user to log in.
-  - **Page path**: [Include the specific page path from the ticket, e.g., `/<customerId>/reports-service-e/service-e`]. Get the customerId from the URL after login.
-  - **Reproduction steps**: [Include the ticket's reproduction steps]
-  - **Write Playwright e2e test file**:
-    1. Create `apps/web/tests/e2e/<feature-area>/<test-name>.spec.ts`
-    2. **Use seed data IDs** from `scripts/database-init/` — define `SEED` constants at the top with IDs matching seed SQL files. Never use fragile text search to find test data.
-    3. Navigate directly via URL using seed IDs: `page.goto(\`/\${SEED.customerId}/employees/\${SEED.userId}/...\`)`
-    4. For **permission/access control tests**: Use `page.route("**/api/service-c/**", ...)` to intercept ServiceC responses and inject/remove permissions
-    5. Each scenario takes a screenshot: `page.screenshot({ path: \`<component-dir>/__screenshots__/<ComponentName>-<state>.png\` })`
-    6. Test both positive and negative cases
-  - **Run tests**: `npx playwright test tests/e2e/<feature-area>/ --headed` to verify they pass
-  - **Close session**: Run `playwright-cli -s=lena close`
-  - **Report to team lead**: Send a message with the e2e test file path, screenshot paths in `__screenshots__/`, and any issues. The test file is the primary artifact — it proves the screenshots are reproducible.
-  - **Commit the test file and screenshots** — these are part of the PR deliverables.
+  - Your job is to **drive the LIVE app in a real browser via `playwright-cli` and save screenshots to `~/Downloads/<TICKET_ID>/`**. Do NOT write committed Playwright e2e specs, `toHaveScreenshot` baselines, repo `page.screenshot()` artifacts, or GIF/video — that contradicts how this team verifies (memory `feedback_dtf_visual_verification_contradiction`).
+  - **Dev server**: should already be running. Check with `lsof -i -P | grep node | grep LISTEN` to find the worktree port. If not running, message the team lead.
+  - **Login**: `playwright-cli -s=lena open http://localhost:<port> --headed`. If you see a login page, use `playwright-cli snapshot` for refs, then `click`/`fill`. If you can't enter a password, message the team lead to ask the user to log in.
+  - **Page path**: [Include the specific page path from the ticket]. Get the customerId from the URL after login (or seed data IDs in `scripts/database-init/`).
+  - **Reproduction / verification steps**: [Include the ticket's steps]
+  - **Verify in the real browser**:
+    1. Navigate to the page and exercise the actual interaction (click, select, type). Scroll the changed element into view.
+    2. `playwright-cli -s=lena network` — confirm requests route correctly (right ids, no new non-2xx).
+    3. `playwright-cli -s=lena console error` — confirm no JS/React errors.
+    4. Confirm rendered text/labels are correct (translations live in S3), not raw i18n keys; check both positive and negative cases where relevant.
+    5. Capture screenshots: `mkdir -p ~/Downloads/<TICKET_ID> && playwright-cli -s=lena screenshot --filename=~/Downloads/<TICKET_ID>/<state>.png` (one per state). NEVER the repo, NEVER `/tmp`.
+  - **Close session**: `playwright-cli -s=lena close`
+  - **Report to team lead**: the `~/Downloads/<TICKET_ID>/` screenshot paths, network/console status, and any issues. Do NOT commit anything — these screenshots are evidence, not repo files.
 
-**Note for team lead**: The "before" state can be tricky since the fix is already committed. Options:
-- If running Phase 4.75 before committing: stash the changes first (`git stash`), let Lena write tests against the bug state, then `git stash pop` for "after"
-- If already committed: the tests should use `page.route()` mocking to simulate both states (preferred), or check out `main` briefly
-- If the "before" is obvious from the ticket screenshots: skip the "before" screenshot and focus on the e2e tests
-
-Tell the user that e2e test files are in `apps/web/tests/e2e/` and screenshots are in `__screenshots__/` next to the component (both committed with PR).
+**Note for team lead**: For a "before/after" comparison, capture the "before" in Phase 1.75 (against `main`/the bug state) and the "after" here — both as `~/Downloads/<TICKET_ID>/` screenshots. The user drag-drops them into the PR description; nothing is committed to the repo.
 
 ### Phase 4.9: De-Sloppify Pass
 
@@ -949,29 +919,21 @@ In this codebase **feature-flagging is frontend-only** (the backend does not eva
 ### Phase 5: Commit, Push & Initial Summary
 
 **HARD GATE — Visual verification (UI tickets only):**
-Before proceeding with ANY push, confirm that visual verification was completed.
+Before proceeding with ANY push, confirm visual verification was done **in the real browser** and that **no screenshots were committed to the repo**.
 
-**What gets committed vs what does NOT** (this is the part agents keep getting wrong — see `feedback_screenshots_must_be_regression` + `feedback_screenshots_user_visible_paths`):
-- ✅ **Commit only `toHaveScreenshot()` regression baselines** — Playwright writes these to a `__snapshots__/` dir next to the test file. They are reproducible test artifacts.
-- 🚫 **NEVER commit manual `page.screenshot()` / `playwright-cli screenshot` walkthrough captures.** Those are evidence, not tests — save them to `~/Downloads/<TICKET_ID>/` and optionally attach to the PR description. Do NOT write them into `apps/web/src/**/__screenshots__/` and do NOT `git add` them.
+**The rule** (see `feedback_dtf_visual_verification_contradiction`, `feedback_real_browser_verification_mandatory`, `feedback_screenshots_user_visible_paths`):
+- ✅ **Visual verification = the lead/dev drove the LIVE app via `playwright-cli`** (exercised the change, checked network + console) and saved screenshots to **`~/Downloads/<TICKET_ID>/`**.
+- 🚫 **NEVER commit any screenshot to the repo** — no `page.screenshot()` / `playwright-cli screenshot` captures in `src/**/__screenshots__/`, and no `toHaveScreenshot` baselines/e2e specs by default. Those go to `~/Downloads/<TICKET_ID>/`; the user drag-drops them into the PR description. (A committed `toHaveScreenshot` regression test is the rare exception, only when the user explicitly asked for one.)
 
-Pick the gate that matches the ticket:
-
-**(a) Standard UI ticket (has an e2e test):** confirm BOTH exist —
-1. **Playwright e2e test file** at `apps/web/tests/e2e/<feature-area>/`:
+**The gate:**
+1. **Screenshots exist in `~/Downloads/<TICKET_ID>/`** (lead has personally seen the rendered output — not just a dev's claim):
    ```bash
-   find apps/web/tests/e2e -name '*.spec.ts' -newer .git/refs/heads/main 2>/dev/null | head -5
+   ls ~/Downloads/<TICKET_ID>/*.png 2>/dev/null
    ```
-2. **`toHaveScreenshot` baseline(s)** the test generated (in `__snapshots__/`):
+   A verbal "looks good" is NOT sufficient — the lead must have driven the live app itself. If no screenshots exist, **STOP, do NOT push**, spawn Lena (Phase 4.75) first. This gate exists because skipping real-browser verification shipped user-facing bugs (PROJ-1701, PROJ-1562).
+2. **No screenshots committed to the repo** — this must return NOTHING:
    ```bash
-   find apps/web -path '*__snapshots__/*' -name '*.png' -newer .git/refs/heads/main 2>/dev/null | head -5
-   ```
-   A verbal "verified in browser" is NOT sufficient — the test is the proof. If NEITHER exists, **STOP, do NOT push**, spawn Lena (Phase 4.75) first. This gate exists because skipping visual verification shipped user-facing bugs in 2 of 7 sessions (PROJ-1701, PROJ-1562).
-
-**(b) No-e2e-test surface (`needs_testing: false`, e.g. a Cosmos-only fixture with no app route):** there is no `toHaveScreenshot` baseline to commit and you must NOT manufacture committed PNGs to satisfy a gate. Instead the lead **independently re-verifies in the real surface** (drive the Cosmos renderer / page via `playwright-cli`, capture the rendered state) and saves the evidence to `~/Downloads/<TICKET_ID>/`. The push gate here is: lead has personally seen the rendered output (not just a dev's claim) and the working tree contains **no committed `page.screenshot()` artifacts**:
-   ```bash
-   # must return NOTHING — manual captures don't belong in the repo
-   git diff --name-only origin/main | grep -E 'src/.*__screenshots__/.*\.png' && echo "REMOVE these — manual shots go to ~/Downloads" || echo "ok: no manual screenshots committed"
+   git diff --name-only origin/main | grep -E 'src/.*__screenshots__/.*\.png|tests/e2e/.*-snapshots/.*\.png' && echo "REMOVE these — screenshots go to ~/Downloads, not the repo" || echo "ok: no screenshots committed"
    ```
 
 Once PR review is approved (or all MUST FIX items are resolved), **run drift detection before pushing**:
@@ -1414,21 +1376,13 @@ Before shutting down the team, run a retrospective to capture learnings that imp
 
 **Marker 1 — Phase 4.75 (Visual Verification):**
 
-If the ticket involved ANY `.tsx` / frontend changes, output exactly ONE of:
-
-Standard UI (has an e2e test):
+If the ticket involved ANY `.tsx` / frontend changes, output exactly:
 ```
 ✓ PHASE 4.75 COMPLETE
-  e2e spec:    apps/web/tests/e2e/<path>/<file>.spec.ts
-  baselines:   <test-dir>/__snapshots__/<Component>-<state>.png  (toHaveScreenshot, committed)
-  playwright:  npx playwright test — PASSED
-```
-No-e2e-test surface (`needs_testing: false`, e.g. Cosmos-only fixture):
-```
-✓ PHASE 4.75 COMPLETE (no-e2e surface)
-  verification: lead re-verified in the real surface via playwright-cli — PASSED
-  evidence:     ~/Downloads/<TICKET_ID>/*.png  (manual shots — NOT committed)
-  committed:    none (git diff shows no src/**/__screenshots__/*.png)
+  verification: lead drove the LIVE app via playwright-cli — network/console clean — PASSED
+  evidence:     ~/Downloads/<TICKET_ID>/*.png  (real-browser shots — NOT committed)
+  cosmos:       <fixture path if a new component, else "n/a">
+  committed:    none (git diff shows no repo screenshots / e2e baselines)
 ```
 
 If the ticket had zero frontend/UI changes, output exactly:
@@ -1910,7 +1864,7 @@ playwright-cli -s=ingrid click e5
 playwright-cli -s=ingrid fill e3 "test@example.com"
 
 # Ad-hoc screenshot (prefer screenshots from e2e tests instead)
-playwright-cli -s=ingrid screenshot --filename=<component-dir>/__screenshots__/<ComponentName>-<state>.png
+playwright-cli -s=ingrid screenshot --filename=~/Downloads/<TICKET_ID>/<state>.png  # user-visible folder, NEVER the repo
 
 # Close session when done
 playwright-cli -s=ingrid close
