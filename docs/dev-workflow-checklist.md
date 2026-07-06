@@ -106,6 +106,8 @@ Applies to all tickets that add or modify user-facing text.
 
 **Completion is blocked** until TranslationService API calls succeed for every new key. If the API is unavailable, note it in the completion message and flag for the team lead.
 
+**Verifying new keys locally (before screenshots):** the running app fetches translations live from S3, so newly-created TranslationService keys render as RAW KEYS until synced to S3 (CI does the sync on merge; for local verification you must sync manually). If a sync needs AWS and the session expired, don't hard-block: AWS creds are **shared across worktrees** (`~/.aws`), so first re-check; if truly expired, refresh via `aws sso login --sso-session repo` and run the sync with `AWS_PROFILE=repo-sso` — only paste temp creds (in your own terminal) as a fallback. Then **curl the live S3 `{lang}.json`** to confirm the key landed before screenshotting. See `aws-setup` skill + memory `reference_aws_creds_shared_sso_refresh`, `feedback_aws_s3_translations_bootstrap_from_start`.
+
 Reference: `docs/INTERNATIONALIZATION.md`
 
 ---
