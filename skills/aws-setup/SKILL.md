@@ -56,24 +56,29 @@ region = <defaultRegion>
 
 ## Step 3: Authenticate
 
-Tell the user:
+**Credentials are shared across all worktrees** — they live on disk in `~/.aws/credentials` / `~/.aws/sso/cache/`, NOT per-tmux/per-session. Before prompting anyone, re-check (`aws-check.sh`): if the parent or another worktree already logged in and the token is still valid, you already have access — just use it and continue, don't stop.
 
-1. Open `<ssoStartUrl>` in your browser
-2. Click the account → role → **"Command line or programmatic access"**
-3. Copy the 3 values: **Access key ID**, **Secret access key**, **Session token**
+### Preferred: SSO login (nothing secret to copy)
 
-Then run the credential helper — it writes to `~/.aws/credentials` which **persists across all terminals and worktrees**:
+When an `[sso-session <profileName>]` exists in `~/.aws/config` (it does for the standard setup), refresh via SSO — the user runs this in-session (e.g. `! aws sso login ...`) and approves in the browser; no keys are copied anywhere:
+
+```bash
+aws sso login --sso-session <profileName>
+```
+
+Then run aws commands with the matching SSO profile (boto3/CLI read the SSO cache directly), e.g. `AWS_PROFILE=<profileName>-sso <cmd>` — no static credentials needed. Verify with `bash ~/.claude/scripts/aws-check.sh`.
+
+### Fallback: paste temp credentials (only if SSO login fails)
+
+1. Open `<ssoStartUrl>` → account → role → **"Command line or programmatic access"**
+2. Copy the 3 values: **Access key ID**, **Secret access key**, **Session token**
+3. Run the credential helper **in your own terminal** (never paste keys into a Claude chat) — it writes `~/.aws/credentials`, which persists across all terminals and worktrees:
 
 ```bash
 bash ~/.claude/scripts/aws-set-credentials.sh "<ACCESS_KEY_ID>" "<SECRET_ACCESS_KEY>" "<SESSION_TOKEN>"
 ```
 
-Verify:
-```bash
-bash ~/.claude/scripts/aws-check.sh
-```
-
-**Note:** `aws sso login` is the standard approach but fails for some SSO configurations. The credentials-file method works reliably. Credentials expire after ~8 hours — re-run when needed.
+**Note:** the static `[<profileName>]` credentials-file entry shadows the SSO `[profile <profileName>]` of the same name and expires after ~8 hours. Prefer the SSO profile (`<profileName>-sso`) so a valid SSO cache is reused automatically. Historically `aws sso login` was flaky on some setups — if it genuinely fails, fall back to the paste method above.
 
 ## Step 4: Set up persistent profile
 

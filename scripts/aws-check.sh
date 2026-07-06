@@ -47,16 +47,25 @@ fi
 
 # --- Session expired — guide user ---
 echo "⚠ AWS session expired or not authenticated."
+echo "  (Credentials live in ~/.aws — shared across all worktrees, not per-tmux. They just need a refresh.)"
 echo ""
+# Preferred: refresh via SSO (no secrets to copy) when an sso-session is configured.
+if grep -q "\[sso-session ${AWS_PROFILE_NAME}\]" ~/.aws/config 2>/dev/null; then
+  echo "Preferred — refresh via SSO (nothing secret to copy):"
+  echo "   aws sso login --sso-session ${AWS_PROFILE_NAME}"
+  echo "   # then run aws commands with the matching SSO profile, e.g. AWS_PROFILE=${AWS_PROFILE_NAME}-sso <cmd>"
+  echo ""
+  echo "Fallback (only if SSO login fails) — paste temp creds in YOUR OWN terminal (never into a Claude chat):"
+elif [[ -n "$SSO_URL" ]]; then
+  echo "Preferred — refresh via SSO:  aws sso login --profile ${AWS_PROFILE_NAME}"
+  echo ""
+  echo "Fallback (only if SSO login fails) — paste temp creds in YOUR OWN terminal (never into a Claude chat):"
+fi
 if [[ -n "$SSO_URL" ]]; then
-  echo "1. Open ${SSO_URL} in your browser"
-  echo "2. Click your account → role → 'Command line or programmatic access'"
-  echo "3. Copy the Access key ID, Secret access key, and Session token"
-  echo "4. Run:"
-  echo ""
-  echo '   bash ~/.claude/scripts/aws-set-credentials.sh "<ACCESS_KEY>" "<SECRET_KEY>" "<SESSION_TOKEN>"'
-  echo ""
-  echo "This writes credentials to ~/.aws/credentials — persists across all terminals and worktrees."
+  echo "1. Open ${SSO_URL} → account → role → 'Command line or programmatic access'"
+  echo "2. Copy the Access key ID, Secret access key, and Session token"
+  echo '3. Run: bash ~/.claude/scripts/aws-set-credentials.sh "<ACCESS_KEY>" "<SECRET_KEY>" "<SESSION_TOKEN>"'
+  echo "   (writes ~/.aws/credentials — persists across all terminals and worktrees)"
 else
   echo "Run: aws sso login --profile ${AWS_PROFILE_NAME}"
 fi

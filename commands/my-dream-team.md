@@ -159,7 +159,7 @@ This phase runs instead of the normal Phase 1-7 workflow when `--resume` is dete
    ```bash
    bash ~/.claude/scripts/aws-check.sh
    ```
-   If it fails, show the output and suggest: `! aws sso login --profile repo`. Wait for authentication, then re-check.
+   Credentials are **shared across worktrees** (on disk in `~/.aws`, not per-tmux) — if the parent or another worktree already logged in and the token is valid, you already have access; don't re-prompt. If it fails, prefer the SSO refresh (nothing secret to copy): suggest `! aws sso login --sso-session repo`, then use `AWS_PROFILE=repo-sso` for aws/S3 commands. Only fall back to paste-temp-creds (in the user's own terminal) if SSO login genuinely fails. Treat a mid-session expiry as "refresh and continue," not a hard human blocker. See memory `reference_aws_creds_shared_sso_refresh`.
 
 2. **Verify working directory** — confirm you are running from the worktree, not the main repo:
    ```bash
