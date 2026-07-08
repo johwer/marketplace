@@ -37,6 +37,12 @@ These patterns come from team experience and are not in the project-level skills
 - `*BaseApi.ts` are manually maintained base API definitions.
 - Use `/generate-api` to regenerate from backend Swagger specs.
 
+### Cosmos Fixtures
+- **New or meaningfully-changed visual components should get a Cosmos fixture** in `apps/web/src/fixtures/RetailerBranded/` (`react-cosmos` 7.3.0; run with `npm run cosmos`).
+- Follow the nearest sibling as a template (e.g. a new `DocumentationNoteRow` mirrors the existing `EmployeeDocumentRow.fixture.tsx`). If an analogous component is already fixtured, the new one should be too.
+- Fixtures give an isolated render, so they're also the cheapest way to produce visual proof when the full flow can't run locally (no backend, blocked click-through).
+
 ### Visual Verification
-- Always take a screenshot in `__screenshots__/` next to the component before pushing.
-- Verbal "verified" is not enough — the screenshot is the proof.
+- `__screenshots__/` captures are for **e2e tests and your own local verification** — they are **not** a hard PR gate. Don't block a PR on a missing `__screenshots__/` folder.
+- **The PR gate is a screenshot in the PR description.** When reviewing, if the description has no screenshot, **ask the author to add one** rather than flagging a missing local screenshot dir.
+- Verbal "verified" is not enough — a screenshot (in the PR description, or a Cosmos fixture render) is the proof.

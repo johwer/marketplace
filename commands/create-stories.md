@@ -68,7 +68,7 @@ bash ~/.claude/scripts/aws-check.sh
 ```
 
 - If it **passes** (exit 0): continue to Step 0.5.
-- If it **fails** (exit 1): show the user the output and suggest they run `! aws sso login --profile repo` (the `!` prefix runs it in this session). Wait for them to authenticate, then re-run the check.
+- If it **fails** (exit 1): **drive the login through the `aws-setup` skill — do NOT hand the user raw `aws sso login` / `aws-set-credentials.sh` commands.** Invoke the `aws-setup` skill; it handles SSO login (preferred) and, if SSO is broken, runs `aws-open-credentials.sh` to open `~/.aws/credentials` in the editor so the user pastes temp creds (keys never touch the chat). Then re-run `aws-check.sh` to verify. Rationale: the skill knows the SSO-session name, the `invalid_request` troubleshooting, and the paste-not-chat rule; manual commands drift and leak.
 
 This step also runs on `--resume` — sessions can outlast the SSO token lifetime.
 
@@ -380,6 +380,8 @@ Use the Write tool to create `~/Documents/<TICKET_ID>/.dream-team/jira-ticket.md
 
 Then write the pre-hydration results from Step 3 to `.dream-team/context.md` in the worktree. This file is consumed by `/my-dream-team` to skip redundant exploration.
 
+> **Re-verify context refs against disk at worktree-launch (retro P).** `context.md` is a *hypothesis* captured during pre-hydration; it can go stale before launch — especially when a sibling ticket merges mid-session (e.g. an epic dependency landing on `main`). At worktree-launch, quickly re-check that the file paths / endpoints / RTK hooks named in `context.md` still exist on the freshly-pulled base (Glob/grep the top few), and note "greenfield vs already-merged" so the dev agent diffs rather than trusts. Don't treat `context.md` as ground truth.
+
 Then write the file using the Write tool at `~/Documents/<TICKET_ID>/.dream-team/context.md` with this format:
 
 ```markdown
@@ -579,30 +581,38 @@ When the user indicates a story is done or merged (e.g., "PROJ-1234 is merged", 
    # Safety: check PR status first
    cd ~/Documents/Repo && gh pr list --head <TICKET_ID> --state all --json number,state,mergedAt,title
 
-   # Kill Vite/Node dev servers for this worktree (prevents orphan processes holding ports)
-   PIDS=$(pgrep -f "node.*<TICKET_ID>" 2>/dev/null || true)
-   [ -z "$PIDS" ] && PIDS=$(lsof -i -P 2>/dev/null | grep node | grep LISTEN | grep "<TICKET_ID>" | awk '{print $2}' | sort -u || true)
-   [ -n "$PIDS" ] && echo "$PIDS" | xargs kill 2>/dev/null || true
-
-   # Kill tmux session if running
-   tmux kill-session -t <TICKET_ID> 2>/dev/null || true
+   # Stop the session + dev servers CLEANLY — use pause-workspace.sh, do NOT broad-kill.
+   # (`pgrep -f "<TICKET_ID>" | xargs kill` once took down the whole tmux server, killing
+   #  in-progress sessions too. pause-workspace.sh scopes the kill to this session/port.)
+   bash ~/.claude/scripts/pause-workspace.sh <TICKET_ID>
 
    # Remove worktree (we're in Repo, not inside the worktree)
    cd ~/Documents/Repo && git worktree remove ~/Documents/<TICKET_ID> --force
 
-   # Clean up leftover directory
+   # Clean up leftover directory + branch + refs
    rm -rf ~/Documents/<TICKET_ID>
-
-   # Delete branch (ask user first if PR is not merged)
-   cd ~/Documents/Repo && git branch -D <TICKET_ID>
-
-   # Prune worktree references
+   cd ~/Documents/Repo && git branch -D <TICKET_ID>   # ask user first if PR is not merged
    cd ~/Documents/Repo && git worktree prune
+   rm -f ~/.claude/workspace-status/<TICKET_ID>.json
    ```
+
+2. **Docker pass (part of every cleanup — do NOT skip).** After removing the worktree(s):
+   - **Health check + CPU-load fix (DO THIS — the dev machine runs hot):** `bash ~/.claude/scripts/docker-health-check.sh`. If it flags a **single `repo-*` worker pegged at ~100% CPU** (known cause **R1** = concurrent EF migrations racing on `docker compose up --build` → a zombied worker), **restart that one container to clear it**: `docker restart <container>`, then confirm CPU dropped (`docker stats --no-stream <container>`). Restarting a stateless worker is safe (volumes persist). What you must NOT do: rebuild or restart the **whole stack** / `docker compose up --build` (that can trigger the R1 race again and another worktree may depend on running state), and never touch volumes. For anything other than a clear single-worker CPU zombie (unhealthy DB, restart-loop, etc.), report to the user rather than restarting. If R1 keeps recurring, offer to file a Jira ticket for the structural fix.
+   - **Leak check (port-scoped, NOT broad):** for each removed worktree's `VITE_DEV_PORT`, `lsof -ti tcp:<PORT> -sTCP:LISTEN` and kill only that PID. Never `pgrep`-match by ticket name.
+   - **Remove unused (conservative):** `docker image prune -f` (dangling only) + `docker builder prune -f` (build cache). **NEVER** `docker volume prune` / `--volumes` (DB & seed state) and never remove running or stopped `repo-*` containers (e.g. the `localstack-init` one-shot exits 0 by design). Inspect `docker system df` / `docker ps -a` before pruning.
+   - **Log recurring issues:** the health-check script logs to `~/.claude/data/docker-health-log.jsonl`; if a symptom recurs (same container, last 7d), append a curated entry to `~/.claude/data/docker-health-findings.md` and suggest a Jira ticket if it keeps recurring.
 
 3. **If PR is NOT merged**, warn the user before proceeding — code may only exist on the remote branch.
 
 4. **Confirm** by showing the updated worktree list.
+
+5. **Retro proposals (don't forget).** After cleanup, run/offer `/retro-proposals` to route accumulated Dream Team learnings (it stops at an approval gate; route-all applies personal-config edits + opens a draft PR for shared-repo doc items). Capturing learnings at cleanup time is how they stop getting lost between story batches.
+
+**Cleanup checklist — verify ALL of these ran (this bundle keeps getting half-done):**
+- [ ] merged worktrees/branches removed (safe `pause-workspace.sh`, not broad kill)
+- [ ] Docker pass: health check, **CPU-load fix** (restart any single R1 zombie worker), port-scoped leak check, conservative prune (images + build cache only), log recurring
+- [ ] `/retro-proposals` run/offered
+- [ ] AWS session valid (via `aws-setup` skill if it needs a refresh)
 
 ### Bulk cleanup
 
