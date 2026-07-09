@@ -23,6 +23,7 @@ These patterns come from team experience and are not in the project-level skills
 - Use `toBackendLanguage()` from `i18n.ts` when sending language to API calls (`"key"` → `"en"`).
 - Commonly missed: empty states, confirmation dialogs, table headers, dropdown labels.
 - TranslationService API workflow: create keys with ALL 5 languages (en, sv, da, no, fi). S3 sync is automatic via CI.
+- **Concise UI copy (flag verbose labels in review).** Copy pasted straight from mockups makes long strings that get translated ×5. Flag: (a) action labels longer than ~1–2 words when the dialog/page context already conveys meaning — a modal's primary button should be `Apply`/`Add`/`Save`/`Finish`, not a full sentence; (b) a counter/value fused into a label (`"{{count}} companies selected"` as one key) — the count belongs in a separate element, the action label stays short/reusable (`common_apply`). Prefer `common_*` keys for ubiquitous actions. Ref: INTERNATIONALIZATION.md "Concise UI copy".
 
 ### Tab State
 - Use `useSearchParamTab` hook for tab components, not `useState`. Tab state must survive page refresh and be shareable via URL.
