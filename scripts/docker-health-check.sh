@@ -138,6 +138,46 @@ while IFS='|' read -r name kind val; do
   esac
 done < "$issues_file"
 
+# --- Classify likely root cause (R1/R2/R3) by log signature ---
+# Deliberately diagnostic, NOT auto-remediating: each cause needs a DIFFERENT
+# recovery, so a blanket `docker restart` would silently fail on R2 and R3.
+classified_file=$(mktemp)
+awk -F'|' '$2=="cpu"||$2=="health"||$2=="status"{print $1}' "$issues_file" \
+  | sort -u > "$classified_file"
+
+if [ -s "$classified_file" ]; then
+  echo ""
+  echo "Likely cause (by log signature):"
+  while read -r name; do
+    [ -z "$name" ] && continue
+    logs=$(docker logs --tail 200 "$name" 2>&1 || true)
+
+    if printf '%s' "$logs" | grep -qE 'OptionsValidationException|Hosting failed to start'; then
+      missing=$(printf '%s' "$logs" \
+        | grep -oE "validation failed for '[A-Za-z]+'" \
+        | head -1 | sed "s/.*'\\(.*\\)'/\\1/")
+      echo "  • ${name} — [R3] empty \${VAR:-} compose default clobbering appsettings${missing:+ (${missing})}"
+      echo "      → set the missing vars in .env, then:"
+      echo "        docker compose up -d --no-deps --force-recreate ${name#${NAME_PREFIX}}"
+      echo "      NOTE: plain 'docker restart' will NOT fix this and does not re-read .env"
+    elif printf '%s' "$logs" | grep -qE '53100|No space left on device'; then
+      echo "  • ${name} — [R2] disk exhaustion (Postgres cannot extend files)"
+      echo "      → bash ~/.claude/scripts/docker-cleanup.sh   then: docker restart ${name}"
+      echo "      NOTE: restart alone will NOT fix this (same full disk)"
+    elif printf '%s' "$logs" | grep -qE '__EFMigrationsHistory|23505|42P07|already exists'; then
+      echo "  • ${name} — [R1] concurrent EF migration race (see NOVA-2980)"
+      echo "      → docker restart ${name}   (alone, it wins the advisory lock)"
+    else
+      echo "  • ${name} — unrecognised signature; diagnose before acting:"
+      echo "        docker logs --tail 100 ${name}"
+      echo "        docker system df && df -h /System/Volumes/Data"
+    fi
+  done < "$classified_file"
+  echo ""
+  echo "  Cause details: ~/.claude/data/docker-health-findings.md (\"Known root causes\")"
+fi
+rm -f "$classified_file"
+
 recurring_count=$(wc -l < "$recurring_file" | tr -d ' ')
 if [ "$recurring_count" -gt 0 ]; then
   echo ""
