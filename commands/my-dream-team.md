@@ -535,7 +535,7 @@ Based on the tech-architect's scope assessment, spawn the needed agents. **Use t
   - **Ambiguous requirements**: If the ticket doesn't clearly specify behavior, message the team lead. Do NOT guess — wrong guesses waste more context than asking.
   - **Completion protocol**: When done, use the **Completion → Team Lead** template from the Communication Protocol. Also send a **Dev → Dev handoff** to Ingrid (or a **Dev → Tester handoff** to Suki if testing is needed). Always include `git diff --name-only` output in your `files_touched`.
   - **Journal gate**: Before sending your completion message, you MUST have written at least one entry in your journal at `.dream-team/journal/kenji.md`. If the file is empty or missing, write at least one entry now — use one of these categories: `instruction-gap`, `tool-failure`, `convention-gap`, `codebase-surprise`, `assumption-wrong`, or `positive`. Your completion will not be accepted without at least one journal entry.
-  - **Commit as you go**: Don't wait until everything is done. Commit after each logical piece of work (e.g., after adding an endpoint, after completing a service method). Use `<TICKET_ID>: <what you did>` format. This keeps changes small and reduces conflict risk.
+  - **Commit as you go — after EVERY file, not every milestone**: Finish a file, commit it. Use `<TICKET_ID>: <what you did>` format. This keeps changes small, reduces conflict risk, and — critically — is your **yield point**: you only receive messages between tool calls, so a long burst of writes makes you unreachable when the team lead needs you (see "Yield points" in the Communication Protocol). Pause and handle pending messages at every task boundary.
   - **Scope**: Only work on what the architect assigned you. Do not refactor unrelated code.
   - Include the specific backend tasks from the architect's analysis and key files to modify
   - Include the architect's conventions summary relevant to your work
@@ -599,7 +599,7 @@ Based on the tech-architect's scope assessment, spawn the needed agents. **Use t
     export const ServiceAHistory: React.FC<ServiceAHistoryProps> = ({ ... }) => {
     ```
     This helps future AI agents understand *what the component is for* and *what to watch out for*. Skip TSDoc on tiny utility components or simple wrappers — only add it to meaningful components with business logic or non-obvious behavior.
-  - **Commit as you go**: Don't wait until everything is done. Commit after each logical piece of work (e.g., after completing a component, after adding i18n keys). Use `<TICKET_ID>: <what you did>` format. This keeps changes small and reduces conflict risk.
+  - **Commit as you go — after EVERY file, not every milestone**: Finish a file, commit it. Use `<TICKET_ID>: <what you did>` format. This keeps changes small, reduces conflict risk, and — critically — is your **yield point**: you only receive messages between tool calls, so a long burst of writes makes you unreachable when the team lead needs you (see "Yield points" in the Communication Protocol). Pause and handle pending messages at every task boundary.
   - **Scope**: Only work on what the architect assigned you. Do not refactor unrelated code.
   - Include the specific frontend tasks from the architect's analysis and key files to modify
   - Include the architect's conventions summary relevant to your work
@@ -1843,6 +1843,18 @@ next_phase_needs: [what should happen next]
 
 ### Avoid message storms
 Batch your updates. A good cadence: (1) when you start your main task, (2) when you hit a meaningful milestone or blocker, (3) when you finish. Three messages total is the target, not ten.
+
+### Yield points — you MUST come up for air (all agents)
+You only receive messages **between tool calls**. A long uninterrupted burst of file writes means the team lead cannot reach you — and when they need to reach you it is usually urgent (the user is rebasing, a container is being rebuilt, the requirement just changed, or your work is about to be thrown away). An agent that writes six files without pausing is indistinguishable from a crashed one, and it has repeatedly cost real time.
+
+So:
+- **Commit after EVERY file you finish**, not after every logical grouping. One file done = one commit. This is both a yield point and the thing that makes your work survivable.
+- **Treat every task boundary as a check-in**: before starting the next task, pause and handle any pending message.
+- **Never chain more than ~3 file writes without a tool call that lets messages land.** Reading a file, running a test, or committing all count.
+- **If the team lead sends something marked URGENT or asks you to STOP, that outranks your current task.** Finish nothing, commit what you have, do what they asked, then wait for the go-ahead. Do not "just finish this file first."
+- Do NOT stage or commit another agent's files to satisfy this — commit only paths you own.
+
+The team lead should treat repeated non-response across several minutes as a signal to verify progress via `git status`/notes rather than assume a crash, and may use `TaskStop` as a last resort.
 
 ## Browser Automation — Playwright CLI
 
