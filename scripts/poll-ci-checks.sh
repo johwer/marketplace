@@ -25,8 +25,16 @@ if [ ! -f "$LOG_FILE" ]; then
   echo "date,repo,pr,elapsed_seconds,result,passed,failed,pending" > "$LOG_FILE"
 fi
 
-# Get the HEAD SHA for this PR
-HEAD_SHA=$(gh api "repos/${OWNER_REPO}/pulls/${PR_NUMBER}" --jq '.head.sha' 2>/dev/null || echo "")
+# Checks that register instantly on every PR and tell you nothing about the build. If ONLY these are
+# present, CI has not really started — treating that as "all checks complete" is a false green.
+TRIVIAL_CHECKS="${TRIVIAL_CHECKS:-label|validate-title|title|semantic}"
+
+# The SHA is re-read every iteration, not captured once: a poll started immediately after a push can
+# otherwise pin to the PRE-push commit (GitHub takes a moment to update the PR head) and then report
+# the OLD commit's results — including a failure the push just fixed.
+read_head_sha() { gh api "repos/${OWNER_REPO}/pulls/${PR_NUMBER}" --jq '.head.sha' 2>/dev/null || echo ""; }
+
+HEAD_SHA=$(read_head_sha)
 if [ -z "$HEAD_SHA" ]; then
   echo "Error: Could not get HEAD SHA for PR #${PR_NUMBER}"
   exit 2
@@ -35,9 +43,19 @@ fi
 echo "Polling CI checks for PR #${PR_NUMBER} on ${OWNER_REPO}..."
 echo "HEAD SHA: ${HEAD_SHA:0:8}"
 echo "Max wait: ${MAX_MINUTES} minutes, checking every ${INTERVAL} seconds"
+echo "Ignoring trivial checks when deciding whether CI has started: ${TRIVIAL_CHECKS}"
 echo ""
 
+PREV_NAMES=""
+
 while [ "$ELAPSED" -lt "$MAX_SECONDS" ]; do
+  CURRENT_SHA=$(read_head_sha)
+  if [ -n "$CURRENT_SHA" ] && [ "$CURRENT_SHA" != "$HEAD_SHA" ]; then
+    echo "  PR head moved ${HEAD_SHA:0:8} -> ${CURRENT_SHA:0:8} (new push) — restarting on the new commit"
+    HEAD_SHA="$CURRENT_SHA"
+    PREV_NAMES=""
+  fi
+
   # Get all check runs for this commit
   CHECKS=$(gh api "repos/${OWNER_REPO}/commits/${HEAD_SHA}/check-runs" 2>/dev/null || echo '{"check_runs":[]}')
 
@@ -47,9 +65,14 @@ while [ "$ELAPSED" -lt "$MAX_SECONDS" ]; do
   FAILED=$(echo "$CHECKS" | jq '[.check_runs[] | select(.conclusion == "failure")] | length')
   PENDING=$((TOTAL - COMPLETED))
 
-  if [ "$TOTAL" -eq 0 ]; then
+  # Substantive checks = everything that is not a trivial always-present one.
+  SUBSTANTIVE=$(echo "$CHECKS" | jq --arg re "$TRIVIAL_CHECKS" '[.check_runs[] | select(.name | test("^(" + $re + ")$") | not)] | length')
+  NAMES=$(echo "$CHECKS" | jq -r '[.check_runs[].name] | sort | join(",")')
+
+  if [ "$TOTAL" -eq 0 ] || [ "$SUBSTANTIVE" -eq 0 ]; then
     MINS=$((ELAPSED / 60))
-    echo "  No checks found yet... (${MINS}m elapsed)"
+    echo "  CI has not started yet — ${TOTAL} check(s), none substantive... (${MINS}m elapsed)"
+    PREV_NAMES=""
     sleep "$INTERVAL"
     ELAPSED=$((ELAPSED + INTERVAL))
     continue
@@ -76,7 +99,18 @@ while [ "$ELAPSED" -lt "$MAX_SECONDS" ]; do
     exit 1
   fi
 
-  # All checks completed and none failed
+  # All checks completed and none failed — but only trust it once the set of check names has been
+  # STABLE for two consecutive polls. Workflows register their jobs progressively, so "nothing is
+  # pending" can be true simply because the remaining jobs do not exist yet.
+  if [ "$PENDING" -eq 0 ] && [ "$NAMES" != "$PREV_NAMES" ]; then
+    MINS=$((ELAPSED / 60))
+    echo "  ${COMPLETED}/${TOTAL} done and none pending, but the check set just changed — confirming it is settled... (${MINS}m elapsed)"
+    PREV_NAMES="$NAMES"
+    sleep "$INTERVAL"
+    ELAPSED=$((ELAPSED + INTERVAL))
+    continue
+  fi
+
   if [ "$PENDING" -eq 0 ]; then
     ACTUAL=$(($(date +%s) - START_TIME))
 
@@ -92,6 +126,7 @@ while [ "$ELAPSED" -lt "$MAX_SECONDS" ]; do
   fi
 
   # Show progress with per-check status
+  PREV_NAMES="$NAMES"
   MINS=$((ELAPSED / 60))
   echo "  ${COMPLETED}/${TOTAL} done (${PASSED} passed, ${PENDING} pending)... (${MINS}m elapsed)"
   echo "$CHECKS" | jq -r '.check_runs[] | select(.status == "completed" and .conclusion == "success") | "    PASS — \(.name)"'
