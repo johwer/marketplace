@@ -993,7 +993,9 @@ Then **commit, push, and generate the initial PR summary**:
    - Each commit message should follow the `TICKET-ID: Description` pattern
 2. **Push the branch** with `git push`. If HTTPS push is rejected for workflow files (`.github/workflows/`), use SSH instead: `git push git@github.com:<OWNER>/<REPO>.git HEAD:<branch-name>`
 3. **Spawn Tane for initial summary** (see Tane's prompt below) — this summary helps GitHub AI reviewers and human reviewers understand the changes
-4. **Update the draft PR description** with Tane's summary using `gh pr edit <PR_NUMBER> --body "..."`. Include the summary, architecture section, progress checkboxes, and the **"How to Test" section** with concrete steps. The "How to Test" section must include:
+3b. **Invoke the `code-walkthrough` skill** to add a `## Walkthrough of the changes` section. It explains the diff file by file for a reviewer who has not read it, and — the part that matters — splits hand-written production code from tests and generated output, because a 1,890-line diff that is 75% tests is a small change wearing a big number and a reviewer who doesn't know that budgets their attention wrongly. It also forces the scope statement: anything in the diff that is NOT what the ticket asked for (an opportunistic fix, a pre-existing bug fixed in passing, endpoints that rode along in a regeneration) gets named with a line count. Unannounced extras read as scope creep; labelled ones read as diligence.
+
+4. **Update the draft PR description** with Tane's summary using `gh pr edit <PR_NUMBER> --body "..."`. Include the summary, architecture section, progress checkboxes, the walkthrough from step 3b, and the **"How to Test" section** with concrete steps. The "How to Test" section must include:
    - The exact URL path (e.g., `http://localhost:<VITE_DEV_PORT>/<customerId>/employees/<employeeId>`)
    - Step-by-step user actions to verify the change
    - What to look for (expected results as a checklist)
