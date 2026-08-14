@@ -48,7 +48,8 @@ to `5001–5006`. It never reads `VITE_DEV_PORT`. Consequences:
 - The only thing that moves the Vite port is the `sed`-generated `vite.config.worktree.mts`.
 - API proxies are switched by `worktree-service.sh` editing `vite.config.worktree.mts`
   directly (`switch_vite_proxy`), **not** by env vars. The `VITE_*_API_PORT` vars in
-  `.env.local` are read only by `generate-api.sh` (to pick the codegen source port).
+  `.env.local` are for the Vite dev-server proxy. Codegen does **not** read them — it reads
+  unprefixed `<SVC>_API_PORT` from the **repo-root `.env`**. Two files, two schemes; don't conflate.
 
 > Cleaner long-term fix (NOT done — it's a committed Repo repo file, so it needs a
 > ticket / DTF, not an ad-hoc edit): make `vite.config.mts` read
@@ -130,17 +131,32 @@ bash ~/.claude/scripts/worktree-service.sh up service-b-api
 
 ## API Codegen Per Worktree
 
-`generate-api.sh` reads the worktree's `.env.local` to find the correct port:
+Codegen resolves the port itself from the **repo-root `.env`** (written by `allocate-ports.sh`),
+so the plain npm script targets whichever services that worktree is running:
 
 ```bash
 # In worktree A: generates types from localhost:10705
-bash ~/.claude/scripts/generate-api.sh service-b
+cd apps/web && npm run generate:api:service-b
 
 # In worktree B: generates types from localhost:10805
-bash ~/.claude/scripts/generate-api.sh service-b
+cd apps/web && npm run generate:api:service-b
 ```
 
 Each worktree gets its own generated TypeScript types matching its own backend changes.
+
+Works from `apps/web` or `apps/mobile` — command names are identical, and for the shared
+services (`service-c`, `service-a`) a single invocation writes **both** apps' clients.
+
+Resolution order is **explicit env var → repo-root `.env` → throw**. There is no fallback to
+the main stack's `500x` ports: regenerating against a stale shared container has silently
+deleted generated members that other people had just added (twice, during NOVA-3366), so an
+unset port is a hard error rather than a guess. Start the service you changed first
+(`worktree-service.sh up <svc>`).
+
+> Historical note: this used to require `~/.claude/scripts/generate-api.sh`, which injected the
+> worktree port into a config that hardcoded `localhost:5001`. That script was deleted once
+> NOVA-3438 moved all 13 codegen configs into `scripts/api-codegen/` and made the configs resolve
+> their own port. If you find a reference to it anywhere, it is stale.
 
 ## Backend builds/tests when the local .NET SDK is pinned
 

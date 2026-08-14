@@ -232,7 +232,23 @@ Run the quality gate script instead of manual commands — it handles formatting
 bash ~/.claude/scripts/quality-gate.sh <worktree-path>
 ```
 
-Auto-detects backend/frontend from changed files. Auto-fixes formatting (CSharpier, Prettier, ESLint). Reports failures. Must exit 0 before pushing.
+Auto-detects backend / frontend / mobile from changed files. Auto-fixes formatting (CSharpier, Prettier, ESLint). Reports failures. Must exit 0 before pushing.
+
+### Dependency changes REQUIRE the real build — HARD GATE
+
+**If the diff adds or removes anything in an app's `package.json` `dependencies`/`devDependencies`, run the actual bundler:**
+
+```bash
+cd <worktree>/apps/web && npm run build
+```
+
+`tsc --noEmit`, ESLint and Vitest are **not sufficient** and will all pass on a broken build. `tsc` resolves the *type* graph; the bundler resolves the *module* graph. They agree only while every runtime import has a matching, correctly-scoped package — declare `@types/x` without `x` itself and type-checking goes green on something that cannot bundle.
+
+NOVA-3438: removing one devDependency dropped a hoisted transitive `lodash` that app code had imported undeclared since March. Prettier, ESLint, tsc and Vitest all passed; the PR was reviewed with zero findings; only `npm run build` caught it.
+
+**Do not substitute a static check.** Grepping `src` for imports of the removed package does not work — the broken import was two hops down the transitive chain from the package actually removed. Catching it statically means diffing the full `npm ls --all` tree before and after, which is more expensive and more error-prone than just running the build.
+
+`quality-gate.sh` now runs this automatically when `apps/web/package.json` or its lockfile changes. There is no cheap mobile equivalent (EAS builds in the cloud; `expo run:*` needs a simulator), so on mobile dependency changes, be correspondingly more careful.
 
 ### Build Verification (if not using the script)
 
@@ -242,6 +258,9 @@ cd <worktree> && dotnet build services/<ServiceName>/<ServiceName>.sln 2>&1 | ta
 
 # Frontend (if changed)
 cd <worktree>/apps/web && npx tsc --noEmit 2>&1 | tail -5
+
+# Mobile (if changed)
+cd <worktree>/apps/mobile && npm run type-check
 ```
 
 Compare with baseline captured at start of session. If baseline was green and now red, there's a regression — fix before pushing.
