@@ -202,8 +202,61 @@ if [[ "$RUN_FRONTEND" == "true" ]]; then
       VITEST_ERRORS=$(tail -5 /tmp/qg-vitest.log)
       add_result "Vitest (--changed)" "FAIL" "$VITEST_ERRORS"
     fi
+
+    # Production build — REQUIRED when dependencies change, because tsc cannot catch it.
+    # tsc resolves the TYPE graph; the bundler resolves the MODULE graph. They agree only
+    # while every runtime import has a matching, correctly-scoped package. Declare
+    # @types/x without x itself and tsc goes green on a build that cannot bundle.
+    # NOVA-3438: removing a devDependency dropped a hoisted transitive `lodash` that app
+    # code had imported undeclared for months. Prettier, ESLint, tsc and Vitest all passed;
+    # only `npm run build` caught it. A static substitute does not work — the broken import
+    # was two hops down the transitive chain from the package actually removed.
+    if echo "$CHANGED" | grep -qE '^apps/web/package(-lock)?\.json$'; then
+      echo "  → Production build (dependencies changed)..."
+      if (cd "$WEB_DIR" && npm run build 2>&1) > /tmp/qg-build.log 2>&1; then
+        add_result "Production build" "PASS" "$(grep -oE 'built in [0-9.]+m?s' /tmp/qg-build.log | tail -1)"
+      else
+        BUILD_ERRORS=$(grep -iE 'failed to resolve|error during build|Error:' /tmp/qg-build.log | head -5)
+        [[ -z "$BUILD_ERRORS" ]] && BUILD_ERRORS=$(tail -5 /tmp/qg-build.log)
+        add_result "Production build" "FAIL" "$BUILD_ERRORS"
+      fi
+    fi
   else
     add_result "Frontend (no apps/web found)" "PASS" "skipped"
+  fi
+fi
+
+# ── Mobile (apps/mobile) ─────────────────────────
+# The gate had NO mobile coverage at all: a branch touching apps/mobile passed with zero
+# checks run against it. That matters more now that web and mobile share generated API
+# clients (NOVA-3438). Triggered independently of the web section — a branch can touch
+# either, or both.
+# Note there is no cheap bundler check here: mobile builds via EAS (cloud) or expo run:*
+# (needs a simulator), so the dependency-change build gate above has no mobile equivalent.
+MOBILE_DIR="$WORKTREE/apps/mobile"
+if echo "$CHANGED" | grep -qE '^apps/mobile/' && [[ -d "$MOBILE_DIR" ]]; then
+  echo ""
+  echo "▸ Mobile checks..."
+
+  echo "  → Prettier format..."
+  if (cd "$MOBILE_DIR" && npx prettier --check . --no-editorconfig 2>&1) > /tmp/qg-m-prettier.log 2>&1; then
+    add_result "Mobile Prettier" "PASS" ""
+  else
+    add_result "Mobile Prettier" "FAIL" "$(tail -5 /tmp/qg-m-prettier.log)"
+  fi
+
+  echo "  → ESLint..."
+  if (cd "$MOBILE_DIR" && npm run lint 2>&1) > /tmp/qg-m-lint.log 2>&1; then
+    add_result "Mobile ESLint" "PASS" ""
+  else
+    add_result "Mobile ESLint" "FAIL" "$(grep -E 'error|✖' /tmp/qg-m-lint.log | head -5)"
+  fi
+
+  echo "  → TypeScript type check..."
+  if (cd "$MOBILE_DIR" && npm run type-check 2>&1) > /tmp/qg-m-tsc.log 2>&1; then
+    add_result "Mobile TypeScript" "PASS" ""
+  else
+    add_result "Mobile TypeScript" "FAIL" "$(grep -E 'error TS' /tmp/qg-m-tsc.log | head -5)"
   fi
 fi
 

@@ -179,7 +179,8 @@ switch_vite_proxy() {
     echo "Updated vite proxy: $service → localhost:$new_port"
 }
 
-# Update VITE_*_API_PORT in .env.local so generate-api.sh picks up the right port
+# Update VITE_*_API_PORT in .env.local so the Vite dev-server proxy targets the worktree service.
+# Note: codegen does NOT read these — it reads unprefixed <SVC>_API_PORT from the repo-root .env.
 switch_env_local_port() {
     local service="$1" new_port="$2"
     local env_local="$WORKTREE_DIR/apps/web/.env.local"
@@ -286,7 +287,7 @@ case "${1:-help}" in
             echo "⚡ .env.local updated: $(vite_env_var "$SERVICE")=$WT_PORT"
             echo "  Restart Vite to pick up the change:"
             echo "  cd apps/web && npx vite --config vite.config.worktree.mts --host"
-            echo "  Generate API types: bash ~/.claude/scripts/generate-api.sh ${SERVICE%-api}"
+            echo "  Generate API types: cd apps/web && npm run generate:api:${SERVICE%-api}"
         fi
 
         echo ""

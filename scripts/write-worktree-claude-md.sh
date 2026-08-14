@@ -76,8 +76,9 @@ bash ~/.claude/scripts/worktree-dev.sh           # add --hard to wipe optimize c
 # Start a backend service (builds Docker, runs on worktree ports)
 bash ~/.claude/scripts/worktree-service.sh up service-b-api
 
-# Generate API types from a running worktree service
-bash ~/.claude/scripts/generate-api.sh service-b
+# Generate API types from a running worktree service (works from apps/web or apps/mobile;
+# the worktree port comes from the repo-root .env automatically, and errors if unset)
+cd apps/web && npm run generate:api:service-b
 
 # Check worktree service status
 bash ~/.claude/scripts/worktree-service.sh status

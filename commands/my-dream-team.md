@@ -1630,18 +1630,20 @@ After rebuilding a service, update the commented-out line in `apps/web/.env.loca
 
 ### RTK Query API generation from worktree service
 
-After rebuilding a service, generate the RTK Query client using the DTF helper:
+After rebuilding a service, generate the RTK Query client with the in-repo script:
 
 ```bash
-bash ~/.claude/scripts/generate-api.sh service-b
+cd apps/web && npm run generate:api:service-b    # or from apps/mobile — same result
 ```
 
-This reads ports from `apps/web/.env.local` automatically. When no override is set, codegen falls back to the default port (500x).
+All 13 codegen configs live in `scripts/api-codegen/` (one generator install, one lockfile). The config resolves the port itself: **explicit env var → repo-root `.env` → throw**. There is no fallback to the main stack's `500x` ports — regenerating against a stale shared container has silently deleted other people's generated members before, so an unset port is a hard error. Start the service first with `worktree-service.sh up <service>`.
+
+For the shared services (`service-c`, `service-a`) one invocation writes **both** `apps/web` and `apps/mobile` clients, and the two are byte-identical.
 
 ### When agents should rebuild
 
 - **Kenji / Diego**: After making API changes that need testing, run `bash ~/.claude/scripts/worktree-service.sh up <service>`. This builds the container AND updates the Vite proxy automatically. Share the port with Ingrid so she can regenerate types.
-- **Ingrid**: After Kenji rebuilds, restart Vite (`npx vite --config vite.config.worktree.mts --host`) to pick up the proxy change. For API generation: `bash ~/.claude/scripts/generate-api.sh service-b`
+- **Ingrid**: After Kenji rebuilds, restart Vite (`npx vite --config vite.config.worktree.mts --host`) to pick up the proxy change. For API generation: `cd apps/web && npm run generate:api:service-b`
 - **Amara**: When verifying API contracts or debugging, use the worktree service to test changes in isolation
 
 ### Running the frontend dev server
