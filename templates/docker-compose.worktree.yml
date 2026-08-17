@@ -77,6 +77,15 @@ services:
       FileServiceConfig__RoutineDocumentS3Bucket: repo-service-b-routine-documents
       FileServiceConfig__ExcelExportS3Bucket: repo-service-d-inbox-files
       FileServiceConfig__FileStorage: aws
+      # ServiceB hard-fails at startup without these (Program.cs: "Missing 'Services:IamServiceApi'
+      # configuration section"). It talks to the MAIN stack's service-c-service-api over mTLS, so the
+      # dev client cert must be mounted too — see volumes below. Mirrors docker-compose.yml.
+      Services__IamServiceApi__BaseUrl: https://service-c-service-api:5009
+      Services__IamServiceApi__ClientCertificatePath: /app/secrets/service-b-client.pfx
+      Services__IamServiceApi__ClientCertificatePassword: ""
+      Services__IamServiceApi__CaCertificatePath: /app/secrets/ca-cert.pem
+    volumes:
+      - ${WORKTREE_BUILD_CONTEXT:-.}/services/ServiceC/ServiceC.Service.API/certs/dev:/app/secrets:ro
     networks:
       - main-network
 
@@ -109,6 +118,10 @@ services:
       ConnectionStrings__DefaultConnection: Host=postgres;Database=repo_service-e;Username=postgres;Password=postgres
       ConnectionStrings__Redis: redis:6379
       OpenTelemetry__ServiceName: ServiceE-API-Worktree
+      # ServiceE hard-fails at startup without these ("FileServiceConfig is not configured
+      # in appsettings.json", Program.cs). Mirrors docker-compose.yml.
+      FileServiceConfig__InsightsHubS3Bucket: repo-service-e-insightshub
+      FileServiceConfig__FileStorage: aws
     networks:
       - main-network
 
