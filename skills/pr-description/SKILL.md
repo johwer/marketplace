@@ -30,7 +30,12 @@ If a bullet could appear in a commit message, it is probably an activity. Push i
 
 ## Shape
 
-Keep the whole thing under ~200 words. Detail belongs below it, in the walkthrough.
+**Compose, never replace.** These are the top sections of a PR description, not the whole thing.
+If the body already has detail sections, edit only the sections below and leave everything else
+byte-identical — see "Writing it back". Applying this as a rewrite on a mature PR deletes most of
+the body, including the pros/cons and verification tables other skills put there.
+
+~200 words covers `## Why` + `## What changes` only — see "Word budget".
 
 ```markdown
 ## Why
@@ -63,6 +68,9 @@ anything a tester would need to reproduce. If it genuinely cannot be observed, s
 <Scope boundary. What a reader might reasonably expect to be here and is not, plus where
 it went — a follow-up ticket number, a held part, a deliberate omission. Omit this section
 only if there is genuinely nothing to say, which is rarer than it feels.>
+
+<!-- walkthrough, verification tables, screenshots and every other existing section
+     continue below, untouched -->
 ```
 
 ## Workflow
@@ -136,9 +144,21 @@ Your reviewers are the audience this helps most, not least.
 | Average sentence length | **15–20 words**, hard cap 25 | Long sentences carry the cognitive load that makes a reader skim |
 | Ideas per paragraph | **one** | A reader scanning for "what changed" should not have to parse |
 | Voice | **active** — "HR users no longer see the tab", not "the tab is no longer shown to HR users" | Names who does what; shorter by construction |
-| Unexpanded acronyms | **zero**, except the ticket prefix | `TT`, `ServiceC`, `ServiceB` are free to you and opaque to a PO |
+| Unexpanded acronyms | **zero**, minus the allowlist below | `TT`, `ServiceC`, `ServiceB`, `ORHI` are free to you and opaque to a PO |
 | Internal type names in "Why" | **zero** | `CompanyAction.ProductContractsRead` belongs in the walkthrough, not the purpose |
 | Unfalsifiable adjectives | **zero** | "cleaner", "more robust", "improved" — measure it or cut it |
+
+**Acronym allowlist — do not expand these.** `API`, `URL`, `CI`, `CD`, `PR`, `HTTP`, `HTTPS`, `JSON`,
+`HTML`, `CSS`, `SQL`, `UI`, `UX`, `ID`, `SDK`, `CLI`. Anyone reading a PR knows them, and forcing an
+expansion produces worse prose — "a machine-readable description of each service" where "each API's
+schema" was clearer. The rule targets **internal domain shorthand**, not industry vocabulary. If in
+doubt: would someone at another company know it? Then it stays.
+
+**Identifiers a reader can act on are not jargon.** "Zero internal type names in `## Why`" means class
+and enum names — `CompanyAction.ProductContractsRead`, `SettingsMap`. It does **not** mean ticket keys
+(`ITSM-19744`), customer names (Scania), environment names (accept), or the literal label the user sees
+on screen ("the Products & Services tab"). Those are the most concrete things you can give a reader —
+they make the description checkable. Name them.
 
 Two quick tests that catch most of what the table misses:
 
@@ -175,7 +195,7 @@ Aim for avg 15–20 and nothing over 25. A dense three-paragraph summary typical
 - **Unfalsifiable claims.** "Improved performance", "cleaner code", "more robust" — with nothing to check. Either measure it or drop it.
 - **Verification theatre.** "Tested thoroughly." Which users, which environment, what did you see?
 
-## Worked example
+## Worked example 1 — a user-visible change
 
 A real one. The ticket asked for a new dedicated permission action; the PR shipped something simpler.
 
@@ -213,6 +233,52 @@ products still sees it.
 Note what makes it work: the second bullet names the risk a reviewer would worry about
 and answers it. The fourth pre-empts "does this need a migration?". "Not in this PR"
 stops anyone assuming the whole overloading problem is solved.
+
+## Worked example 2 — a PR with no user-visible behaviour
+
+Most refactors, tooling and CI work land here, and it is where descriptions are weakest: with no user
+to point at, people fall back to describing activity. The fix is the same rule — state what is now
+**true** — but the subject is the system, not a person.
+
+Ask: *what can the repo, the build, or the next developer now do (or no longer do)?*
+
+```markdown
+## Why
+
+Regenerating an API client was manual, and nothing checked that a committed client still matched
+its backend. Two ways to get this wrong had both already happened: regenerating against a stale
+local container silently deleted members another PR had just added, and a committed client sat
+behind its own backend for weeks because no one regenerated it.
+
+## What changes
+
+- Regenerating on a clean checkout now changes nothing. Any difference is drift, and the build
+  says so instead of a reviewer noticing.
+- A backend change that alters the API contract can no longer merge without updating the
+  committed snapshot in the same PR.
+- Client generation no longer reads from a running service, so output does not depend on what
+  happens to be up locally.
+- No runtime behaviour changes. This is build and CI only; no shipped code path is touched.
+
+## How to see it
+
+`npm run generate:api:service-c` on a clean checkout, then `git status` — output pasted below, no diff.
+Second block shows CI failing on a deliberately hand-edited client, then passing once reverted.
+
+## Not in this PR
+
+- The minimum-client-version gate for mobile — NOVA-3448 Part 4, still open.
+- The shared derivation copy — NOVA-3439, waiting on this.
+```
+
+What makes it work: every bullet is a *capability of the system* that changed. "Regenerating now
+changes nothing" is an outcome; "added a CI check" would have been an activity. The fourth bullet
+does real work — on a tooling PR, "no runtime behaviour changes" is the first thing a reviewer wants
+confirmed, and stating it plainly is worth more than any amount of description elsewhere.
+
+Note also that `## How to see it` is pasted command output, not screenshots. For tooling, the
+evidence a gate actually fires is **showing it fail** — a check that has only ever been seen passing
+has not been demonstrated to work.
 
 ## Related
 
