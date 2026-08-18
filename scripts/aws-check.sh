@@ -49,24 +49,19 @@ fi
 echo "⚠ AWS session expired or not authenticated."
 echo "  (Credentials live in ~/.aws — shared across all worktrees, not per-tmux. They just need a refresh.)"
 echo ""
-# Preferred: refresh via SSO (no secrets to copy) when an sso-session is configured.
-if grep -q "\[sso-session ${AWS_PROFILE_NAME}\]" ~/.aws/config 2>/dev/null; then
-  echo "Preferred — refresh via SSO (nothing secret to copy):"
-  echo "   aws sso login --sso-session ${AWS_PROFILE_NAME}"
-  echo "   # then run aws commands with the matching SSO profile, e.g. AWS_PROFILE=${AWS_PROFILE_NAME}-sso <cmd>"
-  echo ""
-  echo "Fallback (only if SSO login fails) — paste temp creds in YOUR OWN terminal (never into a Claude chat):"
-elif [[ -n "$SSO_URL" ]]; then
-  echo "Preferred — refresh via SSO:  aws sso login --profile ${AWS_PROFILE_NAME}"
-  echo ""
-  echo "Fallback (only if SSO login fails) — paste temp creds in YOUR OWN terminal (never into a Claude chat):"
-fi
-if [[ -n "$SSO_URL" ]]; then
-  echo "1. Open ${SSO_URL} → account → role → 'Command line or programmatic access'"
-  echo "2. Copy the Access key ID, Secret access key, and Session token"
-  echo '3. Run: bash ~/.claude/scripts/aws-set-credentials.sh "<ACCESS_KEY>" "<SECRET_KEY>" "<SESSION_TOKEN>"'
-  echo "   (writes ~/.aws/credentials — persists across all terminals and worktrees)"
-else
-  echo "Run: aws sso login --profile ${AWS_PROFILE_NAME}"
-fi
+echo "Fix it with one command (browser opens, no keys to copy):"
+echo "   bash ~/.claude/scripts/aws-profiles.sh sso"
+echo ""
+echo "That logs in via SSO and re-discovers every account/role you hold. The token then"
+echo "auto-refreshes, so this is not an 8-hourly chore."
+echo ""
+echo "If it fails, diagnose before pasting anything:"
+echo "   bash ~/.claude/scripts/aws-profiles.sh list     # is AWS_PROFILE stale?"
+echo "   bash ~/.claude/scripts/aws-profiles.sh doctor    # is ~/.aws/credentials corrupt?"
+echo ""
+echo "A bare InvalidRequestException with an EMPTY message means the wrong sso_region"
+echo "in ~/.aws/config, NOT that SSO is broken. See the aws-setup skill."
+echo ""
+echo "Pasting static keys is a last resort: a static profile shadows the SSO profile of"
+echo "the same name and dies in ~8h, which is what caused the old re-paste treadmill."
 exit 1

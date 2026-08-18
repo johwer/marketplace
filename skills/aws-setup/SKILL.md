@@ -103,10 +103,45 @@ aws sso login --sso-session <profileName>
 
 Then run aws commands with the matching SSO profile (boto3/CLI read the SSO cache directly), e.g. `AWS_PROFILE=<profileName>-sso <cmd>` — no static credentials needed. Verify with `bash ~/.claude/scripts/aws-check.sh`.
 
-**SSO login troubleshooting (seen on this setup):** if `aws sso login` fails at `RegisterClient` / `StartDeviceAuthorization` with `InvalidRequestException` → `{"error":"invalid_request"}`:
-- First clear a possibly-stale client registration: `rm -f ~/.aws/sso/cache/*.json` and retry.
-- Try the device-code flow: `aws sso login --sso-session <profileName> --use-device-code`.
-- If BOTH the auth-code and device-code flows still return `invalid_request` from the OIDC endpoint (reproduces in the user's own terminal, not just Claude's shell), the OIDC flow is broken environment-wide (Identity Center / CLI-version quirk) — **stop retrying** and use the temp-credential fallback below. Don't loop.
+**If `aws sso login` fails with `InvalidRequestException` and an EMPTY message — it is the region, not SSO.**
+
+This exact symptom cost months of pasting keys on this setup. `sso_region` said `eu-north-1`; the
+Identity Center instance is in **`eu-west-1`**. Every OIDC call hit a region with no instance and
+returned a bare `InvalidRequestException` with no message text, which reads as "SSO is broken here".
+It is not. Fixed 2026-08-18 in both `~/.aws/config` and `company-config.json`.
+
+**Diagnose it, do not retry it.** Retrying either flow tells you nothing, and the empty error message
+gives you nothing either. Probe instead:
+
+```bash
+unset AWS_PROFILE   # a stale profile breaks even `sso login`, which needs no profile
+
+# 1. Plain registration succeeds in EVERY region. This is the misleading part —
+#    it proves RegisterClient works and tells you nothing about where the instance is.
+aws sso-oidc register-client --client-name probe --client-type public \
+  --scopes sso:account:access --region <REGION>
+
+# 2. StartDeviceAuthorization validates the start URL against the Identity Center
+#    instance IN THAT REGION. It only succeeds in the region that actually hosts it.
+aws sso-oidc start-device-authorization --client-id <id> --client-secret <secret> \
+  --start-url <ssoStartUrl> --region <REGION>
+```
+
+Loop step 2 over candidate regions. The one returning `verificationUriComplete` is the real
+`sso_region`. Put it in `~/.aws/config` **and** `company-config.json` so it propagates via
+`dtf install`, clear `~/.aws/sso/cache/*.json`, and log in again.
+
+Two other causes worth ruling out first, both cheap:
+
+- **Stale exported `AWS_PROFILE`.** A shell older than a profile rename fails every aws call with
+  "The config profile (x) could not be found" — including `sso login`. `aws-profiles.sh` unsets it
+  internally; `aws-profiles.sh list` flags it.
+- **Registration rejected for the auth-code flow only.** Plain registration succeeding while one with
+  `--grant-types authorization_code --redirect-uris ...` fails is the same region problem, not a
+  PKCE/CLI-version issue.
+
+**Do not conclude "OIDC is broken environment-wide."** That was the old guidance here and it was
+wrong — it sent everyone to the paste fallback instead of a one-line config fix.
 
 ### Fallback: temp credentials (only if SSO login fails)
 
