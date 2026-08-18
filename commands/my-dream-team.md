@@ -1004,7 +1004,11 @@ Then **commit, push, and generate the initial PR summary**:
 3. **Spawn Tane for initial summary** (see Tane's prompt below) — this summary helps GitHub AI reviewers and human reviewers understand the changes
 3b. **Invoke the `code-walkthrough` skill** to add a `## Walkthrough of the changes` section. It explains the diff file by file for a reviewer who has not read it, and — the part that matters — splits hand-written production code from tests and generated output, because a 1,890-line diff that is 75% tests is a small change wearing a big number and a reviewer who doesn't know that budgets their attention wrongly. It also forces the scope statement: anything in the diff that is NOT what the ticket asked for (an opportunistic fix, a pre-existing bug fixed in passing, endpoints that rode along in a regeneration) gets named with a line count. Unannounced extras read as scope creep; labelled ones read as diligence.
 
-4. **Update the draft PR description** with Tane's summary using `gh pr edit <PR_NUMBER> --body "..."`. Include the summary, architecture section, progress checkboxes, the walkthrough from step 3b, and the **"How to Test" section** with concrete steps. The "How to Test" section must include:
+3c. **Invoke the `pr-description` skill** to write `## Why` and `## What changes`. This REPLACES the placeholder text from the draft — do not ship the draft version. The skill's one rule is never restate the ticket: write outcomes ("HR users no longer see the Products tab"), not activities ("added a permission check"). It carries a measurable readability bar (sentences 15-20 words, active voice, no unexpanded acronyms, no internal type names in `## Why`) and forces a `## Not in this PR` section so a reviewer cannot assume the whole ticket is covered.
+
+3d. **Invoke the `pr-decisions` skill** if — and only if — a real judgement call was made: the implementation diverged from what the ticket proposed, a domain-model gate was resolved, you picked one of several viable mechanisms, or you accepted a known cost. It adds a `## Decisions` section with the alternative and the trade-off for each. **Diverging from the ticket ALWAYS qualifies** — say so in the PR before a reviewer finds it. Omit the section entirely when there were no real decisions; a padded one teaches readers to skip it.
+
+4. **Update the draft PR description** with Tane's summary using `gh pr edit <PR_NUMBER> --body "..."`. Include the `## Why` / `## What changes` from step 3c, any `## Decisions` from step 3d, architecture section, progress checkboxes, the walkthrough from step 3b, and the **"How to Test" section** with concrete steps. The "How to Test" section must include:
    - The exact URL path (e.g., `http://localhost:<VITE_DEV_PORT>/<customerId>/employees/<employeeId>`)
    - Step-by-step user actions to verify the change
    - What to look for (expected results as a checklist)
@@ -1233,7 +1237,7 @@ _Step-by-step instructions for manually verifying this change._
   - **IMPORTANT**: The "How to Test" section must include the exact URL path to navigate to, specific user actions, and concrete expected results. Read the router config to determine the correct URL. This section is what the PO and team use to verify the fix — make it clear enough that anyone can follow it.
   - **IMPORTANT**: The `## Progress` section must always be included and kept up to date with checkboxes reflecting the current state.
 
-After receiving Tane's summary, **update the PR description using the read-then-edit approach** (see Important Rules). Merge Tane's content into the existing PR body — update the `## Summary`, `## How to Test`, etc. sections but **preserve** any user-added images, screenshots, and the `## Progress` checkboxes.
+After receiving Tane's summary, **update the PR description using the read-then-edit approach** (see Important Rules). Merge Tane's content into the existing PR body — update the `## Why`, `## What changes`, `## How to Test`, etc. sections but **preserve** any user-added images, screenshots, and the `## Progress` checkboxes. If `## Why` / `## What changes` still contain the draft placeholder text, run the `pr-description` skill now — shipping the placeholder is a completion-gate failure.
 
 ### Phase 6.75: Agent Retrospectives & Self-Improvement
 
@@ -1505,7 +1509,7 @@ When any agent (Kenji, Diego, or others) needs to change the domain model (entit
 1. **Stop and escalate** to Amara (or Kenji if the architect initiated it)
 2. Amara analyzes the proposed change and presents **multiple options** with pros and cons
 3. The options must be visualized as **Mermaid ER/class diagrams** using the mermaid-diagram skill (located at `~/.claude/skills/mermaid-diagram/`). Follow the SKILL.md rules strictly to produce valid diagrams.
-4. **Update the draft PR description** — add the domain model question to the `## Questions` section using `gh pr edit <PR_NUMBER> --body "..."`. Include the mermaid diagrams, pros/cons for each option, and a clear question for the user. This makes the question visible on GitHub for colleagues to weigh in.
+4. **Update the draft PR description** — add the domain model question to the `## Questions` section using `gh pr edit <PR_NUMBER> --body "..."`. Include the mermaid diagrams, pros/cons for each option, and a clear question for the user. **Use the `pr-decisions` skill for the pros/cons** so each option carries a real alternative and a named cost rather than a strawman — and once the user decides, convert the chosen option into a `## Decisions` entry with `Chose` / `Over` / `Why` / `Cost accepted` / `Revisit if`, so the resolved gate is recorded in the PR rather than lost in a thread. This makes the question visible on GitHub for colleagues to weigh in.
 5. **Block the Jira ticket** — Move the ticket to BLOCKED and add a comment explaining why:
    ```bash
    acli jira workitem transition --key "<TICKET_ID>" --status "BLOCKED"
@@ -1706,7 +1710,7 @@ If the **team lead itself** is running low on context, use Phase 6.75 (retrospec
 - **Domain model changes require user approval** — never auto-approve schema changes
 - **PR description updates — NEVER overwrite blindly.** The user may have manually added images, screenshots, or comments to the PR body. When updating the PR description:
   1. **Read the current body first**: `gh pr view <PR_NUMBER> --json body --jq '.body' > /tmp/pr-body.md`
-  2. **Edit the file** — update only the sections you need to change (e.g., `## Progress`, `## Summary`). Preserve everything else, especially any images (`![...](...)`), manually added content, and sections you didn't write.
+  2. **Edit the file** — update only the sections you need to change (e.g., `## Progress`, `## What changes`). Preserve everything else, especially any images (`![...](...)`), manually added content, and sections you didn't write.
   3. **Write it back**: `gh pr edit <PR_NUMBER> --body-file /tmp/pr-body.md`
   This prevents wiping user-added screenshots and images.
 

@@ -429,7 +429,8 @@ Before transitioning a ticket to Done (Phase 7), **every item below must be conf
 | 3 | **Retrospective completed** | Phase 6.75 ran, learnings saved to `.dream-team/journal/` and memory |
 | 4 | **Jira completion comment posted** | `acli jira workitem comment create` succeeded with PR link + summary |
 | 5 | **CI is green** | Last push has all checks passing |
-| 6 | **PR description is complete** | `Why` + `What changes` written with the `pr-description` skill (outcomes, not a ticket paraphrase), How to Test, and any screenshots are in the PR body |
+| 6 | **PR description is complete** | `Why` + `What changes` written with the `pr-description` skill (outcomes, not a ticket paraphrase; draft placeholder replaced), `Not in this PR` present, How to Test, and any screenshots are in the PR body |
+| 6b | **Decisions recorded** | If the implementation diverged from the ticket, a domain-model gate was resolved, or a known cost was accepted — a `## Decisions` section written with the `pr-decisions` skill, each entry naming a real alternative and the cost. Omit the section if there were genuinely no judgement calls. |
 
 ### Jira Completion Comment
 
