@@ -68,7 +68,9 @@ bash ~/.claude/scripts/aws-check.sh
 ```
 
 - If it **passes** (exit 0): continue to Step 0.5.
-- If it **fails** (exit 1): **drive the login through the `aws-setup` skill — do NOT hand the user raw `aws sso login` / `aws-set-credentials.sh` commands.** Invoke the `aws-setup` skill; it handles SSO login (preferred) and, if SSO is broken, runs `aws-open-credentials.sh` to open `~/.aws/credentials` in the editor so the user pastes temp creds (keys never touch the chat). Then re-run `aws-check.sh` to verify. Rationale: the skill knows the SSO-session name, the `invalid_request` troubleshooting, and the paste-not-chat rule; manual commands drift and leak.
+- If it **fails** (exit 1): run **`bash ~/.claude/scripts/aws-profiles.sh sso`**. It logs in via SSO (a browser opens — the user clicks once, no keys are copied) and re-discovers every account/role. You may run it for the user; the browser step happens on their machine. Then re-run `aws-check.sh` to verify.
+  - **Do NOT reach for pasting static keys.** They expire in ~8h and a static profile shadows the SSO profile of the same name, which is what caused the old re-paste treadmill.
+  - If the login fails, diagnose before anything else: `aws-profiles.sh list` (stale exported `AWS_PROFILE`? breaks even `sso login`) and `aws-profiles.sh doctor` (corrupt `~/.aws/credentials`?). A bare `InvalidRequestException` with an **empty message** means the wrong `sso_region`, not broken SSO — see `docs/aws-access.md` for the region probe. Consult the `aws-setup` skill for the full decision tree.
 
 This step also runs on `--resume` — sessions can outlast the SSO token lifetime.
 
