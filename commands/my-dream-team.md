@@ -384,8 +384,17 @@ Immediately after receiving Amara's analysis, create a **draft PR** so the user 
    Body structure:
 
 ```
-## Summary
-[Ticket summary from Jira — what this feature/fix is about, acceptance criteria]
+## Why
+[1-3 sentences: the problem in the reader's language. NOT a paraphrase of the ticket.]
+
+## What changes
+[2-5 bullets, each a thing that is now TRUE that was not before. Outcomes, not activities.
+ On the initial draft this may be provisional — rewrite it properly before marking ready.]
+
+> **Before marking the PR ready, run the `pr-description` skill** to rewrite `## Why` and
+> `## What changes` properly. The draft version is a placeholder — a description that restates
+> the ticket is the default failure and the skill exists to prevent it. Pair with
+> `code-walkthrough` for the file-by-file section and `pr-screenshot-captions` for the images.
 
 ## Architecture
 - **Scope:** [backend-only / frontend-only / full-stack]

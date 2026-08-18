@@ -429,7 +429,7 @@ Before transitioning a ticket to Done (Phase 7), **every item below must be conf
 | 3 | **Retrospective completed** | Phase 6.75 ran, learnings saved to `.dream-team/journal/` and memory |
 | 4 | **Jira completion comment posted** | `acli jira workitem comment create` succeeded with PR link + summary |
 | 5 | **CI is green** | Last push has all checks passing |
-| 6 | **PR description is complete** | Summary, How to Test, and any screenshots are in the PR body |
+| 6 | **PR description is complete** | `Why` + `What changes` written with the `pr-description` skill (outcomes, not a ticket paraphrase), How to Test, and any screenshots are in the PR body |
 
 ### Jira Completion Comment
 
