@@ -46,6 +46,12 @@ workaround, a silent failure mode.>
 system-visible. Quantify when you can: "5450 lines reformatted, no semantic change" beats
 "reformatted". If behaviour is unchanged, say so explicitly — that is a valuable claim.>
 
+## Decisions            <- only when a real judgement call was made; see `pr-decisions`
+
+<Non-obvious choices, each with the alternative and the trade-off. Omit the section entirely
+when there were none. ALWAYS include it when the implementation diverged from what the
+ticket proposed.>
+
 ## How to see it
 
 <Screenshots for UI. Pasted command output for tooling and CI. The exact steps for
@@ -76,6 +82,32 @@ only if there is genuinely nothing to say, which is rarer than it feels.>
 - **Never claim verification you did not perform.** "Verified on accept with an HR user" is a factual claim. If you only ran unit tests, say that.
 - **Links, not retellings.** Reference the ticket, the incident, the prior PR. Do not reproduce them.
 - **Write it before you think you are done.** The description often exposes that a part of the ticket was missed.
+
+## Readability check — run this before posting
+
+These are measurable, so check them rather than eyeballing. Thresholds are from plain-language
+research (GOV.UK / Digital.gov / Australian Style Manual), which consistently finds that *higher*-
+literacy readers prefer plain English most — it is not simplification, it is speed. One legal-language
+study found 80% preferred clear English, and the preference **grew** with the complexity of the issue.
+Your reviewers are the audience this helps most, not least.
+
+| Check | Threshold | Why |
+|---|---|---|
+| Average sentence length | **15–20 words**, hard cap 25 | Long sentences carry the cognitive load that makes a reader skim |
+| Ideas per paragraph | **one** | A reader scanning for "what changed" should not have to parse |
+| Voice | **active** — "HR users no longer see the tab", not "the tab is no longer shown to HR users" | Names who does what; shorter by construction |
+| Unexpanded acronyms | **zero**, except the ticket prefix | `TT`, `ServiceC`, `ServiceB` are free to you and opaque to a PO |
+| Internal type names in "Why" | **zero** | `CompanyAction.ProductContractsRead` belongs in the walkthrough, not the purpose |
+| Unfalsifiable adjectives | **zero** | "cleaner", "more robust", "improved" — measure it or cut it |
+
+Two quick tests that catch most of what the table misses:
+
+- **The cold-read test.** Read only `## Why` and `## What changes`. If you knew nothing about this
+  work, could you say what changed and whether it is risky? If not, the description is not done.
+- **The stranger test.** Would someone from another team understand it? Not "could they infer it" —
+  understand it, first pass, without opening the diff.
+
+If a sentence needs a second read, split it. If a bullet needs a diagram, it belongs in the walkthrough.
 
 ## Common failure modes
 
@@ -127,6 +159,7 @@ stops anyone assuming the whole overloading problem is solved.
 
 ## Related
 
+- `pr-decisions` — the `## Decisions` section: choices made, alternatives, trade-offs. Use whenever the implementation diverged from the ticket.
 - `code-walkthrough` — the file-by-file section for reviewers. Goes **below** this. Different audience.
 - `pr-screenshot-captions` — captions the screenshots referenced in "How to see it".
 - `tester-handoff` — the full test guide for a non-developer. Referenced from the PR, not inlined.
