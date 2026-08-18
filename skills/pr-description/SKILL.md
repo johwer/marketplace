@@ -46,11 +46,12 @@ workaround, a silent failure mode.>
 system-visible. Quantify when you can: "5450 lines reformatted, no semantic change" beats
 "reformatted". If behaviour is unchanged, say so explicitly — that is a valuable claim.>
 
-## Decisions            <- only when a real judgement call was made; see `pr-decisions`
+## Decisions            <- SLOT ONLY. This skill reserves the heading; `pr-decisions` writes the body.
 
-<Non-obvious choices, each with the alternative and the trade-off. Omit the section entirely
-when there were none. ALWAYS include it when the implementation diverged from what the
-ticket proposed.>
+<Include the heading only when a real judgement call was made, and ALWAYS when the
+implementation diverged from what the ticket proposed. Do not write the content here —
+invoke `pr-decisions` for it, so alternatives and trade-offs have one owner instead of two
+skills producing overlapping prose. If the section already has content, leave it alone.>
 
 ## How to see it
 
@@ -72,6 +73,45 @@ only if there is genuinely nothing to say, which is rarer than it feels.>
 4. **Fill "How to see it" from evidence you actually have.** Never promise verification you did not do.
 5. **Fill "Not in this PR" from the ticket's own scope.** Anything the ticket asked for that you did not do goes here, explicitly. So does anything you did that the ticket did not ask for — flag scope drift rather than letting a reviewer discover it.
 6. **Read it back as the reader.** If you knew nothing about this work, would you know what changed and whether it is safe?
+7. **Apply it without destroying the rest of the description.** See "Writing it back" below. This is not optional — most PRs you run this on already have a body.
+
+## Writing it back — you own five sections, not the whole body
+
+**The PR body is one field, and other skills write into it too.** A PR you run this on may already carry a reviewer walkthrough, captioned screenshots, a test guide and a progress checklist. Replacing the body with only your five sections destroys all of it. That has to be a deliberate act, never a side effect.
+
+**Sections this skill owns:** `## Why`, `## What changes`, `## How to see it`, `## Not in this PR`, and the `## Decisions` slot (content delegated — see `pr-decisions`).
+
+**Sections owned by others — never rewrite or drop:**
+
+| Section (or equivalent) | Owner |
+|---|---|
+| `## Reading this diff`, `## Walkthrough of the changes`, per-file tables | `code-walkthrough` |
+| `## Visual Verification Evidence`, any `<img>` block, `<details>` of superseded shots | `pr-screenshot-captions` |
+| `## Decisions` body text | `pr-decisions` |
+| Test-guide links / attachments | `tester-handoff` |
+| `## Progress` checklist, anything the user wrote by hand | the user |
+
+**Heading collisions.** Real PRs here usually open with `## Summary` rather than `## Why`. If a `## Summary` (or `## Overview`) exists, **replace it** with `## Why` + `## What changes` — do not append, or the PR ends up with two purpose sections saying the same thing differently. `## Not in this PR` and `## How to see it` likewise replace their existing counterpart rather than duplicating it. If a PR splits observation across several sections by audience — local repro, deployed verification, evidence — leave that split alone and treat them collectively as your "How to see it".
+
+**Procedure:**
+
+```bash
+gh pr view <PR> --json body --jq '.body' > /tmp/pr-body.md
+cp /tmp/pr-body.md /tmp/pr-body.backup.md          # cheap insurance; keep until verified
+grep -n '^## ' /tmp/pr-body.md                      # inventory: what exists, who owns it
+# ... splice your sections in, leaving every other section byte-identical ...
+gh pr view <PR> --json body --jq '.body' > /tmp/pr-recheck.md
+diff -q /tmp/pr-body.md /tmp/pr-recheck.md          # a browser edit mid-flight = reconcile, don't clobber
+gh pr edit <PR> --body-file /tmp/pr-new-body.md
+```
+
+Then verify: section count did not shrink, `grep -c '<img'` is unchanged, and the sections you do not own read exactly as before.
+
+**Writing a description from scratch is the easy case** — a brand-new PR with an empty body. Say so and write the whole thing. The rule above exists for every other case.
+
+## Word budget
+
+~200 words covers `## Why` + `## What changes`. That is the target, not a cap on the description as a whole — `## How to see it` and `## Not in this PR` sit outside it, and a full-stack PR that reversed a decision mid-flight will exceed it. When it does, that is the signal to move the reasoning into `## Decisions` via `pr-decisions`, not to compress it until it is unreadable.
 
 ## Rules
 
@@ -108,6 +148,23 @@ Two quick tests that catch most of what the table misses:
   understand it, first pass, without opening the diff.
 
 If a sentence needs a second read, split it. If a bullet needs a diagram, it belongs in the walkthrough.
+
+Score it rather than guessing — write `## Why` + `## What changes` to a file and run:
+
+```bash
+python3 - draft.md << 'EOF'
+import re,sys
+t=open(sys.argv[1]).read()
+prose=" ".join(re.sub(r'^[-*]\s+','',l) for l in t.split("\n") if l.strip() and not l.startswith("#"))
+sents=[x for x in (s.strip() for s in re.split(r'(?<=[.!?])\s+',prose)) if x]
+lens=[len(x.split()) for x in sents]
+print("words %d | sentences %d | avg %.1f | longest %d | over cap %s"
+      % (len(prose.split()), len(sents), sum(lens)/len(lens), max(lens),
+         sorted([l for l in lens if l>25], reverse=True) or "none"))
+EOF
+```
+
+Aim for avg 15–20 and nothing over 25. A dense three-paragraph summary typically scores ~25 average with outliers in the low thirties, which is exactly the version this skill is meant to replace.
 
 ## Common failure modes
 
