@@ -25,6 +25,41 @@ Extract values into variables for use in subsequent steps:
 
 If `company-config.json` is missing or has no `aws` section, ask the user for these values.
 
+## Preferred path — `aws-profiles.sh`, no keys pasted
+
+Before anything manual, use the script. It removes the two recurring failure modes: the
+8-hour re-paste cycle, and the profile-name mismatch that makes a correct paste look expired.
+
+```bash
+bash ~/.claude/scripts/aws-profiles.sh sso      # login + auto-discover EVERY account/role
+bash ~/.claude/scripts/aws-profiles.sh list     # SSO vs static, and which is active
+bash ~/.claude/scripts/aws-profiles.sh check    # validate each (values never printed)
+bash ~/.claude/scripts/aws-profiles.sh doctor   # repair a broken credentials file
+bash ~/.claude/scripts/aws-profiles.sh use rds  # print the export line for a profile
+```
+
+`sso` is the one that matters. It logs in through the browser — an existing Office 365 session
+usually carries straight through — then calls `sso list-accounts` / `list-account-roles` and writes
+a `[profile <accountId>_<RoleName>]` entry for **every** account and role the user actually holds.
+So a newly granted role (e.g. `RDS-ReadOnly` on a different account) appears without anyone hand-
+editing config, and nobody has to know the account ID in advance.
+
+It falls back to `--use-device-code` automatically if the auth-code flow fails, and clears a stale
+client registration before retrying.
+
+**Static keys shadow SSO profiles of the same name**, and the script warns when that happens. Once
+SSO works, retire the credentials file entirely — that is the end state:
+```bash
+mv ~/.aws/credentials ~/.aws/credentials.retired-$(date +%s)
+```
+
+**`doctor` exists because the file keeps getting corrupted the same way:** pasting the portal block
+twice produces a duplicate `[<accountId>_<RoleName>]` header, which makes the whole file unparseable
+— every profile then reports expired, including ones with valid keys. `doctor` dedupes and re-parses.
+Run it first whenever a paste "didn't work".
+
+Only fall through to the manual steps below if `sso` genuinely fails.
+
 ## Step 1: Check if AWS CLI is authenticated
 
 ```bash
