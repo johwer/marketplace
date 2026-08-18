@@ -17,6 +17,13 @@
 
 set -uo pipefail
 
+# Remember what the caller had, then get out of its way. A stale exported AWS_PROFILE — one
+# renamed or retired since the shell started — makes every aws call fail with "The config
+# profile (x) could not be found", INCLUDING `sso login`, which does not need a profile at all.
+# That failure looks like SSO being broken when it is just a stale environment variable.
+ACTIVE_PROFILE="${AWS_PROFILE:-}"
+unset AWS_PROFILE
+
 CONFIG="$HOME/.aws/config"
 CREDS="$HOME/.aws/credentials"
 COMPANY="$HOME/.claude/company-config.json"
@@ -120,7 +127,14 @@ PY
   fi
   echo
   bold "Active"
-  echo "  AWS_PROFILE=${AWS_PROFILE:-(unset)}"
+  if [[ -z "$ACTIVE_PROFILE" ]]; then
+    echo "  AWS_PROFILE=(unset)"
+  elif grep -q "^\[profile ${ACTIVE_PROFILE}\]" "$CONFIG" 2>/dev/null || grep -q "^\[${ACTIVE_PROFILE}\]" "$CREDS" 2>/dev/null; then
+    echo "  AWS_PROFILE=$ACTIVE_PROFILE"
+  else
+    warn "  AWS_PROFILE=$ACTIVE_PROFILE  <- STALE: no such profile. This shell predates a rename;"
+    warn "     every aws call in it will fail until you open a new shell or re-export."
+  fi
 }
 
 cmd_check() {

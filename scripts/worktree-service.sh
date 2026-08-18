@@ -208,6 +208,22 @@ compose() {
         "$@"
 }
 
+# --- ServiceC routing helpers (see the long comment in `up`) ---------------------
+# Is THIS worktree's ServiceC container running? Scoped via `compose` so another
+# worktree's service-c-api-wt can never satisfy the check.
+worktree_service-c_running() {
+    compose ps --status running --format '{{.Service}}' 2>/dev/null | grep -qx "service-c-api-wt"
+}
+
+set_service-c_service_host() {
+    _host="$1"
+    if ! grep -q '^ServiceC_SERVICE_HOST=' "$WORKTREE_DIR/.env" 2>/dev/null; then
+        echo "ServiceC_SERVICE_HOST=$_host" >> "$WORKTREE_DIR/.env"
+    else
+        sed -i '' "s/^ServiceC_SERVICE_HOST=.*/ServiceC_SERVICE_HOST=$_host/" "$WORKTREE_DIR/.env"
+    fi
+}
+
 case "${1:-help}" in
     up)
         SERVICE="${2:?Usage: $0 up <service>}"
@@ -226,14 +242,22 @@ case "${1:-help}" in
         check_main_network
         COMPOSE_NAME=$(to_compose_name "$SERVICE")
 
-        # When ServiceC is started from the worktree, other worktree services should
-        # route authorization calls to it (not to the main stack's ServiceC).
-        if [ "$SERVICE" = "service-c-api" ]; then
-            if ! grep -q '^ServiceC_SERVICE_HOST=' "$WORKTREE_DIR/.env" 2>/dev/null; then
-                echo "ServiceC_SERVICE_HOST=service-c-api-wt" >> "$WORKTREE_DIR/.env"
-            else
-                sed -i '' 's/^ServiceC_SERVICE_HOST=.*/ServiceC_SERVICE_HOST=service-c-api-wt/' "$WORKTREE_DIR/.env"
-            fi
+        # Route authorization calls to the worktree's own ServiceC whenever one is running,
+        # or is being started right now.
+        #
+        # This MUST be re-evaluated on every `up`, not only when SERVICE=service-c-api.
+        # Docker reads .env at container CREATION time, so a sibling service created
+        # BEFORE service-c-api keeps whatever ServiceC_SERVICE_HOST held at that moment — forever.
+        # Starting service-c-api afterwards updates .env but does NOT recreate the sibling.
+        # The result is silent: the sibling authorizes against the MAIN STACK's ServiceC,
+        # which predates the branch and does not know newly added enum members. It
+        # rejects them as invalid, the caller surfaces a plain 403, and the failure
+        # looks like a permissions bug in your own code. Cost a full investigation
+        # on NOVA-3440 before the routing was identified as the cause.
+        if [ "$SERVICE" = "service-c-api" ] || worktree_service-c_running; then
+            set_service-c_service_host "service-c-api-wt"
+        else
+            set_service-c_service_host "service-c-api"
         fi
 
         echo "Building and starting $SERVICE from worktree ($WORKTREE_DIR)..."
@@ -276,6 +300,20 @@ case "${1:-help}" in
             exit 1
         fi
         echo "✅ $SERVICE is healthy."
+
+        # Siblings created BEFORE this ServiceC still hold the old ServiceC_SERVICE_HOST in their
+        # container env (docker fixes it at creation). Recreate them so they actually
+        # route to the worktree ServiceC rather than silently to the main stack's.
+        if [ "$SERVICE" = "service-c-api" ]; then
+            RUNNING_SIBLINGS=$(compose ps --status running --format '{{.Service}}' 2>/dev/null | grep -v '^service-c-api-wt$' || true)
+            if [ -n "$RUNNING_SIBLINGS" ]; then
+                echo ""
+                echo "Recreating worktree services started before ServiceC so they route to service-c-api-wt:"
+                echo "$RUNNING_SIBLINGS" | sed 's/^/  - /'
+                # shellcheck disable=SC2086
+                compose up -d --force-recreate $RUNNING_SIBLINGS
+            fi
+        fi
 
         # Switch vite proxy and .env.local port for this service to the worktree port
         WT_PORT=$(worktree_port "$SERVICE")
