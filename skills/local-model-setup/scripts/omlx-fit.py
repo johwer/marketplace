@@ -47,6 +47,16 @@ PREFILL_GIB_PER_1K_PER_32L = 0.136
 
 CLAUDE_CODE_MIN_CONTEXT = 48 * 1024  # integrations/claude.py refuses below this
 
+# Clearing the launcher's 48K gate is NOT enough to actually use Claude Code. Its own
+# preamble — system prompt + tool schemas + CLAUDE.md + MEMORY.md — measured 53,753
+# tokens in a real repo, i.e. it BLOWS a 49152 window before the user types anything
+# ("400 Prompt too long: 53753 tokens exceeds max context window of 49152"). Budget the
+# preamble plus room to actually converse. Highly repo-dependent: a directory without a
+# large global CLAUDE.md is much cheaper.
+CLAUDE_CODE_PREAMBLE_TOKENS = 54_000
+CLAUDE_CODE_WORKING_HEADROOM = 32_000
+CLAUDE_CODE_USABLE_CONTEXT = CLAUDE_CODE_PREAMBLE_TOKENS + CLAUDE_CODE_WORKING_HEADROOM
+
 # Verified MLX repos. weights_gib = actual .safetensors total from the HF tree API.
 MODELS = [
     {
@@ -156,6 +166,7 @@ def main() -> int:
             "max_context": cap,
             "fits_at_all": cap >= 4096,
             "claude_code_ready": cap >= CLAUDE_CODE_MIN_CONTEXT,
+            "claude_code_usable": cap >= CLAUDE_CODE_USABLE_CONTEXT,
             "at_48k_gib": round(required_gib(m, CLAUDE_CODE_MIN_CONTEXT, a.kv_bits), 2),
             "drafter": m["drafter"],
             "quality": m["quality"],
@@ -181,7 +192,11 @@ def main() -> int:
               "changing memory_guard_tier will NOT help")
     print(f"Abort threshold:   {usable:.2f} GiB  <- everything must fit under this")
     print(f"KV quantization:   {a.kv_bits}-bit"
-          f"{' (turboquant_kv_enabled)' if a.kv_bits == 4 else ''}\n")
+          f"{' (turboquant_kv_enabled)' if a.kv_bits == 4 else ''}")
+    print(f"Claude Code needs: {CLAUDE_CODE_USABLE_CONTEXT/1000:.0f}K to be usable "
+          f"({CLAUDE_CODE_PREAMBLE_TOKENS/1000:.0f}K preamble measured + "
+          f"{CLAUDE_CODE_WORKING_HEADROOM/1000:.0f}K to converse), "
+          f"not just the {CLAUDE_CODE_MIN_CONTEXT/1000:.0f}K launcher gate\n")
 
     print(f"{'model':<30}{'weights':>9}{'pred ctx':>10}{'verified':>10}{'@48K bud':>10}  verdict")
     print("-" * 90)
@@ -189,8 +204,10 @@ def main() -> int:
         ctx = f"{r['max_context']/1000:.0f}K" if r["fits_at_all"] else "—"
         if not r["fits_at_all"]:
             verdict = "does not fit"
+        elif r["claude_code_usable"]:
+            verdict = "Claude Code usable"
         elif r["claude_code_ready"]:
-            verdict = "Claude Code ready"
+            verdict = "clears 48K gate, but < 54K preamble"
         else:
             verdict = f"too small for Claude Code (needs 48K)"
         v = r["verified_ctx"]
@@ -205,10 +222,14 @@ def main() -> int:
         print("VERDICT: no candidate model fits this machine.")
         return 1
 
-    if best["claude_code_ready"]:
+    if best["claude_code_usable"] or best["claude_code_ready"]:
         print(f"READY TO SET UP — best pick: {best['id']}")
-        print(f"  predicted max context ~{best['max_context']/1000:.0f}K, "
-              "clears Claude Code's 48K gate.")
+        print(f"  predicted max context ~{best['max_context']/1000:.0f}K "
+              "(a CONSERVATIVE floor — see note below).")
+        if not best["claude_code_usable"]:
+            print(f"  Predicted below the {CLAUDE_CODE_USABLE_CONTEXT/1000:.0f}K Claude Code "
+                  "needs — but measured capacity has exceeded this prediction, so try it:")
+            print(f"  configure 98304 and send a real Claude Code turn before deciding.")
         v = best["verified_ctx"]
         if v and v < CLAUDE_CODE_MIN_CONTEXT * 0.95:
             print(f"  CAUTION: only verified to {v/1000:.1f}K tokens on real hardware — 48K")
