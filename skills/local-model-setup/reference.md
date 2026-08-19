@@ -4,7 +4,9 @@ All numbers below were measured on **MacBook Pro, Apple M2 (8 cores: 4P+4E), 16 
 macOS 26.6.1**, oMLX **0.6.3rc1**, on 2026-08-19. Treat them as anchors for that
 machine, and re-measure on new hardware rather than extrapolating.
 
-## Throughput — Qwen3.5-9B-MLX-4bit
+## Throughput
+
+### Qwen3.5-9B-MLX-4bit
 
 250-token completions at `temperature: 0`, warm, timed by `usage.total_time`:
 
@@ -23,6 +25,17 @@ bandwidth; the published 2.7–4.4× figures assume far more compute relative to
 bandwidth. 4-bit KV quantization cost essentially nothing (17.4 vs 17.8), so always
 enable it.
 
+### Qwen3.5-4B-MLX-4bit
+
+| Config | tok/s |
+|---|---|
+| No DFlash, 4-bit KV, 48K configured | **29.4** |
+
+The 4B decodes ~1.7x faster than the 9B (29.4 vs 17.8) and holds only 2.97 GiB, which
+is what buys it the extra context headroom.
+
+### Prefill
+
 Prefill is much slower than decode and is usually the real cost:
 
 | Prompt | Wall time | Prefill |
@@ -36,14 +49,32 @@ makes a local model impractical for agentic coding loops on this hardware.
 
 ## Context limits — measured, 16 GB
 
-| Prompt size | Result |
-|---|---|
-| 31.5K | OK |
-| ~36K | Rejected by the pre-chunk prefill guard |
-| 45K | Aborted mid-prefill at 11.3 GB vs an 11.2 GB threshold, after 6 minutes |
+Token counts are server-reported `prompt_tokens`, not chars/4 estimates. (An earlier
+version of this file labelled the 37.8K runs as "45K" from a chars/4 guess — if you see
+that figure quoted anywhere, it is wrong.)
 
-So the practical ceiling is **~32K**, even though `max_context_window: 49152` was
-accepted without complaint. **The KV cache is not the binding constraint** — at 48K it
+**Qwen3.5-9B-4bit** — practical ceiling **~32K**:
+
+| Prompt | Result |
+|---|---|
+| 31,516 tok | OK |
+| ~36K (est) | Rejected by the pre-chunk prefill guard |
+| 37,820 tok | Aborted mid-prefill at 11.3 GB vs an 11.2 GB threshold, after 6 min |
+
+**Qwen3.5-4B-4bit** — verified to **~38K**:
+
+| Prompt | Result |
+|---|---|
+| 37,820 tok | **OK**, 420 s (~90 tok/s prefill) |
+
+The 4B got there only by throttling: the scheduler cut the prefill chunk from 2048 to
+512 and reclaimed 1.08 GB of pooled Metal buffers at 9.25 GB usage against a 9.53 GB
+sizing target. It adapts rather than aborting, so long contexts degrade into slowness
+before they fail. 48K on the 4B is **predicted but not verified** — it is close to the
+edge, so do not claim it without a full-size test.
+
+Both were configured with `max_context_window: 49152`, which was accepted without
+complaint in both cases. **The KV cache is not the binding constraint** — at 48K it
 is only 1.50 GiB at 4 bits. Prefill activation peak is what blows the budget, which is
 why aborts happen mid-request rather than at load.
 
@@ -76,6 +107,41 @@ with it stopped.** Docker Desktop had allocated 12.79 GB of 16 to its VM.
 
 **24 GB is the minimum for a dependable 48K context** on a 9B — which independently
 matches the "24 GB fit-first minimum" published for these models.
+
+## Tool-calling reliability
+
+Claude Code is entirely tool-driven, so this matters more than tok/s.
+
+| Model | Loose phrasing ("using the available tool") | Explicit / `tool_choice` |
+|---|---|---|
+| Qwen3.5-9B | `tool_use` first try | — |
+| Qwen3.5-4B | **Refused** — `end_turn` + "I cannot access files on your local filesystem" | `tool_use` 3/3 |
+
+The 4B is capable but less reliable at *deciding* to use a tool, and will sometimes
+refuse a filesystem-flavoured request outright. Agentic loops depend on unprompted tool
+selection, so treat this as the 4B's real limitation — not its context window. Verify
+tool calling with a loosely-worded prompt, not a coaxed one, or the check passes
+vacuously.
+
+## Sizing-script calibration
+
+`scripts/omlx-fit.py` predicts max context as
+`weights + (kv_per_1k + 0.136 x layers/32) x ctx/1000 <= 0.95 x ceiling`.
+
+The activation coefficient was back-calculated from the two measured peaks:
+
+| Model | hidden | Peak | Implied activation |
+|---|---|---|---|
+| 9B (aborted at 37.8K) | 4096 | 11.3 GB | 0.118 GiB per 1K |
+| 4B (completed 37.8K) | 2560 | 9.25 GB | 0.136 GiB per 1K |
+
+They agree despite hidden_size differing by 1.6x, so **activation scales with layer
+count, not hidden_size.** A first version scaled by `hidden_size` and overpredicted the
+4B by ~2 GiB (claimed 73K, real ~38-49K). The `layers/32` scaling is inferred from two
+32-layer models, so the 64-layer 27B row is rough.
+
+Predicted vs verified on 16 GB: 9B 33K predicted / 31.5K verified; 4B 49K predicted /
+37.8K verified. The script prints both columns — never quote the prediction alone.
 
 ## Model / drafter compatibility
 
@@ -116,6 +182,10 @@ used *less* memory while being slower.
   use it to judge whether a context size fits.
 - `omlx launch claude` refuses any model configured under **48K** context
   (`Claude Code requires at least 48K context`).
+- **A long prefill blocks the whole server.** A small request sent during a 37.8K
+  prefill got no response at all until it finished. The DFlash engine is explicitly
+  one-request-at-a-time, and heavy prefill starves the batched engine too — so one big
+  turn stalls everything.
 - `mtp_enabled` is mutually exclusive with `dflash_enabled`.
 - `/admin/api/hf/tasks` reports a **stale `downloaded_size`/`progress`** — it sat at
   26 MB while 1.1 GB was already on disk, and `progress` briefly read 380%. Poll
