@@ -26,12 +26,17 @@ TIER_RESERVE_GIB = {"safe": 8.0, "balanced": 6.0, "aggressive": 4.0, "custom": 2
 HARD_WATERMARK = 0.95  # abort threshold as a fraction of the ceiling
 METAL_CAP_FRACTION = 0.74  # Metal recommendedMaxWorkingSetSize, measured 11.84/16
 
-# Prefill activation cost per 1K context tokens, per unit of hidden_size/4096.
-# Calibrated on a 16 GB M2 with Qwen3.5-9B-4bit against three measured points:
-#   31.5K prompt -> OK, ~36K -> rejected by pre-chunk guard, 45K -> aborted at 11.3 GB.
-# This is the dominant term at long context; the KV cache is comparatively small.
-# Approximate, and the one number here most worth re-measuring on new hardware.
-PREFILL_GIB_PER_1K = 0.13
+# Prefill activation cost per 1K context tokens, scaled by layers/32.
+# Back-calculated from measured peaks on a 16 GB M2, both models L=32 / kv=4 / hd=256:
+#   Qwen3.5-9B: aborted at 11.3 GB on a 37.8K prompt -> 0.118 GiB/1K activation
+#   Qwen3.5-4B: completed a 37.8K prompt at 9.25 GB  -> 0.136 GiB/1K activation
+# The two agree despite hidden_size differing 4096 vs 2560, so activation is scaled by
+# LAYER COUNT, not hidden_size. An earlier version scaled by hidden_size and
+# underestimated the 4B by ~2 GiB. The layers/32 scaling is inferred, not measured —
+# both calibration models have 32 layers — so treat deep models (the 64-layer 27B) as
+# rough. Takes the conservative end of the measured range.
+# This activation term dominates; the KV cache is comparatively small.
+PREFILL_GIB_PER_1K_PER_32L = 0.136
 
 CLAUDE_CODE_MIN_CONTEXT = 48 * 1024  # integrations/claude.py refuses below this
 
@@ -44,6 +49,8 @@ MODELS = [
         "layers": 32, "kv_heads": 4, "head_dim": 256, "hidden": 2560,
         "drafter": "z-lab/Qwen3.5-4B-DFlash",
         "quality": 1,
+        # measured on 16 GB M2: 37.8K prompt completed in 420s (throttled to 512-tok chunks)
+        "verified_ctx": 37820, "verified_on_gib": 16,
     },
     {
         "id": "mlx-community/Qwen3.5-9B-MLX-4bit",
@@ -52,6 +59,8 @@ MODELS = [
         "layers": 32, "kv_heads": 4, "head_dim": 256, "hidden": 4096,
         "drafter": "z-lab/Qwen3.5-9B-DFlash",
         "quality": 2,
+        # measured on 16 GB M2: 31.5K OK; 37.8K aborted at 11.3 GB
+        "verified_ctx": 31516, "verified_on_gib": 16,
         # VLM-typed: the non-DFlash VLM engine loads the vision tower too (5.68 GiB
         # resident measured). DFlash's text-only path loaded only 3.39 GiB.
     },
@@ -103,13 +112,13 @@ def kv_gib_per_1k(m: dict, kv_bits: int) -> float:
 
 
 def required_gib(m: dict, ctx: int, kv_bits: int) -> float:
-    per_1k = kv_gib_per_1k(m, kv_bits) + PREFILL_GIB_PER_1K * (m["hidden"] / 4096)
+    per_1k = kv_gib_per_1k(m, kv_bits) + PREFILL_GIB_PER_1K_PER_32L * (m["layers"] / 32)
     return m["weights_gib"] + per_1k * (ctx / 1000)
 
 
 def max_context(m: dict, usable: float, kv_bits: int) -> int:
     """Largest context whose predicted peak stays under the abort threshold."""
-    per_1k = kv_gib_per_1k(m, kv_bits) + PREFILL_GIB_PER_1K * (m["hidden"] / 4096)
+    per_1k = kv_gib_per_1k(m, kv_bits) + PREFILL_GIB_PER_1K_PER_32L * (m["layers"] / 32)
     room = usable - m["weights_gib"]
     if room <= 0:
         return 0
@@ -142,6 +151,8 @@ def main() -> int:
             "at_48k_gib": round(required_gib(m, CLAUDE_CODE_MIN_CONTEXT, a.kv_bits), 2),
             "drafter": m["drafter"],
             "quality": m["quality"],
+            "verified_ctx": m.get("verified_ctx"),
+            "verified_on_gib": m.get("verified_on_gib"),
         })
 
     ready = [r for r in rows if r["claude_code_ready"]]
@@ -164,8 +175,8 @@ def main() -> int:
     print(f"KV quantization:   {a.kv_bits}-bit"
           f"{' (turboquant_kv_enabled)' if a.kv_bits == 4 else ''}\n")
 
-    print(f"{'model':<32}{'weights':>9}{'max ctx':>10}{'@48K':>9}  verdict")
-    print("-" * 78)
+    print(f"{'model':<30}{'weights':>9}{'pred ctx':>10}{'verified':>10}{'@48K':>8}  verdict")
+    print("-" * 88)
     for r in sorted(rows, key=lambda x: x["quality"]):
         ctx = f"{r['max_context'] // 1024}K" if r["fits_at_all"] else "—"
         if not r["fits_at_all"]:
@@ -174,8 +185,12 @@ def main() -> int:
             verdict = "Claude Code ready"
         else:
             verdict = f"too small for Claude Code (needs 48K)"
-        print(f"{r['label']:<32}{r['weights_gib']:>7.2f}G{ctx:>10}"
-              f"{r['at_48k_gib']:>8.1f}G  {verdict}")
+        v = r["verified_ctx"]
+        # Only count as verified when proven on a machine no larger than this one.
+        proven = v and r["verified_on_gib"] and r["verified_on_gib"] <= ram
+        vtxt = f"{v // 1024}K" if proven else ("—" if not v else f"({v // 1024}K)")
+        print(f"{r['label']:<30}{r['weights_gib']:>7.2f}G{ctx:>10}{vtxt:>10}"
+              f"{r['at_48k_gib']:>7.1f}G  {verdict}")
 
     print()
     if best is None:
@@ -184,7 +199,13 @@ def main() -> int:
 
     if best["claude_code_ready"]:
         print(f"READY TO SET UP — best pick: {best['id']}")
-        print(f"  max context ~{best['max_context'] // 1024}K, clears Claude Code's 48K gate.")
+        print(f"  predicted max context ~{best['max_context'] // 1024}K, "
+              "clears Claude Code's 48K gate.")
+        v = best["verified_ctx"]
+        if v and v < CLAUDE_CODE_MIN_CONTEXT:
+            print(f"  CAUTION: only verified to {v // 1024}K on real hardware — the 48K")
+            print("  claim is a prediction. Prove it with a full-size prompt (SKILL.md")
+            print("  step 5 check 3) before telling the user Claude Code will hold up.")
         print(f"  Next: set it up for Claude Code and DTF (see SKILL.md step 4).")
     else:
         print(f"BEST AVAILABLE: {best['id']} at ~{best['max_context'] // 1024}K context")
