@@ -120,33 +120,43 @@ jobs off the critical path: drafting a commit message from a diff, summarizing a
 log. Propose one of those as a standalone script and get confirmation before editing
 any DTF command or agent — those live in shared config.
 
-## Step 5 — Verify, don't assume
-
-Three checks, all of which have caught real problems:
+## Step 5 — Verify from a clean state
 
 ```bash
-KEY=$(python3 -c "import json;print(json.load(open('$HOME/.omlx/settings.json'))['auth']['api_key'])")
-
-# 1. throughput — usage.total_time is server-measured
-curl -s localhost:8000/v1/chat/completions -H "Authorization: Bearer $KEY" \
- -H 'Content-Type: application/json' \
- -d '{"model":"<ID>","messages":[{"role":"user","content":"List five TypeScript utility types."}],"max_tokens":250,"temperature":0}' \
- | python3 -c "import sys,json;u=json.load(sys.stdin)['usage'];print(u['completion_tokens']/u['total_time'],'tok/s')"
-
-# 2. tool calling — Claude Code is useless without it. Expect stop_reason: tool_use
-curl -s localhost:8000/v1/messages -H "x-api-key: $KEY" -H 'anthropic-version: 2023-06-01' \
- -H 'Content-Type: application/json' \
- -d '{"model":"<ID>","max_tokens":300,"tools":[{"name":"read_file","description":"Read a file","input_schema":{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}}],"messages":[{"role":"user","content":"Read /etc/hosts using the tool."}]}'
-
-# 3. REAL context — send a prompt near the configured limit and confirm it completes
+scripts/omlx-verify.sh <ID>                  # state gate + throughput + tool calling
+scripts/omlx-verify.sh <ID> --full           # ... plus a full-size context test (slow)
+scripts/omlx-verify.sh <ID> --full --reset   # reload first to clear pooled Metal buffers
+scripts/omlx-verify.sh <ID> --state          # just the state check
 ```
 
-Check 3 is the one that gets skipped. A configured context window proves nothing;
-only a large prompt that returns a completion does. Budget minutes — prefill is slow.
+**The state gate is the point.** It refuses to benchmark while swap > 1 GB, the
+compressor is > 3 GiB, or Docker containers are up — because the same model on the same
+prompt measured **420 s / 9.25 GB peak with 4.4 GB of swap hot, and 143 s / 5.80 GB on a
+clean machine.** A 3x error from machine state alone. If you benchmark dirty you will
+draw the wrong conclusion and write it into the docs, which is exactly what happened
+here. `--force` exists, but then label the result unreliable.
 
-If the user wants DFlash, benchmark it against the same prompts with
-`dflash_enabled` true and false, reloading between each, and report both numbers.
-Every variant measured slower on an M2 base; assume nothing about a new chip.
+To get clean: stop Docker, `omlx-down.sh --models` to unload and let swap settle, then
+reload. `--reset` does the reload for you.
+
+The three checks and why each earns its place:
+
+1. **Throughput** — from `usage.total_time`, server-measured, after a warmup call.
+2. **Tool calling with LOOSE phrasing.** A coaxed prompt ("use the read_file tool")
+   passes even on a model that won't pick a tool unprompted — the 4B refused
+   "using the available tool" while the 9B complied, then managed 3/3 when coaxed.
+   Agentic loops depend on unprompted selection, so the loose prompt is the real test.
+   A `WEAK` verdict means Claude Code will stall or need hand-holding.
+3. **Full-size context** at ~98% of the configured window. You cannot send more than
+   `max_context_window`, so this is the strongest available proof. A configured window
+   proves nothing on its own — this is the check that gets skipped, and skipping it is
+   how a "48K-ready" claim turns out to abort mid-prefill.
+
+Always record a figure together with the state block the script prints. A number
+without its machine state is not a measurement.
+
+If the user wants DFlash, benchmark it with `dflash_enabled` true and false, reloading
+between each, and report both. Every variant measured slower on an M2 base.
 
 ## Step 6 — Cleanup (do not leave a model resident)
 
