@@ -61,17 +61,21 @@ that figure quoted anywhere, it is wrong.)
 | ~36K (est) | Rejected by the pre-chunk prefill guard |
 | 37,820 tok | Aborted mid-prefill at 11.3 GB vs an 11.2 GB threshold, after 6 min |
 
-**Qwen3.5-4B-4bit** — verified to **~38K**:
+**Qwen3.5-4B-4bit** — **48K VERIFIED**, clears Claude Code's gate:
 
-| Prompt | Result |
-|---|---|
-| 37,820 tok | **OK**, 420 s (~90 tok/s prefill) |
+| Prompt | Result | Peak | Throttling |
+|---|---|---|---|
+| 37,820 tok | OK, 420 s (~90 tok/s) | 9.25 GB | chunk 2048 -> 512, 1.08 GB reclaimed |
+| 48,260 tok | **OK, 143 s (338 tok/s)** | **5.80 GB** | chunk 2048 -> 1792 only |
 
-The 4B got there only by throttling: the scheduler cut the prefill chunk from 2048 to
-512 and reclaimed 1.08 GB of pooled Metal buffers at 9.25 GB usage against a 9.53 GB
-sizing target. It adapts rather than aborting, so long contexts degrade into slowness
-before they fail. 48K on the 4B is **predicted but not verified** — it is close to the
-edge, so do not claim it without a full-size test.
+**The larger prompt was 3x faster and used 3.4 GB less.** The difference was machine
+state, not context: the 37.8K run happened with ~4.4 GB of swap in use left over from
+the 9B benchmarks, so the guard throttled hard and thrashed. On a clean machine the
+48.3K prompt sailed through.
+
+The lesson for benchmarking here: **a single timing under memory pressure is close to
+meaningless.** Check `sysctl vm.swapusage` before trusting any measurement, and re-run
+anything taken while swap was hot.
 
 Both were configured with `max_context_window: 49152`, which was accepted without
 complaint in both cases. **The KV cache is not the binding constraint** — at 48K it
@@ -140,8 +144,15 @@ count, not hidden_size.** A first version scaled by `hidden_size` and overpredic
 4B by ~2 GiB (claimed 73K, real ~38-49K). The `layers/32` scaling is inferred from two
 32-layer models, so the 64-layer 27B row is rough.
 
-Predicted vs verified on 16 GB: 9B 33K predicted / 31.5K verified; 4B 49K predicted /
-37.8K verified. The script prints both columns — never quote the prediction alone.
+Predicted vs verified on 16 GB: 9B 34K predicted / 31.5K verified (aborted at 37.8K);
+4B 51K predicted / **48.3K verified**. The limit predictions are good.
+
+What the formula does **not** predict is peak usage: it budgeted 11.0 GiB for the 4B at
+48K, and the verified run peaked at 5.80 GB. oMLX's guard expands to fill whatever is
+available and throttles chunk size as it tightens, so peak RSS is not a function of
+context alone. Read the `@48K bud` column as a sizing budget, never as expected usage.
+The script prints predicted and verified as separate columns — never quote the
+prediction alone.
 
 ## Model / drafter compatibility
 

@@ -35,6 +35,13 @@ METAL_CAP_FRACTION = 0.74  # Metal recommendedMaxWorkingSetSize, measured 11.84/
 # underestimated the 4B by ~2 GiB. The layers/32 scaling is inferred, not measured —
 # both calibration models have 32 layers — so treat deep models (the 64-layer 27B) as
 # rough. Takes the conservative end of the measured range.
+# NOTE: this predicts the LIMIT well (4B: 49K predicted vs 48.3K verified; 9B: 33K vs
+# 31.5K verified) but OVERSTATES peak usage — the 4B's verified 48.3K run peaked at only
+# 5.80 GB against an 11.0 GiB budget. oMLX's guard adaptively expands to fill available
+# memory and throttles chunk size as it tightens, so peak is not a fixed function of
+# context. Read the "@48K bud" column as a sizing budget, not a prediction of RSS.
+# Measurements also shift with machine state: the same 4B prompt took 420s at 9.25 GB
+# with 4.4 GB of swap in use, and 143s at 5.80 GB on a clean machine.
 # This activation term dominates; the KV cache is comparatively small.
 PREFILL_GIB_PER_1K_PER_32L = 0.136
 
@@ -49,8 +56,9 @@ MODELS = [
         "layers": 32, "kv_heads": 4, "head_dim": 256, "hidden": 2560,
         "drafter": "z-lab/Qwen3.5-4B-DFlash",
         "quality": 1,
-        # measured on 16 GB M2: 37.8K prompt completed in 420s (throttled to 512-tok chunks)
-        "verified_ctx": 37820, "verified_on_gib": 16,
+        # measured on 16 GB M2: 48.3K prompt completed in 143s at 338 tok/s prefill,
+        # peak 5.80 GB, chunk throttled only 2048->1792. Clears the Claude Code gate.
+        "verified_ctx": 48260, "verified_on_gib": 16,
     },
     {
         "id": "mlx-community/Qwen3.5-9B-MLX-4bit",
@@ -175,10 +183,10 @@ def main() -> int:
     print(f"KV quantization:   {a.kv_bits}-bit"
           f"{' (turboquant_kv_enabled)' if a.kv_bits == 4 else ''}\n")
 
-    print(f"{'model':<30}{'weights':>9}{'pred ctx':>10}{'verified':>10}{'@48K':>8}  verdict")
-    print("-" * 88)
+    print(f"{'model':<30}{'weights':>9}{'pred ctx':>10}{'verified':>10}{'@48K bud':>10}  verdict")
+    print("-" * 90)
     for r in sorted(rows, key=lambda x: x["quality"]):
-        ctx = f"{r['max_context'] // 1024}K" if r["fits_at_all"] else "—"
+        ctx = f"{r['max_context']/1000:.0f}K" if r["fits_at_all"] else "—"
         if not r["fits_at_all"]:
             verdict = "does not fit"
         elif r["claude_code_ready"]:
@@ -188,9 +196,9 @@ def main() -> int:
         v = r["verified_ctx"]
         # Only count as verified when proven on a machine no larger than this one.
         proven = v and r["verified_on_gib"] and r["verified_on_gib"] <= ram
-        vtxt = f"{v // 1024}K" if proven else ("—" if not v else f"({v // 1024}K)")
+        vtxt = f"{v/1000:.1f}K" if proven else ("—" if not v else f"({v/1000:.1f}K)")
         print(f"{r['label']:<30}{r['weights_gib']:>7.2f}G{ctx:>10}{vtxt:>10}"
-              f"{r['at_48k_gib']:>7.1f}G  {verdict}")
+              f"{r['at_48k_gib']:>9.1f}G  {verdict}")
 
     print()
     if best is None:
@@ -199,13 +207,16 @@ def main() -> int:
 
     if best["claude_code_ready"]:
         print(f"READY TO SET UP — best pick: {best['id']}")
-        print(f"  predicted max context ~{best['max_context'] // 1024}K, "
+        print(f"  predicted max context ~{best['max_context']/1000:.0f}K, "
               "clears Claude Code's 48K gate.")
         v = best["verified_ctx"]
-        if v and v < CLAUDE_CODE_MIN_CONTEXT:
-            print(f"  CAUTION: only verified to {v // 1024}K on real hardware — the 48K")
+        if v and v < CLAUDE_CODE_MIN_CONTEXT * 0.95:
+            print(f"  CAUTION: only verified to {v/1000:.1f}K tokens on real hardware — 48K")
             print("  claim is a prediction. Prove it with a full-size prompt (SKILL.md")
             print("  step 5 check 3) before telling the user Claude Code will hold up.")
+        elif v:
+            print(f"  VERIFIED on hardware: a {v/1000:.1f}K-token prompt completed "
+                  f"(gate is {CLAUDE_CODE_MIN_CONTEXT/1000:.1f}K).")
         print(f"  Next: set it up for Claude Code and DTF (see SKILL.md step 4).")
     else:
         print(f"BEST AVAILABLE: {best['id']} at ~{best['max_context'] // 1024}K context")
