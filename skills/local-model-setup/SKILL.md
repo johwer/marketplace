@@ -112,6 +112,23 @@ only — it writes nothing to `~/.claude`, so the user's normal setup is untouch
 `--opus` / `--sonnet` / `--haiku` map individual tiers if you want only some traffic
 local.
 
+Shell aliases (added to `~/.zshrc`; back up before editing, and re-add after any
+dotfile reset):
+
+```bash
+alias claude-local='omlx launch claude --model Qwen3.5-4B-MLX-4bit'
+alias omlx-status=' ... omlx-down.sh --status'
+alias omlx-stop='  ... omlx-down.sh'
+alias omlx-fit='   ... omlx-fit.py'
+alias omlx-verify=' ... omlx-verify.sh'
+```
+
+**Never export `ANTHROPIC_BASE_URL` globally.** It would silently route every `claude`
+session on the machine to the local model, real work included. A separate command is the
+only safe shape. The corollary users trip over: because the integration is env-var-only
+and writes nothing to `~/.claude`, the local model exists *only* inside a window opened
+this way — close the window and it's gone, and a normal `claude` never sees it.
+
 **DTF:** be honest about what's viable. At local decode speeds (~17 tok/s) and
 prefill of 100–220 tok/s, no DTF phase that reads the convention docs is realistic —
 architecture, review, and ticket analysis all depend on context this can't hold, and
@@ -157,6 +174,40 @@ without its machine state is not a measurement.
 
 If the user wants DFlash, benchmark it with `dflash_enabled` true and false, reloading
 between each, and report both. Every variant measured slower on an M2 base.
+
+## Step 5b — What to actually test in chat
+
+Benchmarks say it's alive; these say whether it's *useful*. Run them in ascending order
+and stop where it breaks — that tells you the real ceiling better than any token count.
+
+1. **Recall, no tools** — "What does `Array.prototype.flatMap` do?" Establishes baseline
+   coherence. If this is shaky, nothing else matters.
+2. **Single-file generation** — "Write a TypeScript debounce that preserves the return
+   type." A 4B should manage this. Check it compiles mentally: generics right, no
+   invented APIs.
+3. **Unprompted tool use** — "What files are in this directory?" The model must *choose*
+   to call a tool without being told to. This is where small models fail and where
+   agentic use lives or dies. Run it several times; the 4B is non-deterministic here.
+4. **Read-then-reason** — "Read package.json and tell me which test runner this uses."
+   Two steps: one tool call, then reasoning over real output.
+5. **Multi-step edit** — "Add a `--verbose` flag to <small script> and show the diff."
+   Requires read, plan, write. Expect this to be the first thing that struggles.
+6. **Follow a convention** — point it at a real convention doc and ask it to apply one
+   rule. Tests instruction-following under a large context, which is the actual failure
+   mode for local models on this repo.
+
+What to watch for beyond right/wrong answers:
+
+- **Invented APIs / hallucinated file paths** — the classic small-model tell.
+- **Declining a tool it has** ("I cannot access your filesystem") — capability is there,
+  the decision isn't.
+- **Ignoring half a multi-part instruction** — the practical ceiling for a 4B.
+- **`Thinking Process:` leaking into replies** — means `enable_thinking: false` isn't
+  holding through that request shape; report it, don't work around it.
+
+Honest expectation for a 4B: solid at 1-2, usable at 3-4 with retries, unreliable at
+5-6. That maps to "single-file, well-specified, low-stakes work" — which is exactly what
+the model itself said when asked.
 
 ## Step 6 — Cleanup (do not leave a model resident)
 
