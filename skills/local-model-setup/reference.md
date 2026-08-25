@@ -206,6 +206,19 @@ used *less* memory while being slower.
 - **macOS never releases `vm.swapusage` "used"**, so it reflects history, not pressure.
   Gate benchmarks on the *swapout rate* (`vm_stat` Swapouts sampled over a couple of
   seconds), or you will refuse to benchmark forever on a machine that once swapped.
+- **`qwen35_ane_prefill_enabled` is a no-op on the brew build.** It accepts `true`, then
+  logs `Private ANE runtime unavailable; Qwen ANE prefill skipped` on every load and
+  changes nothing. Don't count on the ANE to fix slow prefill here.
+- **`hot_cache_max_size` defaults to `"0"`** — the RAM prefix cache is OFF out of the box,
+  even though `cache.enabled` is `true`. For a Claude Code session whose ~54K preamble is
+  identical every turn, that means re-prefilling it. Set it (e.g. `"2GB"`) via
+  `POST /admin/api/global-settings`, but watch memory: on 16 GB it eats headroom a 54K
+  prefill needs, and prefill rejection is the failure mode.
+- **The server serialises heavy prefills, and concurrent sessions starve each other.**
+  Two 54K requests at once produced `Prefill would require ~10.55 GB peak (current 7.23 GB
+  + KV+SDPA 3.32 GB) but dynamic ceiling is 10.20` and a hard rejection. NEVER benchmark
+  against a server someone is using — you will stall their session and misattribute the
+  cause.
 - `mtp_enabled` is mutually exclusive with `dflash_enabled`.
 - `/admin/api/hf/tasks` reports a **stale `downloaded_size`/`progress`** — it sat at
   26 MB while 1.1 GB was already on disk, and `progress` briefly read 380%. Poll
