@@ -299,6 +299,36 @@ actually works (KV 3.00 GiB at 4-bit, weights + KV 5.97 GiB, comfortably inside 
   tok/s before the first token. Later turns reuse the cached prefix.
 - Launching from a directory without a large global `CLAUDE.md` cuts a big share of it.
 
+### Verdict: a 16 GB Mac cannot run Claude Code agentically
+
+Raising the window to 98304 stopped the 400 errors but produced **autocompact thrashing**
+— "the context refilled to the limit within 3 turns of the previous compact, 3 times in a
+row". The arithmetic explains it and no setting fixes it:
+
+```
+window                98,304
+Claude Code preamble  53,753   (55% of the window)
+-------------------------------
+usable working space ~44,551
+```
+
+Compaction summarises the *conversation*, but the preamble is fixed — still 54K
+immediately after every compact. One decent file read refills the remaining 44K, and it
+compacts again. 131072 would give ~77K of working room but does not fit: KV alone becomes
+4.00 GiB, so weights + KV + prefill activations lands ~10.3 GB against a ~10.2 GB ceiling.
+
+So on 16 GB this is **structural, not tuning**: Claude Code's own overhead eats more than
+half of the largest context the machine can hold. What still works well —
+
+- **Direct API chat** (`/v1/chat/completions`) — no preamble, ~29 tok/s, snappy.
+- **Claude Code from a lean directory** — without a large global `CLAUDE.md` + `MEMORY.md`
+  the preamble drops a lot and working room roughly doubles. Untested; the obvious next
+  experiment.
+- **Single-turn prompts that read no files.**
+
+Not viable: agentic work in a repo with big convention docs. At 24 GB the abort threshold
+goes 11.25 -> 16.87 GiB, which makes both a 131K window and the 9B realistic.
+
 This also showed the sizing formula is a **conservative floor, not a ceiling**: it
 predicted a ~51K limit for the 4B, yet a 96K window with a 53.7K prompt works fine. The
 0.136 GiB/1K coefficient came from a pressure-polluted run; the clean 48.3K run implies
