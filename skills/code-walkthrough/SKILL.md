@@ -5,7 +5,7 @@ description: Explain the CODE changes of a branch or PR in plain prose, file by 
 
 # Code Walkthrough — explain the diff, simply
 
-Produces a **"Walkthrough of the changes"** section for a PR description (or a chat answer). Audience: a developer reviewer who has not read the diff and wants to know *where to look and why*.
+Produces a **"Walkthrough of the changes"** section — in the Repo DTF flow it goes into the PR's `Implementation notes — reviewer detail` comment, outside DTF into the PR description, and it works as a chat answer too. Audience: a developer reviewer who has not read the diff and wants to know *where to look and why*.
 
 The goal is to answer, in under a minute: **how much real change is there, which files matter, and is any of it not what the ticket asked for?**
 
@@ -49,10 +49,28 @@ Adjust the patterns to the repo. Sanity-check the split against `git diff --stat
    **In the Repo DTF flow: into the `Implementation notes — reviewer detail` comment, not the PR body.** The walkthrough is mechanism — it answers "how does it work", which is what a reviewer who has already decided to review wants. Putting it in the description pushes the purpose and the screenshots below the fold, and `pr-ready` will relocate it at the ready transition anyway. Write it to the comment directly and skip the round trip:
 
    ```bash
-   CID=$(gh api "repos/{owner}/{repo}/issues/<PR>/comments" \
+   PR=<number>
+   WALK=/tmp/walkthrough.md   # your walkthrough, starting with "### Walkthrough of the changes"
+
+   CID=$(gh api "repos/{owner}/{repo}/issues/$PR/comments" \
           --jq '.[] | select(.body | contains("pr-ready:notes")) | .id' | head -1)
-   # append under "### Walkthrough of the changes" in that comment, or create it — see pr-ready
+
+   if [ -z "$CID" ]; then
+     # no notes comment yet — create it with the marker pr-ready looks for
+     { printf '<!-- pr-ready:notes -->\n## Implementation notes — reviewer detail\n\n'; cat "$WALK"; } \
+       > /tmp/notes-new.md
+     gh pr comment "$PR" --body-file /tmp/notes-new.md
+   else
+     gh api "repos/{owner}/{repo}/issues/comments/$CID" --jq '.body' > /tmp/notes-current.md
+     # drop any previous walkthrough block (its heading through to the next ### or EOF), then re-append
+     awk '/^### Walkthrough of the changes/{skip=1; next} /^### /{skip=0} !skip' \
+       /tmp/notes-current.md > /tmp/notes-new.md
+     { printf '\n'; cat "$WALK"; } >> /tmp/notes-new.md   # blank line before the heading
+     gh api -X PATCH "repos/{owner}/{repo}/issues/comments/$CID" -F body=@/tmp/notes-new.md
+   fi
    ```
+
+   Idempotent — re-running replaces your section and leaves the other subsections alone. Never `gh pr comment` a second walkthrough; the marker exists so there is exactly one notes comment per PR.
 
    **Outside DTF (or when asked for it in the description):** into the PR body under `## Walkthrough of the changes`, after the summary and before the evidence/testing sections.
 
@@ -61,6 +79,8 @@ Adjust the patterns to the repo. Sanity-check the split against `git diff --stat
 ## Shape
 
 Numbered bold paragraphs, one per file, biggest first. Prose, not bullet soup — a reviewer reads this top to bottom.
+
+**Heading level depends on the target:** `### Walkthrough of the changes` inside the notes comment (whose own title is the `##`), `## Walkthrough of the changes` when it goes in the PR body. The example below shows the body form.
 
 ```markdown
 ## Walkthrough of the changes
@@ -105,4 +125,4 @@ about 30 of the 45 edited lines. A pure swap would have been ~15.
 
 - `tester-handoff` — the non-developer test guide. Different audience, no code references.
 - `pr-screenshot-captions` — captions the visual evidence.
-- This pairs with DTF `my-dream-team` Phase 5, where the PR description is written.
+- In DTF this runs around Phase 5–6 and writes to the notes comment; `pr-ready` assembles the body at the ready transition and will relocate a walkthrough it finds there.
