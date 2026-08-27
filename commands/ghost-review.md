@@ -221,6 +221,34 @@ Look for queries that fetch everything (no `Take`/page size, `int.MaxValue` as a
 **[FQDN] Fully-qualified namespaces in code**
 Look for fully-qualified type names / namespaces inline in code (e.g. `Some.Long.Namespace.Type`) instead of a `using`. He flags this as unnecessary noise.
 
+**[FRAME-MISMATCH] Frontend reinterprets a value without reading what the backend does with it**
+When a frontend change alters how a value is **parsed, compared or serialised** — dates, currency,
+IDs, anything with a unit or frame — read the producing backend before accepting the change. Three
+greps, and they catch the class of bug a diff-only review cannot see:
+
+1. **Read the producer.** Find the DTO property and the SQL/expression behind it. What type is it
+   (`DateTime` vs `DateOnly` vs `string`)? Does one response column come from more than one source?
+   A `UNION ALL` can put two different frames in one field, in which case a single parse is wrong
+   for half the rows.
+2. **Read the comparison.** Find where the backend uses the value in a predicate. A frontend fix
+   reasoned from what a stored value *means* is a no-op — or a regression — if the server compares
+   it in a different frame (e.g. truncating to `DateTime.UtcNow.Date` while the client brackets a
+   local day).
+3. **Trace the round-trip.** If the value has both a read and a write path, check that
+   read → edit → save with no user change is idempotent. Fixing one side alone silently rewrites
+   stored data on save.
+
+Flag as MUST FIX when the PR changes a parse/compare and cites no evidence of the producing type or
+the server-side comparison. "It renders correctly now" is not that evidence.
+
+(NOVA-3618: three separate instances in one PR. A dashboard column unioning `inserted_at` with
+`planned_at` meant one parse broke whichever half it did not suit; a pause window rewritten to
+bracket local days was inert because the repository compares against `UtcNow.Date`, and skipped a
+day at negative offsets; and a timezone guard asserted a wire shape the DTO never sends. All three
+were invisible to tsc, eslint, 2000 unit tests, real-browser verification in two zones, and a
+diff-scoped pre-emptive review — because every one of them lived in code adjacent to the diff
+rather than in it.)
+
 ---
 
 ### Step 4 — Format findings
