@@ -169,6 +169,13 @@ review the diff._
 
 Omit any subsection that has nothing in it. A comment with two subsections is a good comment.
 
+## Both DTF modes
+
+This runs in **full and lite mode alike**. Full mode enforces it at the Phase 6 ready step and
+Completion Gate item 6b; lite mode has no hooks, so it self-enforces at Phase 6.9 **Marker 3**,
+which requires the pasted gate output. A solo lite session produces the same wall a full team
+does — the reader cannot tell which mode wrote it, so neither can the gate.
+
 ## Ordering — what must have run first
 
 - **`tester-handoff` runs BEFORE this skill.** It reads the body's `## How to Test` as one of its

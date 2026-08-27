@@ -121,6 +121,7 @@ Check if the arguments contain `--lite`. If present:
   - **Phase 6.75**: Retrospective — write your own retro learnings using the same 4 categories with destination hints: instruction improvements (`dream-team`/`agent:<name>`/`skill:<name>`), convention discoveries (`project-claude`/`agents-md:<path>`/`repo-docs`), doc gaps (`repo-docs`/`agents-md:<path>`), process improvements (`dream-team`/`memory`). Tag each item with a suggested destination so [`/retro-proposals`](commands.md#team-review) can route it later.
   - **Phase 7**: Cleanup — runs the **Completion Gate** first (see `dev-workflow-checklist.md` Section 9): all PR comments resolved, visual-verification screenshots present in `~/Downloads/<TICKET_ID>/`, retro done, CI green, PR description complete. Then posts a **Jira completion comment** with PR link + summary, @mentioning the ticket creator if different from assignee. Then transitions ticket to Klart.
 - **Visual verification applies in lite mode too.** The same Phase 4.75 gate (real-browser `playwright-cli` check + `~/Downloads/<TICKET_ID>/` screenshots) applies whether you're in full Dream Team or lite mode. Don't skip it just because you're working solo.
+- **PR body assembly applies in lite mode too.** `pr-ready` + `pr-body-gate.sh` run before `gh pr ready` in **both** modes — full mode enforces it at the Phase 6 ready step and Completion Gate item 6b, lite mode at Phase 6.9 Marker 3. A solo session produces the same wall of text a full team does; the reader can't tell which mode wrote it.
 - **Lead independently re-verifies in the real browser.** Never trust a dev agent's "looks good" — the team lead (and lite-mode solo) MUST personally drive the live app via `playwright-cli` and see the rendered state (+ network/console clean) before push. A claimed pass without an independent real-browser check has shipped user-facing bugs (retro NOVA-3043).
 - **New shared `ui/` primitives with interactive/conditional logic ship a unit test in the SAME PR.** Consumer tests miss the primitive's own logic (e.g. a FormSection collapsible path). Hard gate for any new `ui/` component with behavior, not just static rendering.
 - **Spawn-time prompts are frozen.** A subagent only sees its prompt as it was at spawn — relay any decision made AFTER spawn via `SendMessage`, never by assuming the agent re-reads context. And an agent→lead message may surface only as an `idle_notification`: on idle, the lead verifies progress via files/git/journal rather than waiting for a delivered DONE (retro NOVA-2924).
@@ -1443,7 +1444,24 @@ If you have not yet done Phase 6.75 — **STOP. Go do it now. Then come back her
 
 ---
 
-**Both markers must appear in your output before you write the first line of Phase 7.** If either is missing, Phase 7 has been entered prematurely and the session is incomplete.
+**Marker 3 — PR body assembly (`pr-ready` + body gate):**
+
+The description a human actually reads is not optional in lite mode. Run `pr-ready` (after `tester-handoff` and `pr-screenshot-captions`), then the gate, and output exactly — with the **real pasted gate output**, not a paraphrase:
+
+```
+✓ PR BODY ASSEMBLED
+  skill:    pr-ready — body cut to Why / What changes / Visual verification / Scope
+  moved:    <walkthrough | decisions | verification | pre-emptive review | audit findings — or "nothing to move">
+  comment:  <URL of the "Implementation notes — reviewer detail" comment, or "n/a">
+  gate:     bash ~/.claude/scripts/pr-body-gate.sh <PR_NUMBER>
+            <paste the actual output line, e.g. "✓ PR #3412 body: 174 words, no banned sections">
+```
+
+If the gate exits 1 — **STOP. Run `pr-ready` properly. Do not hand-edit around the gate**, and do not go ready.
+
+---
+
+**All three markers must appear in your output before you write the first line of Phase 7.** If any is missing, Phase 7 has been entered prematurely and the session is incomplete.
 
 ### Phase 7: Cleanup & Workspace Teardown
 
