@@ -44,7 +44,19 @@ Adjust the patterns to the repo. Sanity-check the split against `git diff --stat
 
 6. **State scope honestly.** If part of the diff isn't what the ticket asked for — an opportunistic fix, a pre-existing bug fixed in passing, endpoints that rode along in a regeneration — say so explicitly, with a rough line count. Reviewers find these anyway; finding them unannounced reads as scope creep, and finding them labelled reads as diligence.
 
-7. **Write it into the PR description** under `## Walkthrough of the changes`, usually after the summary and before the evidence/testing sections. Re-fetch the body immediately before writing (`gh pr view <N> --json body`) and diff it against what you last read — the field is one text box and a concurrent edit is last-write-wins.
+7. **Write it where the reader who wants it will find it.**
+
+   **In the Repo DTF flow: into the `Implementation notes — reviewer detail` comment, not the PR body.** The walkthrough is mechanism — it answers "how does it work", which is what a reviewer who has already decided to review wants. Putting it in the description pushes the purpose and the screenshots below the fold, and `pr-ready` will relocate it at the ready transition anyway. Write it to the comment directly and skip the round trip:
+
+   ```bash
+   CID=$(gh api "repos/{owner}/{repo}/issues/<PR>/comments" \
+          --jq '.[] | select(.body | contains("pr-ready:notes")) | .id' | head -1)
+   # append under "### Walkthrough of the changes" in that comment, or create it — see pr-ready
+   ```
+
+   **Outside DTF (or when asked for it in the description):** into the PR body under `## Walkthrough of the changes`, after the summary and before the evidence/testing sections.
+
+   Either way, re-fetch immediately before writing (`gh pr view <N> --json body`, or re-read the comment) and diff against what you last read — the field is one text box and a concurrent edit is last-write-wins.
 
 ## Shape
 

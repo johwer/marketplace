@@ -157,10 +157,17 @@ Before proceeding to the next step (CI polling, marking ready, etc.):
 2. **AI review + CI**: PR stays as draft throughout
 3. **User review**: After AI review and CI are green, notify the user. PR is still a draft.
 4. **Tester handoff (auto, before going ready)**: When the user confirms "ship it", invoke the `tester-handoff` skill BEFORE marking the PR ready. The skill auto-skips for backend-only / docs / deps / test-only / i18n-only PRs (posts a short Jira comment instead). For everything else, it generates `howtotest-<TICKET-ID>.txt`, attaches it to Jira, and posts a pointer comment. This is mandatory in both lite and team mode — applies to every user-facing change.
-5. **User confirms ready**: Only when user says "Done — ship it":
+5. **Assemble the body (auto, before going ready) — HARD GATE**: invoke the **`pr-ready`** skill. It cuts the description to the four sections a human reads — `## Why`, `## What changes`, `## Visual verification`, `## Scope` (~180 words, 250 cap) — and moves the walkthrough, resolved decisions, verification log, pre-emptive review and audit findings into a single `Implementation notes — reviewer detail` comment below the diff. `Progress`, `Architecture`, `How to Test`, `Questions` and the ASCII banner are dropped; the test guide is a one-line pointer to the Jira comment. Order matters: `tester-handoff` and `pr-screenshot-captions` run **before** this.
+
+   Then confirm it with the gate, and **paste the output** — a gate nobody sees refusing is not a gate:
+   ```bash
+   bash ~/.claude/scripts/pr-body-gate.sh <PR_NUMBER>   # exit 1 = REFUSED, do not go ready
+   ```
+
+6. **User confirms ready**: Only when user says "Done — ship it":
    - Mark PR ready: `gh pr ready <PR_NUMBER>`
    - **Reviewers are auto-assigned by `.github/CODEOWNERS` on ready — do NOT manually assign.** Confirm who was picked: `gh pr view <PR_NUMBER> --json reviewRequests --jq '.reviewRequests[]?.login'` and report to the user.
-6. **Never manually assign reviewers from `reviewers.json` in the flow.** CODEOWNERS handles it. The opt-in [`/reviewers`](#) command exists only for explicitly adding *extra* reviewers beyond CODEOWNERS, when the user asks.
+7. **Never manually assign reviewers from `reviewers.json` in the flow.** CODEOWNERS handles it. The opt-in [`/reviewers`](#) command exists only for explicitly adding *extra* reviewers beyond CODEOWNERS, when the user asks.
 
 ### Reviewer Category Mapping (for the opt-in `/reviewers` command only — NOT the default flow)
 
@@ -429,8 +436,9 @@ Before transitioning a ticket to Done (Phase 7), **every item below must be conf
 | 3 | **Retrospective completed** | Phase 6.75 ran, learnings saved to `.dream-team/journal/` and memory |
 | 4 | **Jira completion comment posted** | `acli jira workitem comment create` succeeded with PR link + summary |
 | 5 | **CI is green** | Last push has all checks passing |
-| 6 | **PR description is complete** | `Why` + `What changes` written with the `pr-description` skill (outcomes, not a ticket paraphrase; draft placeholder replaced), `Not in this PR` present, How to Test, and any screenshots are in the PR body |
-| 6b | **Decisions recorded** | If the implementation diverged from the ticket, a domain-model gate was resolved, or a known cost was accepted — a `## Decisions` section written with the `pr-decisions` skill, each entry naming a real alternative and the cost. Omit the section if there were genuinely no judgement calls. |
+| 6 | **PR description is readable** | Four sections only — `## Why`, `## What changes`, `## Visual verification`, `## Scope`. `Why` + `What changes` written with the `pr-description` skill (outcomes, not a ticket paraphrase; draft placeholder replaced), screenshots present for UI changes, one-line `Test guide:` pointer. Assembled by the `pr-ready` skill. |
+| 6b | **Body gate passes** | `bash ~/.claude/scripts/pr-body-gate.sh <PR_NUMBER>` exits 0 — **paste the output**. Exit 1 means the body still carries session scaffolding or is over 250 words; run `pr-ready`, do not hand-edit around the gate. |
+| 6c | **Decisions recorded, not displayed** | If the implementation diverged from the ticket, a domain-model gate was resolved, or a known cost was accepted — one `Chose X over Y because Z` line per decision in the `Implementation notes — reviewer detail` comment, written with the `pr-decisions` skill. An **open** decision stays in the body; a resolved one moves to the comment. Omit entirely if there were genuinely no judgement calls. |
 
 ### Jira Completion Comment
 

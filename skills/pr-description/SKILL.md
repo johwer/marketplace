@@ -98,6 +98,13 @@ only if there is genuinely nothing to say, which is rarer than it feels.>
 | `## Decisions` body text | `pr-decisions` |
 | Test-guide links / attachments | `tester-handoff` |
 | `## Progress` checklist, anything the user wrote by hand | the user |
+| The body's overall **shape** at the ready transition — which sections survive at all | `pr-ready` |
+
+**One exception to "compose, never replace":** at the ready transition, `pr-ready` (Repo DTF
+only) deletes and relocates sections body-wide, cutting it to `## Why` / `## What changes` /
+`## Visual verification` / `## Scope` and moving reviewer detail into an "Implementation notes"
+comment. That is a deliberate, once-per-PR act by a skill that owns the whole field. It does not
+license *you* to replace the body — your rule above is unchanged.
 
 **Heading collisions.** Real PRs here usually open with `## Summary` rather than `## Why`. If a `## Summary` (or `## Overview`) exists, **replace it** with `## Why` + `## What changes` — do not append, or the PR ends up with two purpose sections saying the same thing differently. `## Not in this PR` and `## How to see it` likewise replace their existing counterpart rather than duplicating it. If a PR splits observation across several sections by audience — local repro, deployed verification, evidence — leave that split alone and treat them collectively as your "How to see it".
 
