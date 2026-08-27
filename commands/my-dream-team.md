@@ -119,7 +119,7 @@ Check if the arguments contain `--lite`. If present:
   - **Phase 6.5**: Summary (write it yourself instead of spawning Tane)
   - **Phase 4.75 (Visual verification)**: **Drive the LIVE app in a real browser via `playwright-cli` and save screenshots to `~/Downloads/<TICKET_ID>/`** — that IS the verification. Navigate the worktree dev app (port 31xx), exercise the changed UI, and check network + console (not just the DOM). Save one screenshot per relevant state to `~/Downloads/<TICKET_ID>/` (user-visible folder; NEVER the repo, NEVER `/tmp`). **Do NOT** write committed Playwright e2e specs, `toHaveScreenshot` baselines, `page.screenshot()` artifacts in the repo, or GIF/video by default — that is the wrong default and contradicts how this team verifies (see memory `feedback_dtf_visual_verification_contradiction`, `feedback_real_browser_verification_mandatory`, `feedback_screenshots_user_visible_paths`). **New component → add a Cosmos fixture** (Vite/Cosmos for component states) instead of an e2e spec, plus a unit test if it has interactive logic. A committed `toHaveScreenshot` regression test is the rare EXCEPTION — only when the user explicitly asks for one. See `~/.claude/skills/playwright-cli/SKILL.md`.
   - **Phase 6.75**: Retrospective — write your own retro learnings using the same 4 categories with destination hints: instruction improvements (`dream-team`/`agent:<name>`/`skill:<name>`), convention discoveries (`project-claude`/`agents-md:<path>`/`repo-docs`), doc gaps (`repo-docs`/`agents-md:<path>`), process improvements (`dream-team`/`memory`). Tag each item with a suggested destination so [`/retro-proposals`](commands.md#team-review) can route it later.
-  - **Phase 7**: Cleanup — runs the **Completion Gate** first (see `dev-workflow-checklist.md` Section 7): all PR comments resolved, visual-verification screenshots present in `~/Downloads/<TICKET_ID>/`, retro done, CI green, PR description complete. Then posts a **Jira completion comment** with PR link + summary, @mentioning the ticket creator if different from assignee. Then transitions ticket to Klart.
+  - **Phase 7**: Cleanup — runs the **Completion Gate** first (see `dev-workflow-checklist.md` Section 9): all PR comments resolved, visual-verification screenshots present in `~/Downloads/<TICKET_ID>/`, retro done, CI green, PR description complete. Then posts a **Jira completion comment** with PR link + summary, @mentioning the ticket creator if different from assignee. Then transitions ticket to Klart.
 - **Visual verification applies in lite mode too.** The same Phase 4.75 gate (real-browser `playwright-cli` check + `~/Downloads/<TICKET_ID>/` screenshots) applies whether you're in full Dream Team or lite mode. Don't skip it just because you're working solo.
 - **Lead independently re-verifies in the real browser.** Never trust a dev agent's "looks good" — the team lead (and lite-mode solo) MUST personally drive the live app via `playwright-cli` and see the rendered state (+ network/console clean) before push. A claimed pass without an independent real-browser check has shipped user-facing bugs (retro NOVA-3043).
 - **New shared `ui/` primitives with interactive/conditional logic ship a unit test in the SAME PR.** Consumer tests miss the primitive's own logic (e.g. a FormSection collapsible path). Hard gate for any new `ui/` component with behavior, not just static rendering.
@@ -391,17 +391,23 @@ Immediately after receiving Amara's analysis, create a **draft PR** so the user 
 [2-5 bullets, each a thing that is now TRUE that was not before. Outcomes, not activities.
  On the initial draft this may be provisional — rewrite it properly before marking ready.]
 
-> **Before marking the PR ready, run the `pr-description` skill** to rewrite `## Why` and
-> `## What changes` properly. The draft version is a placeholder — a description that restates
-> the ticket is the default failure and the skill exists to prevent it. Pair with
-> `code-walkthrough` for the file-by-file section and `pr-screenshot-captions` for the images.
+> **Before marking the PR ready:** run the `pr-description` skill to rewrite `## Why` and
+> `## What changes` properly — the draft version is a placeholder, and a description that
+> restates the ticket is the default failure. Then run **`pr-ready`**, which cuts the body to
+> the four reader-facing sections and moves everything else into the `Implementation notes`
+> comment. Pair with `pr-screenshot-captions` for the images (before `pr-ready`), and note that
+> `code-walkthrough` writes to the notes comment, not here.
+>
+> **Sections below marked `[session-only]` are working scaffolding.** They are useful while
+> agents are running and are **deleted at the ready transition** by `pr-ready` — do not invest
+> effort polishing them, and do not put anything reader-facing in them.
 
-## Architecture
+## Architecture  <!-- [session-only] stripped at ready by pr-ready -->
 - **Scope:** [backend-only / frontend-only / full-stack]
 - **Agents:** [which agents are working on this]
 - **Key files:** [main files to be modified]
 
-## How to Test
+## How to Test  <!-- [session-only] stripped at ready by pr-ready -->
 _Step-by-step instructions for manually verifying this change._
 
 ### Prerequisites
@@ -418,10 +424,10 @@ _Step-by-step instructions for manually verifying this change._
 - [ ] [Another verification point]
 - [ ] [Edge case to check]
 
-## Questions
+## Questions  <!-- [session-only] stripped at ready by pr-ready -->
 _No open questions yet._
 
-## Progress
+## Progress  <!-- [session-only] stripped at ready by pr-ready -->
 - [x] Architecture analysis complete
 - [ ] Implementation in progress
 - [ ] PR review
@@ -1103,6 +1109,11 @@ The decision is split into TWO user-confirmable steps (NOVA-3039 retro, user-man
 3. **If "Mark ready":**
    - **Screenshot-caption check (BEFORE marking ready)**: Ask the user: "Have you added screenshots to the PR description?" If yes (or if `<img`/`![` tags appear in the PR body that you didn't put there), **invoke the `pr-screenshot-captions` skill** — it groups the images into before/after pairs by step, captions each with what it shows + what it proves, adds spacing, drops broken/error captures, collapses intermediate/exploration shots, verifies each against the local source files (never from filenames alone), and uses a re-fetch-before-write flow so a concurrent user edit isn't clobbered. (If the skill isn't installed, do it manually: caption under EACH image grouped under a "Visual Verification Evidence" heading, label non-evidentiary shots honestly, preserve images where the user placed them.)
    - **Pre-emptive review HARD GATE (before `gh pr ready`)**: Run `/ghost-review` (backend diffs) and `/owl-review` (tech-lead lens) and resolve their MUST FIX items first. These catch the issues human reviewers push back on before the PR is visible — treat a clean pass as a prerequisite for marking ready, not an optional nicety (NOVA-3250).
+   - **Assemble the body HARD GATE (before `gh pr ready`)**: invoke the **`pr-ready`** skill. It cuts the description to the four sections a human reads — `## Why`, `## What changes`, `## Visual verification`, `## Scope` (~180 words, 250 cap) — and moves the walkthrough, resolved decisions, verification log, pre-emptive review findings and audit notes into a single `Implementation notes — reviewer detail` comment below the diff. `Progress`, `Architecture`, `How to Test`, `Questions` and the ASCII banner are dropped here. Run it AFTER `tester-handoff` (6.4) and `pr-screenshot-captions`, and confirm with the gate — **paste the output**:
+     ```bash
+     bash ~/.claude/scripts/pr-body-gate.sh <PR_NUMBER>   # exit 1 = REFUSED, do not go ready
+     ```
+     A median DTF PR body was measured at 1,700 words / 13 headings before this step existed. That is an eight-minute read a reviewer does not start, which is why they skip to the diff or skip the PR.
    - **Mark the PR as ready**: `gh pr ready <PR_NUMBER>`
    - **Do NOT manually assign reviewers.** The repo's `.github/CODEOWNERS` auto-requests the right reviewers the moment the PR goes ready — manual assignment from `reviewers.json` is redundant and risks over-pinging. After `gh pr ready`, confirm who CODEOWNERS picked:
      ```bash
@@ -1440,7 +1451,7 @@ Only triggered when the user confirms they are done:
 
 **IMPORTANT:** Run Phase 6.75 (retrospective) BEFORE this phase. The retrospective needs `.dream-team/` files (journals, notes) which get deleted here.
 
-1. **Run the Completion Checklist** — See `~/.claude/docs/dev-workflow-checklist.md` Section 7 (Completion Gate). This is a **HARD GATE** — every item must be confirmed before proceeding. The checklist covers: PR review comments resolved, screenshots on disk, retro completed, Jira comment posted.
+1. **Run the Completion Checklist** — See `~/.claude/docs/dev-workflow-checklist.md` Section 9 (Completion Gate). This is a **HARD GATE** — every item must be confirmed before proceeding. The checklist covers: PR review comments resolved, screenshots on disk, retro completed, Jira comment posted.
 
    **Before checking "PR review comments resolved"**, run the GraphQL query to verify — do not assume. Every comment needs both a **reply** (explaining what was changed or pushing back with reasoning) AND a **resolve**. Replying without resolving leaves threads visibly open. Resolving without replying leaves reviewers without confirmation:
    ```bash
