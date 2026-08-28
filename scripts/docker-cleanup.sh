@@ -153,4 +153,8 @@ echo "=== Docker disk usage (after) ==="
 docker system df
 echo
 echo "Host disk usage now: $(host_disk_pct)% (was ${PCT}%)"
-[ "$DRY" = 1 ] && echo "(dry-run — nothing was actually removed)"
+if [ "$DRY" = 1 ]; then echo "(dry-run — nothing was actually removed)"; fi
+
+# Explicit: without this the script inherits the status of the test above, so every
+# real (non-dry) run exited 1 and launchd reported the daily cleanup as failing.
+exit 0
