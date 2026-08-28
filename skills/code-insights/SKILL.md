@@ -32,13 +32,23 @@ Split into frontend (.ts/.tsx) and backend (.cs) files.
 
 **Frontend (.tsx/.ts) — React 19 aware**
 
-NOTE: React 19 with React Compiler handles memoization automatically. Do NOT suggest useMemo/useCallback/React.memo — the compiler does this. Focus on things the compiler can't fix:
+NOTE: **React Compiler is NOT enabled in this repo.** There is no `babel-plugin-react-compiler` in `apps/web/vite.config.*` or `package.json`, and `docs/CODING_STYLE_FRONTEND.md:230` reads "React Compiler (when re-enabled) will handle memoization automatically. Until then, `useMemo` is fine for expensive computations." It was trialled and backed out.
+
+So memoization is **manual and load-bearing**: `useMemo` / `useCallback` / `React.memo` are legitimate suggestions, and *removing* them is a regression, not a cleanup. Do not tell anyone the compiler will cover it.
+
+Two things worth flagging in review:
+- **Unstable identity feeding a hook dependency** — `foo?.data ?? []` or an inline object/array passed as a dep, or into a `useMemo`/`useEffect` dep array. A fresh identity every render defeats the memo and can loop an effect. This is the common real bug, not a micro-optimisation.
+- **Genuinely expensive work recomputed every render** — sorts, filters and reduces over non-trivial lists in the render body.
+
+Don't flag memoizing a trivial derived value (`const fullName = first + " " + last`); the styleguide calls that out too.
+
+Also focus on:
 
 | Pattern | Look for | Why it matters |
 |---------|----------|----------------|
 | Async waterfall | Sequential `await a(); await b();` where independent | Double wait time. Use `Promise.all` |
 | Computation in JSX | `.sort()/.filter()/.reduce()` chains in the return statement | Readability issue. Extract to a named const above the return |
-| Inline function in JSX loop | `{items.map(i => <Item onClick={() => handle(i)} />)}` | Not a perf issue in React 19 (compiler), but readability — extract if complex |
+| Inline function in JSX loop | `{items.map(i => <Item onClick={() => handle(i)} />)}` | Readability first — extract if complex. With no compiler, it also re-creates the handler each render, which matters only if the child is memoized or the list is large |
 | Missing error boundary | New page/route component without error handling | One crash takes down the whole page |
 | Barrel imports | `import { X } from './index'` or `from '@/ui'` | Pulls in entire module. Direct import is tree-shakeable |
 | Large component (> 150 lines) | Single file keeps growing | Split into smaller components or custom hooks |

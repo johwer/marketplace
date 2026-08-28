@@ -319,7 +319,7 @@ Split the changed files into two halves (by file count). Launch 4 agents **in pa
 
 **Agent 6: Improvement Reviewer** (Sonnet) — skip if `--no-improve`
 - Reviews ALL changed files
-- **First, read `~/.claude/skills/code-insights/SKILL.md`** and use its Mode 1 pattern tables as the checklist. Do not restate them here — that file is the source of truth, so it stays correct as the conventions move. Note in particular its React 19 rule: never propose `useMemo`/`useCallback`/`React.memo`, the compiler handles them.
+- **First, read `~/.claude/skills/code-insights/SKILL.md`** and use its Mode 1 pattern tables as the checklist. Do not restate them here — that file is the source of truth, so it stays correct as the conventions move. Note that React Compiler is **not** enabled in this repo, so memoization is manual: `useMemo`/`useCallback` are legitimate proposals, and removing one is a regression rather than a cleanup.
 - Prompt: "You are an improvement reviewer. Your output is better code, not observations. For each finding you MUST supply a `proposal` containing the actual replacement code — not a description of it. If you cannot write the replacement, the finding does not exist: drop it. Also supply the trade-off, because a proposal with no cost is usually a proposal you haven't thought through. Return: `{file, line, category: 'IMPROVEMENT', description, proposal: '<code>', tradeoff, evidence}`."
 
 **Agent 7: Structural Reviewer** (Opus) — skip if `--no-improve`
@@ -443,9 +443,20 @@ Each finding leads with the defect in one line, then the replacement code, then 
    Evidence: `ManagerResponse.managers` is `Manager[] | null` at `store/rtk-apis/service-b/service-bApi.ts:812`;
    the seed has 3 of 11 employees with no manager row.
 
-### IMPROVEMENT (1)
+### IMPROVEMENT (2)
 
-1. `src/utils/date.ts:30` — Hand-rolled day comparison duplicates an existing helper.
+1. `src/components/ProfileCard.tsx:55` — `?? []` mints a new array every render, so the
+   `useMemo` below it never hits and the effect depending on it re-fires each pass.
+
+   ```tsx
+   - const managers = data?.managers ?? [];
+   + const managers = useMemo(() => data?.managers ?? [], [data]);
+   ```
+   Evidence: React Compiler is not enabled (`apps/web/package.json` has no
+   `babel-plugin-react-compiler`), so memoization here is manual and load-bearing.
+   Trade-off: one more hook to read; the alternative is a wasted memo and a looping effect.
+
+2. `src/utils/date.ts:30` — Hand-rolled day comparison duplicates an existing helper.
 
    ```ts
    - if (startOfDay(new Date(plannedAt)) < startOfDay(new Date()))
