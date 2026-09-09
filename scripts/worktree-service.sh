@@ -18,7 +18,8 @@
 #   3. CWD auto-detect           If CWD is inside a worktree
 #
 # Available services (API only — workers/sync not yet supported):
-#   service-b-api, service-a-api, service-e-api, service-d-api, service-c-api
+#   service-b-api, service-a-api, service-e-api, service-d-api, service-c-api,
+#   service-a-advisory, service-c-service-api
 #
 # Examples:
 #   bash ~/.claude/scripts/worktree-service.sh up service-b-api
@@ -125,16 +126,18 @@ check_main_network() {
 }
 
 # Available services (user-facing names)
-SERVICES="service-b-api service-a-api service-e-api service-d-api service-c-api"
+SERVICES="service-b-api service-a-api service-e-api service-d-api service-c-api service-a-advisory service-c-service-api"
 
 # Map service name → main stack port (500x default)
 main_stack_port() {
     case "$1" in
-        service-c-api)        echo 5001 ;;
-        service-a-api)    echo 5002 ;;
-        service-e-api) echo 5003 ;;
-        service-b-api)        echo 5005 ;;
-        service-d-api)  echo 5006 ;;
+        service-c-api)          echo 5001 ;;
+        service-a-api)      echo 5002 ;;
+        service-e-api)   echo 5003 ;;
+        service-b-api)          echo 5005 ;;
+        service-d-api)    echo 5006 ;;
+        service-a-advisory) echo 5010 ;;
+        service-c-service-api)  echo 5009 ;;
     esac
 }
 
@@ -142,23 +145,28 @@ main_stack_port() {
 worktree_port() {
     local env_key
     case "$1" in
-        service-c-api)        env_key="ServiceC_API_PORT" ;;
-        service-a-api)    env_key="ABSENCE_API_PORT" ;;
-        service-e-api) env_key="STATISTICS_API_PORT" ;;
-        service-b-api)        env_key="ServiceB_API_PORT" ;;
-        service-d-api)  env_key="MESSENGER_API_PORT" ;;
+        service-c-api)          env_key="ServiceC_API_PORT" ;;
+        service-a-api)      env_key="ABSENCE_API_PORT" ;;
+        service-e-api)   env_key="STATISTICS_API_PORT" ;;
+        service-b-api)          env_key="ServiceB_API_PORT" ;;
+        service-d-api)    env_key="MESSENGER_API_PORT" ;;
+        service-a-advisory) env_key="ABSENCE_ADVISORY_API_PORT" ;;
+        service-c-service-api)  env_key="ServiceC_SERVICE_API_PORT" ;;
     esac
     grep "^${env_key}=" "$WORKTREE_DIR/.env" 2>/dev/null | cut -d= -f2
 }
 
 # Map service name → VITE env var name in .env.local
+# service-c-service-api has no Vite proxy entry (mTLS-only internal service, not browser-facing) —
+# switch_vite_proxy/switch_env_local_port already no-op safely when a proxy line is absent.
 vite_env_var() {
     case "$1" in
-        service-c-api)        echo "VITE_ServiceC_API_PORT" ;;
-        service-a-api)    echo "VITE_ABSENCE_API_PORT" ;;
-        service-e-api) echo "VITE_STATISTICS_API_PORT" ;;
-        service-b-api)        echo "VITE_ServiceB_API_PORT" ;;
-        service-d-api)  echo "VITE_MESSENGER_API_PORT" ;;
+        service-c-api)          echo "VITE_ServiceC_API_PORT" ;;
+        service-a-api)      echo "VITE_ABSENCE_API_PORT" ;;
+        service-e-api)   echo "VITE_STATISTICS_API_PORT" ;;
+        service-b-api)          echo "VITE_ServiceB_API_PORT" ;;
+        service-d-api)    echo "VITE_MESSENGER_API_PORT" ;;
+        service-a-advisory) echo "VITE_ABSENCE_ADVISORY_API_PORT" ;;
     esac
 }
 
@@ -208,6 +216,88 @@ compose() {
         "$@"
 }
 
+# --- mTLS SAN preflight ------------------------------------------------------
+# The dev server cert (service-c-service-server.pfx) has a fixed SAN list: service-c-service-api (+ its
+# .repo/.svc/.svc.cluster.local variants), localhost, 127.0.0.1. A client whose
+# Services__IamServiceApi__BaseUrl host is a "-wt" name (e.g. service-c-service-api-wt) is NOT on
+# that list and will fail the mTLS handshake with "host name mismatch" — UNLESS its block also
+# sets Services__IamServiceApi__ServerName to a real SAN. Catch this BEFORE a slow docker build
+# instead of after a crash/mismatch. Runs only for the service being started; is a no-op if that
+# service's block has no Services__IamServiceApi__BaseUrl at all.
+preflight_service-c_service_san() {
+    local service="$1" compose_name block base_url host server_name expected pfx sans match entry
+
+    compose_name=$(to_compose_name "$service")
+    # Slice this service's block out of the template: from its "  <name>:" line up to (not
+    # including) the next top-level "  <key>:" line.
+    block=$(awk -v svc="  ${compose_name}:" '
+        $0 == svc { found=1; print; next }
+        found && /^  [A-Za-z0-9_.-]+:$/ { exit }
+        found { print }
+    ' "$COMPOSE_FILE")
+
+    # Grouped `(grep ... || true)` so a NON-match (the common case: most services have no
+    # BaseUrl/ServerName line at all) can't propagate a nonzero exit through the pipe under
+    # this script's `set -e -o pipefail` and silently kill the whole `up` command.
+    base_url=$( (echo "$block" | grep -oE 'Services__IamServiceApi__BaseUrl: *https://[^[:space:]]+' || true) | head -1 | sed 's#.*https://##')
+    [ -n "$base_url" ] || return 0   # this service doesn't call service-c-service-api — nothing to check
+    host="${base_url%%:*}"
+
+    server_name=$( (echo "$block" | grep -oE 'Services__IamServiceApi__ServerName: *[^[:space:]]+' || true) | head -1 | sed 's/.*: *//')
+    expected="${server_name:-$host}"
+
+    if ! command -v openssl &>/dev/null; then
+        echo "⚠️  openssl not found on PATH — skipping mTLS SAN preflight for $service (will find out at container boot instead)." >&2
+        return 0
+    fi
+    pfx="$WORKTREE_DIR/services/ServiceC/ServiceC.Service.API/certs/dev/service-c-service-server.pfx"
+    if [ ! -f "$pfx" ]; then
+        echo "⚠️  Dev server cert not found at $pfx — skipping mTLS SAN preflight for $service." >&2
+        return 0
+    fi
+
+    # Note: the system's default /usr/bin/openssl on macOS is LibreSSL, which lacks `-ext`
+    # (OpenSSL-only). `-text | grep` works on both LibreSSL and real OpenSSL, so use that.
+    # `|| true` guards the same set -e/pipefail trap as above in case the cert is unreadable.
+    sans=$( (openssl pkcs12 -in "$pfx" -passin pass: -nokeys 2>/dev/null \
+        | openssl x509 -noout -text 2>/dev/null \
+        | grep -A1 "Subject Alternative Name" || true) | tail -1)
+    if [ -z "$sans" ]; then
+        echo "⚠️  Could not read SANs from $pfx — skipping mTLS SAN preflight for $service." >&2
+        return 0
+    fi
+
+    match=""
+    IFS=',' read -ra entries <<< "$sans"
+    for entry in "${entries[@]}"; do
+        entry=$(echo "$entry" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^DNS://' -e 's/^IP Address://' \
+            | tr '[:upper:]' '[:lower:]')
+        if [ "$entry" = "$(echo "$expected" | tr '[:upper:]' '[:lower:]')" ]; then
+            match="yes"
+            break
+        fi
+    done
+
+    if [ -z "$match" ]; then
+        echo "" >&2
+        echo "❌ mTLS SAN preflight failed for $service — refusing to build." >&2
+        echo "   Services__IamServiceApi__BaseUrl points at host '$host'." >&2
+        if [ -n "$server_name" ]; then
+            echo "   Services__IamServiceApi__ServerName is set to '$server_name', which is NOT a SAN on the dev server cert." >&2
+        else
+            echo "   No Services__IamServiceApi__ServerName override is set, so '$host' itself must be a SAN on the dev cert — it isn't." >&2
+        fi
+        echo "   SANs found on service-c-service-server.pfx: $sans" >&2
+        echo "" >&2
+        echo "   Fix one of:" >&2
+        echo "     1. Add Services__IamServiceApi__ServerName: <a real SAN, e.g. service-c-service-api> to ${compose_name}'s block in" >&2
+        echo "        docker-compose.worktree.yml." >&2
+        echo "     2. Regenerate service-c-service-server.pfx (services/ServiceC/ServiceC.Service.API/certs/dev/) with '$host' added to its SAN list." >&2
+        echo "" >&2
+        exit 1
+    fi
+}
+
 # --- ServiceC routing helpers (see the long comment in `up`) ---------------------
 # Is THIS worktree's ServiceC container running? Scoped via `compose` so another
 # worktree's service-c-api-wt can never satisfy the check.
@@ -241,6 +331,7 @@ case "${1:-help}" in
         fi
         check_main_network
         COMPOSE_NAME=$(to_compose_name "$SERVICE")
+        preflight_service-c_service_san "$SERVICE"
 
         # Route authorization calls to the worktree's own ServiceC whenever one is running,
         # or is being started right now.
@@ -280,6 +371,13 @@ case "${1:-help}" in
             fi
             # Fallback signal in case a service exposes health on a non-standard path.
             if compose logs "$COMPOSE_NAME" 2>/dev/null | grep -q "Now listening on"; then
+                UP_OK="yes"; break
+            fi
+            # service-c-service-api is mTLS-only (terminates HTTPS itself via AddIamServiceMtls(),
+            # never emits "Now listening on"), so neither check above can ever succeed for it.
+            # Use the same baked-in probe its own Docker healthcheck/k8s liveness uses.
+            if [ "$SERVICE" = "service-c-service-api" ] && \
+               compose exec -T "$COMPOSE_NAME" /usr/local/bin/healthcheck.sh &>/dev/null; then
                 UP_OK="yes"; break
             fi
             STATE=$(compose ps --format '{{.State}}' "$COMPOSE_NAME" 2>/dev/null | head -1)

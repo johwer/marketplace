@@ -80,6 +80,10 @@ services:
       # ServiceB hard-fails at startup without these (Program.cs: "Missing 'Services:IamServiceApi'
       # configuration section"). It talks to the MAIN stack's service-c-service-api over mTLS, so the
       # dev client cert must be mounted too — see volumes below. Mirrors docker-compose.yml.
+      # BaseUrl host "service-c-service-api" is a real SAN on the dev server cert, so no ServerName
+      # override is needed here — that's only for a client pointed at a "-wt" service-c-service-api
+      # host, which no worktree service currently does. See worktree-service.sh's
+      # preflight_service-c_service_san() / parallel-worktrees.md for what that rule covers.
       Services__IamServiceApi__BaseUrl: https://service-c-service-api:5009
       Services__IamServiceApi__ClientCertificatePath: /app/secrets/service-b-client.pfx
       Services__IamServiceApi__ClientCertificatePassword: ""
@@ -192,6 +196,60 @@ services:
       RateLimiting__Policies__refreshToken__WindowSeconds: 60
       RateLimiting__Policies__serviceAuth__PermitLimit: 30
       RateLimiting__Policies__serviceAuth__WindowSeconds: 60
+    networks:
+      - main-network
+
+  service-c-service-api-wt:
+    build:
+      context: ${WORKTREE_BUILD_CONTEXT:-.}
+      dockerfile: services/ServiceC/ServiceC.Service.API/Dockerfile
+    ports:
+      - "${ServiceC_SERVICE_API_PORT:-6009}:5009"
+    environment:
+      <<: [*common-api-environment, *jwt-client-config]
+      # No ASPNETCORE_URLS: this service terminates mTLS itself (AddIamServiceMtls() binds
+      # Kestrel to Mtls__Port). Mirrors docker-compose.yml's service-c-service-api exactly.
+      ConnectionStrings__DefaultConnection: Host=postgres;Database=repo_service-c;Username=postgres;Password=postgres
+      OpenTelemetry__ServiceName: ServiceC-Service-API-Worktree
+      Mtls__Port: "5009"
+      Mtls__ServerCertificatePath: /app/secrets/service-c-service-server.pfx
+      Mtls__ServerCertificatePassword: ""
+      Mtls__CaCertificatePath: /app/secrets/ca-cert.pem
+      Mtls__ClientPins__HcmMtlsClient: service-b
+      Mtls__ClientPins__AdvisoryMtlsClient: service-a-advisory
+      LegacyIam__Enabled: "false"
+      LegacyIam__ApiUrl: ""
+      MTLS_HEALTHCHECK_CLIENT_CERTIFICATE_PASSWORD: ""
+    volumes:
+      - ${WORKTREE_BUILD_CONTEXT:-.}/services/ServiceC/ServiceC.Service.API/certs/dev:/app/secrets:ro
+    networks:
+      - main-network
+
+  service-a-advisory-wt:
+    build:
+      context: ${WORKTREE_BUILD_CONTEXT:-.}
+      dockerfile: services/ServiceA/ServiceA.Advisory.API/Dockerfile
+    ports:
+      - "${ABSENCE_ADVISORY_API_PORT:-6010}:5010"
+    environment:
+      <<: [*common-api-environment, *jwt-client-config]
+      ASPNETCORE_URLS: http://+:5010
+      ConnectionStrings__DefaultConnection: Host=postgres;Database=repo_service-a;Username=postgres;Password=postgres
+      OpenTelemetry__ServiceName: ServiceA-Advisory-API-Worktree
+      Services__IamServiceApi__Enabled: "true"
+      # Talks to the MAIN stack's service-c-service-api over mTLS (pre-existing IamLegacyTokenClient
+      # usage, unrelated to any single ticket). "service-c-service-api" is a real SAN on the dev server
+      # cert, so no ServerName override is needed — mirrors service-b-api-wt above. NOVA-3184 briefly
+      # wired this at a worktree service-c-service-api-wt (with a ServerName override) to reach an
+      # internal search endpoint on that branch; that endpoint and the internal mTLS hop were
+      # deleted in the same ticket (product decision: the client calls Nova and legacy directly
+      # and maps the results, no service-to-service hop), so this reverts to the original wiring.
+      Services__IamServiceApi__BaseUrl: https://service-c-service-api:5009
+      Services__IamServiceApi__ClientCertificatePath: /app/secrets/service-a-advisory-client.pfx
+      Services__IamServiceApi__ClientCertificatePassword: ""
+      Services__IamServiceApi__CaCertificatePath: /app/secrets/ca-cert.pem
+    volumes:
+      - ${WORKTREE_BUILD_CONTEXT:-.}/services/ServiceC/ServiceC.Service.API/certs/dev:/app/secrets:ro
     networks:
       - main-network
 

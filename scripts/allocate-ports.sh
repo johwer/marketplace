@@ -11,7 +11,9 @@
 # Port scheme:
 #   Vite:    31xx  (e.g., PROJ-1657 -> 3174)
 #   Cosmos:  UI 39xx + renderer 38xx (e.g. slot 74 -> 3974 / 3874)
-#   APIs:    base = 10000 + (slot * 100), then +1 through +8 per service
+#   APIs:    base = 10000 + (slot * 100), then +1 through +9 per service
+#            (+1 service-c, +2 service-a, +3 service-e, +4 service-a-advisory, +5 service-b,
+#             +6 service-d, +7 service-a-sync, +8 service-c-sync, +9 service-c-service-api)
 #
 # Non-worktree users are NOT affected — all configs fall back to
 # hardcoded defaults (500x) when no env vars are set.
@@ -96,6 +98,8 @@ ServiceB_PORT=$((API_BASE + 5))
 MESSENGER_PORT=$((API_BASE + 6))
 ABSENCE_SYNC_PORT=$((API_BASE + 7))
 ServiceC_SYNC_PORT=$((API_BASE + 8))
+ABSENCE_ADVISORY_PORT=$((API_BASE + 4))
+ServiceC_SERVICE_API_PORT=$((API_BASE + 9))
 
 PROJECT_NAME="repo-$(echo "$TICKET_ID" | tr '[:upper:]' '[:lower:]')"
 
@@ -118,6 +122,8 @@ ABSENCE_SYNC_API_PORT=$ABSENCE_SYNC_PORT
 STATISTICS_API_PORT=$STATISTICS_PORT
 ServiceB_API_PORT=$ServiceB_PORT
 MESSENGER_API_PORT=$MESSENGER_PORT
+ABSENCE_ADVISORY_API_PORT=$ABSENCE_ADVISORY_PORT
+ServiceC_SERVICE_API_PORT=$ServiceC_SERVICE_API_PORT
 EOF
 
 # --- Write apps/web/.env.local ---
@@ -157,6 +163,7 @@ VITE_ABSENCE_API_PORT=5002
 VITE_STATISTICS_API_PORT=5003
 VITE_ServiceB_API_PORT=5005
 VITE_MESSENGER_API_PORT=5006
+VITE_ABSENCE_ADVISORY_API_PORT=5010
 # --- WORKTREE PORTS END ---
 EOF
 

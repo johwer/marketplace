@@ -21,30 +21,37 @@ Key conventions:
 - Lint: `npx eslint --no-error-on-unmatched-pattern <files>`
 
 Visual verification (MANDATORY for UI changes):
-- **Chrome Browser Queue**: Only one workspace can use Chrome at a time. Coordinate access:
+- **Use `playwright-cli`.** Not AppleScript, not `screencapture`, not the Puppeteer MCP tools, and
+  not the Chrome browser queue — each agent gets its own named session, so no coordination is
+  needed and several worktrees can verify in parallel. See `~/.claude/skills/playwright-cli/SKILL.md`.
+- **Start Vite on the worktree config**, never `npm start` (that hardcodes port 3000 and collides
+  with other worktrees): `cd apps/web && npx vite --config vite.config.worktree.mts --host`.
+  Check for an existing server first (`lsof -i -P | grep node | grep LISTEN`) and reuse it.
+- **Drive the live app**, don't just render a component:
   ```bash
-  bash ~/.claude/scripts/chrome-queue.sh join <TICKET_ID> <your-name>   # Join queue
-  bash ~/.claude/scripts/chrome-queue.sh my-turn <TICKET_ID>            # Check turn (exit 0=yes)
-  bash ~/.claude/scripts/chrome-queue.sh done <TICKET_ID>               # Release when done
+  playwright-cli -s=<your-name> open http://localhost:<PORT>/<path> --headed
+  playwright-cli -s=<your-name> snapshot          # element refs for interaction
+  playwright-cli -s=<your-name> click <ref>
+  playwright-cli -s=<your-name> console error     # JS/React errors headless testing misses
+  playwright-cli -s=<your-name> close
   ```
-  If not your turn, skip visual verification and note it in your completion message.
-- **Screenshot workflow** (AppleScript — no `--chrome` flag needed):
-  1. Start Vite on your worktree port: `cd apps/web && npm start` (uses VITE_DEV_PORT from .env.local)
-  2. Navigate Chrome via AppleScript:
-     ```bash
-     osascript -e 'tell application "Google Chrome" to set URL of active tab of first window to "https://localhost:<PORT>/..."'
-     ```
-  3. Wait for page load, then screenshot:
-     ```bash
-     sleep 3 && screencapture -x /tmp/<TICKET_ID>-screenshot.png
-     ```
-  4. Read the screenshot with the Read tool to verify visually
-  5. For interactions (click, scroll), use AppleScript + JavaScript:
-     ```bash
-     osascript -e 'tell application "Google Chrome" to execute javascript "document.querySelector(\"button\").click()" in active tab of first window'
-     ```
-  6. Release Chrome: `bash ~/.claude/scripts/chrome-queue.sh done <TICKET_ID>`
-- **If screencapture fails** (Screen Recording permission not granted): tell the team lead that visual verification needs `--chrome`. The team lead can restart this session with `claude --dangerously-skip-permissions --chrome` to enable the Chrome plugin for screenshots.
+  Use `localhost`, not `127.0.0.1` (CORS/IPv6).
+- **Save screenshots to `~/Downloads/<TICKET_ID>/`** — one per relevant state, scrolled to the
+  changed element:
+  ```bash
+  mkdir -p ~/Downloads/<TICKET_ID>
+  playwright-cli -s=<your-name> screenshot --filename=~/Downloads/<TICKET_ID>/<state>.png
+  ```
+  **Never `/tmp`, and never commit a screenshot to the repo** — no `__screenshots__` captures and
+  no `toHaveScreenshot` baselines unless the user explicitly asked for a regression test. The
+  screenshots are evidence for the PR description, which the user drag-drops in.
+- **Screenshot in the market locale** (sv for Sweden). Switch via the Navbar globe dropdown, not
+  by setting `mh_lang` in localStorage — AuthContext overwrites it.
+- **Verify against real seed accounts**, and check whether the account you picked is a global
+  admin. A global admin passes every permission check unconditionally and therefore proves nothing
+  about a grant.
+- **New component → add a Cosmos fixture** (`*.fixture.tsx`) for its states rather than an e2e
+  spec, plus a unit test if it has interactive or conditional logic.
 - Compare with design mockups or Jira attachments if available (download with `bash ~/.claude/scripts/jira-download-attachments.sh <TICKET_ID>`)
 
 Context management:
