@@ -2,7 +2,8 @@
 # docker-health-check.sh — Quick health snapshot of the Repo docker stack.
 #
 # Flags any repo-* container that is:
-#   - not running (or exited within the last hour)
+#   - not running (or exited within the last hour; a *-init/-setup/-migrate
+#     one-shot that exited 0 with no restarts is treated as completed, not an issue)
 #   - reporting docker healthcheck status = unhealthy
 #   - over CPU_THRESHOLD% CPU in a single snapshot
 #   - has restarted >= RESTART_THRESHOLD times
@@ -78,11 +79,21 @@ while IFS= read -r c; do
   fi
 
   if [ "$status" = "exited" ]; then
-    finished=$(docker inspect "$c" --format '{{.State.FinishedAt}}' 2>/dev/null || echo "")
-    if [ -n "$finished" ] && [ "$finished" != "0001-01-01T00:00:00Z" ]; then
-      finished_epoch=$(date -u -j -f "%Y-%m-%dT%H:%M:%S" "${finished%.*}" "+%s" 2>/dev/null || echo 0)
-      if [ "$finished_epoch" -gt 0 ] && [ $((now_epoch - finished_epoch)) -lt 3600 ]; then
-        printf '%s|status|exited\n' "$c" >> "$issues_file"
+    exit_code=$(docker inspect "$c" --format '{{.State.ExitCode}}' 2>/dev/null || echo "")
+    case "$exit_code" in ''|*[!0-9]*) exit_code=0 ;; esac
+    # A one-shot that completed is not an incident. repo-localstack-init seeds the
+    # S3 buckets and SQS queues and exits 0 on every `compose up`, which flagged four
+    # times in a week before this. A NON-zero exit is still reported, with its code.
+    case "$c" in *-init|*-init-*|*-setup|*-migrate) is_oneshot=1 ;; *) is_oneshot=0 ;; esac
+    if [ "$is_oneshot" = "1" ] && [ "$exit_code" -eq 0 ] && [ "$restarts" -eq 0 ]; then
+      : # finished its work as designed
+    else
+      finished=$(docker inspect "$c" --format '{{.State.FinishedAt}}' 2>/dev/null || echo "")
+      if [ -n "$finished" ] && [ "$finished" != "0001-01-01T00:00:00Z" ]; then
+        finished_epoch=$(date -u -j -f "%Y-%m-%dT%H:%M:%S" "${finished%.*}" "+%s" 2>/dev/null || echo 0)
+        if [ "$finished_epoch" -gt 0 ] && [ $((now_epoch - finished_epoch)) -lt 3600 ]; then
+          printf '%s|status|exited (code %s)\n' "$c" "$exit_code" >> "$issues_file"
+        fi
       fi
     fi
   elif [ "$status" != "running" ]; then

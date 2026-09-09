@@ -207,6 +207,43 @@ Checklist for every new api service:
 - [ ] Run `bash ~/.claude/scripts/worktree-service.sh up <svc>` — the post-up smoke check
       will fail loudly if the app didn't start listening.
 
+### `service-a-advisory` and `service-c-service-api`
+Added for NOVA-3184, originally so ServiceA.Advisory could be verified over real HTTP against a
+worktree ServiceC.Service.API rather than the main stack's (that ticket added an internal search
+endpoint on `service-c-service-api`). Kept as startable worktree services on their own merits after that
+ticket's product direction changed (see below) — they're useful independently of any one ticket.
+- **`service-c-service-api-wt` has no `ASPNETCORE_URLS`** — it terminates mTLS itself
+  (`AddIamServiceMtls()` binds Kestrel straight to `Mtls__Port`, 5009). It also has **no Vite
+  proxy entry** — it's an internal service-to-service API over mTLS, never called from the
+  browser, so `vite_env_var()` in `worktree-service.sh` intentionally has no case for it.
+- **`service-a-advisory-wt` is wired to the MAIN stack's `service-c-service-api`**
+  (`Services__IamServiceApi__BaseUrl: https://service-c-service-api:5009`), same as `service-b-api-wt` and
+  every other cross-service client — this is the pre-existing `IamLegacyTokenClient` mTLS usage,
+  unrelated to any single ticket. NOVA-3184 briefly rewired this to the worktree
+  `service-c-service-api-wt` (with a `Services__IamServiceApi__ServerName` override — see below) to
+  reach its new internal endpoint; that endpoint and the whole internal mTLS hop were later
+  deleted on the same ticket (product decision: the browser-facing client calls Nova and legacy
+  separately and maps the results itself, no service-to-service hop), so the wiring reverted to
+  the original main-stack pairing. If a future ticket needs a worktree service to call a
+  `-wt` sibling's `service-c-service-api` again, the `ServerName` mechanism below still works — just
+  re-add the override.
+- Ports: `ABSENCE_ADVISORY_API_PORT` = `API_BASE+4`, `ServiceC_SERVICE_API_PORT` = `API_BASE+9` (see
+  `allocate-ports.sh`'s port-scheme comment — both slots were previously unused).
+
+#### mTLS hostname mismatch: `ServerName` and the preflight check
+The dev server cert (`service-c-service-server.pfx`) has a **fixed** SAN list — `service-c-service-api` (+
+`.repo`/`.svc`/`.svc.cluster.local` variants), `localhost`, `127.0.0.1` — baked in at commit
+time. A `-wt` hostname like `service-c-service-api-wt` is never on it, so any client's
+`Services__IamServiceApi__BaseUrl` pointing at a `-wt` host fails the mTLS handshake with "host
+name mismatch" unless that same block also sets `Services__IamServiceApi__ServerName` to a real
+SAN. No worktree service currently does this (see above — the one that did was reverted), so this
+mechanism is currently dormant but still enforced: `worktree-service.sh`'s `up <svc>` runs a
+preflight (`preflight_service-c_service_san`) that extracts the pfx's SANs via `openssl` and refuses
+with a clear error — naming the host, the SANs found, and the two fixes (set `ServerName`, or
+regenerate the cert) — *before* the docker build, if the expected name (`ServerName` if set, else
+the `BaseUrl` host) isn't one of them. The template is static (the script never rewrites this env
+var), so the pairing is enforced by the preflight, not by a rewrite step.
+
 ## Lifecycle Commands
 
 ### Create

@@ -21,7 +21,22 @@ Key conventions:
 - **Minimal auth mapping for 500 fixes**: When fixing a 500 in an auth check, find the minimal mapping needed (read-only first) rather than mirroring full CRUD.
 - Format with CSharpier: `dotnet csharpier .` before committing
 - Build check: `dotnet build services/<ServiceName>/<ServiceName>.sln`
-- **SDK-pin gotcha (worktrees)**: `global.json` may pin a newer SDK than is installed locally → `dotnet build/test/csharpier` fail with "no compatible .NET SDK". This silently hides regressions until CI. **Verify backend changes via the matching SDK Docker image BEFORE pushing**: `docker run --rm -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:10.0 bash -c "dotnet tool restore; dotnet csharpier check .; dotnet build services/<Svc>/<Svc>.sln -c Release /warnaserror; dotnet test services/<Svc>/<Svc>.API.Test/<...>.csproj -c Release"`. (Integration tests need testcontainers → rely on CI; don't claim they passed locally.) CI builds with `/warnaserror` (catches CS1573 missing XML-doc `<param>` tags when you add a parameter).
+- **Verify locally before pushing, and say what you actually ran.** Build and test with the repo's
+  own toolchain first: `dotnet build services/<Svc>/<Svc>.sln -c Release /warnaserror`, the unit
+  tests, and `dotnet csharpier check .` (repo-pinned version, including generated migrations).
+  CI builds with `/warnaserror`, which catches CS1573 missing XML-doc `<param>` tags when you add
+  a parameter.
+- **Run the integration suite locally too** — `dotnet test services/<Svc>/<Svc>.IntegrationTests --filter <YourTests>`.
+  Testcontainers work on dev machines; these suites typically finish in seconds. Only fall back to
+  CI if the run genuinely fails to start, and then say which suite and why. Do not pre-emptively
+  defer the tests most worth running — a hedge in your completion message is worth much less than
+  a result, and the integration tests are usually the only thing exercising the SQL-level behaviour
+  your unit tests mock away.
+- **SDK-pin gotcha (worktrees)**: `global.json` may pin a newer SDK than is installed locally →
+  `dotnet build/test/csharpier` fail with "no compatible .NET SDK". **Check first**:
+  `dotnet --version` against the pin in `global.json`. Usually the local SDK satisfies it and you
+  need nothing. Only if it genuinely does not, run via the matching image:
+  `docker run --rm -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:10.0 bash -c "dotnet tool restore; dotnet csharpier check .; dotnet build services/<Svc>/<Svc>.sln -c Release /warnaserror"`.
 - **Grep ALL consumer tests on a ctor/signature change** — including the **unit-test project** (e.g. `*.API.Test`), not just integration tests. Adding a constructor parameter (e.g. a new injected service to an event handler) breaks every test that constructs the type; missing one = red CI.
 - **Reflection-driven completeness tests**: some suites enumerate a hardcoded list of types/enums (e.g. ServiceA `ExcelTranslationsTests` checks every `ExportType` is in `service-aRelatedExportTypes` and every Excel DTO in `dtoTypes`, with sheet/column keys resolvable per language). Adding a new export type/DTO means **registering it in those test lists too** (English fallback covers non-localized languages for a single-market feature).
 

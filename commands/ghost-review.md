@@ -86,6 +86,59 @@ Recurring concrete cases he has flagged in `TTPermissionsMappings.cs` / `Actions
 - Creating/editing roles gated behind user-level permissions — role management is company-scoped.
 If a PR touches permission mappings, scrutinize whether each granted action matches the scope (user vs company) of what it actually authorizes.
 
+**[GATE-NOT-EXCLUSIVE] A new permission that gates nothing only it grants**
+When a PR adds a Permission and then gates an endpoint on an *action*, check how many
+permissions grant that action: `grep -n "UserAction.<Action>" services/ServiceC/ServiceC.Domain/Permissions/DefaultPermissionsMappings.cs`.
+If several everyday permissions grant it, the new permission is decoration — anyone holding
+`ViewServiceA`, `ViewCase` or `ManageUserProfile` passes the same gate.
+
+Flag it, and name the fix: a purpose-made action granted only by the new permission. An Action is
+a cheap change (mapping files only, no assignability map, no seed, derived at runtime), so "it
+would be more work" is not a defence.
+
+Then check the other half, because narrowing the gate usually breaks it: does the new permission
+still satisfy the *per-target* check further down? If it grants only the new action, the caller
+passes the gate and has every result dropped — they can search and see nothing. That empty result
+is indistinguishable from "no such record", so it fails silently. The permission must grant both.
+
+Concrete: NOVA-3184 gated on `UserRead` (≈8 grantors), narrowed to `UserSearchBySsn` granted only
+by `CustomerPermission.MedicalAdvisor`, then had to add `UserRead` to that permission too.
+
+**[REUSE-FIRST] A new action or class where an existing one fits**
+He asks "could this reuse X?" before accepting anything new. Before adding an Action, enum member,
+helper or class, search for an existing one and either use it or state in the PR why it does not
+fit. A defensible answer names the mismatch: e.g. the 87 `UserAction` members are all "read this
+attribute of a person you already identified", whereas a lookup by an external key is "find a
+person you cannot yet name" — a different capability, so none fit.
+
+Also check the inverse: a class with ONE caller where that caller is a pure pass-through should be
+inlined. And logic that duplicates an existing service's helper should say so and pick a direction.
+
+**[JUSTIFICATION-VS-MECHANISM] A comment or commit message that the code does not support**
+His sharpest reviews read the collaborator, not the comment. For any defensive mechanism —
+a probe, a retry, a swallow, a sentinel — open the thing it calls and confirm the failure it
+defends against can actually occur:
+- Does the adapter already catch and return false, so the exception you handle never escapes?
+- Does the call return early on the sentinel you pass, so the cost you are equalising differs anyway?
+If the justification is false, the mechanism goes — do not rewrite the comment to fit.
+
+Concrete: NOVA-3184 carried a `Guid.Empty` probe justified first on a status-code asymmetry that
+could not occur (the HTTP adapter catches and returns false) and then on latency (the check returns
+after one lookup miss for `Guid.Empty` but continues for a real hit). Both false; it was defended
+twice before being deleted.
+
+**[VACUOUS-TEST] A test whose inputs cannot exercise what it claims**
+For any test named after a guard, check the inputs could actually trigger it. He caught a
+century-collision test using two different birth dates, which can never collide either way.
+
+Read the assertion against the property: if the inputs cannot produce the failure, the test is
+green for the wrong reason. Either construct the real case or delete the test and its claim.
+
+**[REDUNDANT-RESPONSE-FIELD] A field constant across every row**
+A response field set from the request is the caller's own input echoed back. Flag it. Do not accept
+"take it from the row instead" without checking what the row holds — if storage is unnormalised,
+the stored value leaks which internal format matched.
+
 **[MULTI-TENANCY] Missing cross-tenant validation**
 Look for:
 - Service/handler methods that accept `companyId` from request body/params without validating it belongs to the `customerId` from the JWT
