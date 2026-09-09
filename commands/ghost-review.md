@@ -104,6 +104,38 @@ is indistinguishable from "no such record", so it fails silently. The permission
 Concrete: NOVA-3184 gated on `UserRead` (≈8 grantors), narrowed to `UserSearchBySsn` granted only
 by `CustomerPermission.MedicalAdvisor`, then had to add `UserRead` to that permission too.
 
+**[SILENT-SUPERUSER-INHERIT] A new action silently inherited by CustomerSupport**
+`CustomerPermission.CustomerSupport` is mapped in a blanket loop over
+`Enum.GetValues<UserAction>()` minus a two-member exclusion list
+(`DefaultPermissionsMappings.cs`, near the CustomerSupport block). So **every new `UserAction`
+is granted to customer support the moment it enters the enum** — no mapping line, no decision,
+no review.
+
+Two things follow, and both are worth flagging on any PR adding a `UserAction`:
+
+Never write "granted only by X" about a new action without checking that loop. It is true of the
+lines the PR adds and false in practice. The honest claim is "exclusive against everyday view
+permissions", which is usually the point being made anyway.
+
+Ask whether support *should* reach the new capability. Usually yes, and usually harmless because
+support already holds broader tools. But the inheritance is a silence rather than a decision, so
+for anything support should not reach, the exclusion list is where that gets said — and nobody
+will notice it was not.
+
+Concrete: NOVA-3184 added `UserSearchBySsn` for a nurse-only search and customer support acquired
+it automatically. Correct outcome, wrong description, and the PR claimed exclusivity it did not have.
+
+**[SPECULATIVE-GENERALITY] A name or abstraction built for a second consumer that does not exist**
+The mirror of REUSE-FIRST, and he will push back on it just as hard. Before widening a name or
+extracting an abstraction "so the sibling ticket can use it too", confirm the sibling still needs
+it: check its branch, not the plan. A reuse argument built on a design that has since been
+reverted is worse than no argument, because it bakes a guess into a name.
+
+Concrete: NOVA-3184 modelled a two-key lookup contract, complete with an unimplemented branch
+answering 501, for a sibling ticket that then shipped its lookup on a different service entirely
+and later reverted it. The seam was removed as unused surface. Specific names age better than
+hopefully-general ones — generalise when the second consumer arrives, with the consumer in hand.
+
 **[REUSE-FIRST] A new action or class where an existing one fits**
 He asks "could this reuse X?" before accepting anything new. Before adding an Action, enum member,
 helper or class, search for an existing one and either use it or state in the PR why it does not
