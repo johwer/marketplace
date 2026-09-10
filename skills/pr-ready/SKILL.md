@@ -46,8 +46,8 @@ ticket if there is one.>
 
 ## Scope
 
-Not covered: <one line>. Follow-up: NOVA-XXXX.
-Test guide: NOVA-XXXX Jira comment.
+Not covered: <one line>. Follow-up: PROJ-XXXX.
+Test guide: PROJ-XXXX Jira comment.
 ```
 
 Image captions do not count toward the budget. Neither does anything inside `<details>`.

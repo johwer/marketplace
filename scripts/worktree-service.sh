@@ -344,7 +344,7 @@ case "${1:-help}" in
         # which predates the branch and does not know newly added enum members. It
         # rejects them as invalid, the caller surfaces a plain 403, and the failure
         # looks like a permissions bug in your own code. Cost a full investigation
-        # on NOVA-3440 before the routing was identified as the cause.
+        # on PROJ-3440 before the routing was identified as the cause.
         if [ "$SERVICE" = "service-c-api" ] || worktree_service-c_running; then
             set_service-c_service_host "service-c-api-wt"
         else
@@ -356,9 +356,9 @@ case "${1:-help}" in
 
         # Post-up smoke check. A container reports "Up" even when the .NET app crashed on
         # boot (e.g. missing S3 env → AddRepoS3() throws → host crash-loops at 100% CPU,
-        # see NOVA-3183). Poll the /health endpoint (robust across ASP.NET log-format
+        # see PROJ-3183). Poll the /health endpoint (robust across ASP.NET log-format
         # differences — the old "Now listening on" grep false-negatived on service-a-api and
-        # the script bailed BEFORE switching the Vite proxy, NOVA-2590). Cold .NET boots can
+        # the script bailed BEFORE switching the Vite proxy, PROJ-2590). Cold .NET boots can
         # exceed 15s, so allow ~45s. Fail loudly with logs instead of reporting success on a dead app.
         echo "Waiting for $SERVICE to become healthy..."
         WT_PORT=$(worktree_port "$SERVICE")

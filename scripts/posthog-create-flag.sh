@@ -8,16 +8,16 @@
 # PATCHes it to the standard config instead of failing.
 #
 # Usage (preferred — let it derive the standard key shape <ticket>-<slug>):
-#   posthog-create-flag.sh --ticket NOVA-2831 --key "Legacy user redirect"
-#       -> key: nova-2831-legacy-user-redirect
-#   posthog-create-flag.sh --ticket NOVA-2831 --description "NOVA-2831: Legacy user redirect"
-#       -> key: nova-2831-legacy-user-redirect  (slug derived from description)
+#   posthog-create-flag.sh --ticket PROJ-2831 --key "Legacy user redirect"
+#       -> key: proj-2831-legacy-user-redirect
+#   posthog-create-flag.sh --ticket PROJ-2831 --description "PROJ-2831: Legacy user redirect"
+#       -> key: proj-2831-legacy-user-redirect  (slug derived from description)
 #
 # Or pass an explicit --key:
-#   posthog-create-flag.sh --key nova-2526-service-a-log-notifications --description "..."
+#   posthog-create-flag.sh --key proj-2526-service-a-log-notifications --description "..."
 #
 # Key/description:
-#   --ticket        Ticket id (e.g. NOVA-2831). Used to build/prefix the key as
+#   --ticket        Ticket id (e.g. PROJ-2831). Used to build/prefix the key as
 #                   <ticket-lowercased>-<kebab-slug>, guaranteeing the ticket number is in the key.
 #   --key           Either the full kebab-case key, OR (with --ticket) the slug portion.
 #   --description   Human description. Convention: start with the ticket id.
@@ -25,7 +25,7 @@
 #
 # Options:
 #   --hosts h1,h2   Comma-separated $host values to enable for.
-#                   Default: polaris-accept.repo.se,leo-stg.terveystalo.com
+#                   Default: polaris-accept.repo.se,leo-stg.retailer-b.com
 #   --rollout N     Rollout percentage for the matched group (default 100)
 #   --project ID    PostHog project id (default 42565)
 #   --api-host URL  PostHog API host (default https://eu.posthog.com)
@@ -43,7 +43,7 @@
 #
 set -euo pipefail
 
-KEY="" ; DESC="" ; TICKET="" ; HOSTS="polaris-accept.repo.se,leo-stg.terveystalo.com"
+KEY="" ; DESC="" ; TICKET="" ; HOSTS="polaris-accept.repo.se,leo-stg.retailer-b.com"
 ROLLOUT=100 ; ACTIVE=true ; DRY_RUN=false
 
 # Project id / API host default from dtf-config.json (posthog section), else built-in.
@@ -70,14 +70,14 @@ while [ $# -gt 0 ]; do
 done
 
 # --- Derive the flag key in the standard shape: <ticket-lowercased>-<kebab-slug> ---
-# e.g. --ticket NOVA-2831 --key "Legacy user redirect"  ->  nova-2831-legacy-user-redirect
-#      --ticket NOVA-2831 (no --key) -> slug derived from --description (ticket prefix stripped)
+# e.g. --ticket PROJ-2831 --key "Legacy user redirect"  ->  proj-2831-legacy-user-redirect
+#      --ticket PROJ-2831 (no --key) -> slug derived from --description (ticket prefix stripped)
 slugify() { python3 -c "import re,sys; s=re.sub(r'[^a-z0-9]+','-',sys.argv[1].lower()).strip('-'); print(re.sub(r'-+','-',s))" "$1"; }
 
 if [ -n "$TICKET" ]; then
-  TICKET_LC=$(printf '%s' "$TICKET" | tr '[:upper:]' '[:lower:]')        # NOVA-2831 -> nova-2831
+  TICKET_LC=$(printf '%s' "$TICKET" | tr '[:upper:]' '[:lower:]')        # PROJ-2831 -> proj-2831
   if [ -n "$KEY" ]; then SLUG_SRC="$KEY"
-  else SLUG_SRC=$(printf '%s' "$DESC" | sed -E 's/^[A-Za-z]+-?[0-9]+:?[[:space:]]*//'); fi  # strip leading "NOVA-2831:" from desc
+  else SLUG_SRC=$(printf '%s' "$DESC" | sed -E 's/^[A-Za-z]+-?[0-9]+:?[[:space:]]*//'); fi  # strip leading "PROJ-2831:" from desc
   SLUG=$(slugify "$SLUG_SRC")
   case "$SLUG" in
     "$TICKET_LC"-*) KEY="$SLUG" ;;        # already prefixed
@@ -91,7 +91,7 @@ fi
 [ -n "$DESC" ] || { echo "ERROR: --description is required (or pass --ticket to derive it)" >&2; exit 2; }
 
 # Guard the convention: a derived/standard key must carry a ticket number.
-echo "$KEY" | grep -Eq '[a-z]+-[0-9]+' || echo "WARNING: flag key '$KEY' has no ticket number — convention is <ticket>-<slug>, e.g. nova-2831-legacy-user-redirect" >&2
+echo "$KEY" | grep -Eq '[a-z]+-[0-9]+' || echo "WARNING: flag key '$KEY' has no ticket number — convention is <ticket>-<slug>, e.g. proj-2831-legacy-user-redirect" >&2
 
 # --- Resolve API key ---
 resolve_key() {

@@ -10,15 +10,15 @@
 # PostHog project doesn't accumulate dead flags.
 #
 # Usage:
-#   posthog-delete-flag.sh --key nova-2526-service-a-log-notifications
-#   posthog-delete-flag.sh --ticket NOVA-2831 --key "Legacy user redirect"   # derives nova-2831-legacy-user-redirect
+#   posthog-delete-flag.sh --key proj-2526-service-a-log-notifications
+#   posthog-delete-flag.sh --ticket PROJ-2831 --key "Legacy user redirect"   # derives proj-2831-legacy-user-redirect
 #   posthog-delete-flag.sh --id 196664                                       # delete by numeric id (skips search)
-#   posthog-delete-flag.sh --key nova-2526-... --restore                     # un-delete
-#   posthog-delete-flag.sh --key nova-2526-... --dry-run                     # show match, change nothing
+#   posthog-delete-flag.sh --key proj-2526-... --restore                     # un-delete
+#   posthog-delete-flag.sh --key proj-2526-... --dry-run                     # show match, change nothing
 #
 # Key/identity (one required):
 #   --key           Full kebab-case key, OR (with --ticket) the slug portion.
-#   --ticket        Ticket id (e.g. NOVA-2831). Builds/prefixes the key as
+#   --ticket        Ticket id (e.g. PROJ-2831). Builds/prefixes the key as
 #                   <ticket-lowercased>-<kebab-slug>, mirroring posthog-create-flag.sh.
 #   --id            Numeric PostHog flag id. Bypasses the key search entirely.
 #

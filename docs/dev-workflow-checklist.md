@@ -251,7 +251,7 @@ cd <worktree>/apps/web && npm run build
 
 `tsc --noEmit`, ESLint and Vitest are **not sufficient** and will all pass on a broken build. `tsc` resolves the *type* graph; the bundler resolves the *module* graph. They agree only while every runtime import has a matching, correctly-scoped package — declare `@types/x` without `x` itself and type-checking goes green on something that cannot bundle.
 
-NOVA-3438: removing one devDependency dropped a hoisted transitive `lodash` that app code had imported undeclared since March. Prettier, ESLint, tsc and Vitest all passed; the PR was reviewed with zero findings; only `npm run build` caught it.
+PROJ-3438: removing one devDependency dropped a hoisted transitive `lodash` that app code had imported undeclared since March. Prettier, ESLint, tsc and Vitest all passed; the PR was reviewed with zero findings; only `npm run build` caught it.
 
 **Do not substitute a static check.** Grepping `src` for imports of the removed package does not work — the broken import was two hops down the transitive chain from the package actually removed. Catching it statically means diffing the full `npm ls --all` tree before and after, which is more expensive and more error-prone than just running the build.
 

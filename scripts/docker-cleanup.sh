@@ -110,7 +110,7 @@ fi
 
 # --- dead-worktree NAMED volumes (repo-<ticket>_*) whose worktree is gone ---
 # A compose stack for a removed worktree leaves NAMED volumes (e.g.
-# repo-nova-2457_postgres_data). These hold dev/seed DB data, so we remove them
+# repo-proj-2457_postgres_data). These hold dev/seed DB data, so we remove them
 # ONLY when: the ticket has no git worktree AND the volume is dangling (no container).
 # The main stack (repo_*, no hyphen-ticket) never matches and is always safe.
 if [ "$ORPHAN_WT" = 1 ]; then
@@ -132,7 +132,7 @@ if [ "$ORPHAN_WT" = 1 ]; then
     owt_removed=0; owt_kept=0
     while IFS= read -r v; do
       [ -z "$v" ] && continue
-      # parse ticket from repo-<ticket>_...  where ticket looks like nova-1234 / proj-1234
+      # parse ticket from repo-<ticket>_...  where ticket looks like proj-1234 / proj-1234
       if [[ "$v" =~ ^repo-([a-z]+-[0-9]+)_ ]]; then
         tk="${BASH_REMATCH[1]}"
         if echo "$ACTIVE" | grep -q " $tk " ; then

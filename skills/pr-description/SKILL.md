@@ -21,7 +21,7 @@ The single most common failure. An activity is what you did; an outcome is what 
 
 | Activity (weak) | Outcome (useful) |
 |---|---|
-| Added a permission check to the Products tab | Terveystalo HR users no longer see the Products & Services tab. Their deviant-rules and health-case tabs are unaffected. |
+| Added a permission check to the Products tab | RetailerB HR users no longer see the Products & Services tab. Their deviant-rules and health-case tabs are unaffected. |
 | Removed three feature flags | Three menu entries that no user could ever reach are gone. No user-visible behaviour changes. |
 | Refactored the codegen setup | One command now regenerates a shared API client into both web and mobile. Previously each app had its own setup that had to be bumped in lockstep by hand. |
 | Fixed the date picker | The date picker no longer overlaps the submit button on mobile. |
@@ -209,13 +209,13 @@ A real one. The ticket asked for a new dedicated permission action; the PR shipp
 ```markdown
 ## Why
 
-A Terveystalo HR user at Scania could open Administration > Services and see the
+A RetailerB HR user at Scania could open Administration > Services and see the
 Products & Services tab, which they are not entitled to (ITSM-19744). The tab had no
 permission check at all — every other tab on that page was gated, this one was not.
 
 ## What changes
 
-- HR users at Terveystalo no longer see the Products & Services tab.
+- HR users at RetailerB no longer see the Products & Services tab.
 - Their deviant-rules and health-case tabs are unchanged, and their day-to-day case
   work is unaffected — this was the main risk, since the same actions authorise both.
 - The page itself is now driven by write actions rather than read actions, so holding
@@ -231,8 +231,8 @@ products still sees it.
 
 ## Not in this PR
 
-- The wider audit of which actions reveal which surfaces — NOVA-3440.
-- The two platform-flag proxies — NOVA-3488.
+- The wider audit of which actions reveal which surfaces — PROJ-3440.
+- The two platform-flag proxies — PROJ-3488.
 - `ProductContractsRead` still gates the endpoint server-side; that is deliberate and
   unchanged.
 ```
@@ -274,8 +274,8 @@ Second block shows CI failing on a deliberately hand-edited client, then passing
 
 ## Not in this PR
 
-- The minimum-client-version gate for mobile — NOVA-3448 Part 4, still open.
-- The shared derivation copy — NOVA-3439, waiting on this.
+- The minimum-client-version gate for mobile — PROJ-3448 Part 4, still open.
+- The shared derivation copy — PROJ-3439, waiting on this.
 ```
 
 What makes it work: every bullet is a *capability of the system* that changed. "Regenerating now

@@ -7,7 +7,7 @@ user_invocable: true
 ## Why this is a gate and not a nudge
 
 Nearly every authorization mistake at Repo is the same mistake: someone needed a
-capability, could not see that it already existed, and added a new one. NOVA-3172 is the
+capability, could not see that it already existed, and added a new one. PROJ-3172 is the
 canonical case, and `docs/authorization-surfaces.md` already records the ruling that came
 out of it:
 
@@ -55,7 +55,7 @@ name is not a reference.
 
 **The wiring between them** — `services/ServiceC/ServiceC.Domain/Permissions/`
 - `DefaultPermissionsMappings.cs` — Repo retailers (Base, Plus, PlusAdvisory)
-- `TTPermissionsMappings.cs` — Terveystalo, `TT`-prefixed permissions, mapped independently
+- `TTPermissionsMappings.cs` — RetailerB, `TT`-prefixed permissions, mapped independently
 - both registered in `ActionsMap.cs` static constructor, which runs at application start
 - `PermissionResolver.cs` — the dictionaries, including the **Tag-scope-only** buckets: a
   `User`-scoped assignment does *not* grant those
@@ -64,7 +64,7 @@ Two more layers people forget:
 
 - **Assignability** — holding a mapping is not enough. `ServicePermissionMap.Compose(retailer,
   activeContracts)` decides what a company *may* assign, via
-  `ServiceC.API/Services/AssignablePermissionProvider.cs:42`. Terveystalo and the Swedish retailers
+  `ServiceC.API/Services/AssignablePermissionProvider.cs:42`. RetailerB and the Swedish retailers
   share **no permission values at all**.
 - **Runtime** — `AuthorizationService.CanUserDoUserAction` / `CanUserDoCompanyAction` /
   `CanUserDoCustomerAction` (`services/ServiceC/ServiceC.API/Services/Authorization/AuthorizationService.cs:23,82,113`).
@@ -84,7 +84,7 @@ answer yet.
 ```
 FINNS         — CompanyAction.HcmTemplateEdit, DefaultPermissionsMappings.cs:212
                 already granted by CompanyPermission.ManageHcm. Use it.
-FINNS DELVIS  — the action exists but is unmapped for Terveystalo (TTPermissionsMappings.cs)
+FINNS DELVIS  — the action exists but is unmapped for RetailerB (TTPermissionsMappings.cs)
 FINNS INTE    — nothing covers <concept>; adding one costs: enum + 2 mapping files +
                 ServicePermissionMap + seed + migration + deriveAuthorizedFeatures.ts
 ```
@@ -103,7 +103,7 @@ answer stated up front so it can be waved through in a word.
    say explicitly whether a `User`-scoped assignment must *not* grant it; that is the
    Tag-scope-only bucket and it is easy to miss.
 
-If it is a Terveystalo ticket, add: does this need a `TT`-prefixed twin? The two retailers share
+If it is a RetailerB ticket, add: does this need a `TT`-prefixed twin? The two retailers share
 no permission values.
 
 ## Step 5 — Record the decision, then stop blocking
@@ -111,7 +111,7 @@ no permission values.
 Write one line into the notes and into the PR body's Decisions section:
 
 > **Permission:** reused `CompanyAction.HcmTemplateEdit` rather than adding
-> `ManageHcmTemplates` — the template admin tab is an administration surface (NOVA-3172
+> `ManageHcmTemplates` — the template admin tab is an administration surface (PROJ-3172
 > pattern), so the write action reveals it. Scope: Company.
 
 That line is what the reviewer challenges. Without it, the reviewer only sees the code and has

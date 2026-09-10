@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # comment-gate.sh — deterministic, fail-closed check on comments ADDED by a change.
 #
-# The rule it enforces is docs/CODING_STYLE_FRONTEND.md:256 (NOVA-3283): a comment earns
+# The rule it enforces is docs/CODING_STYLE_FRONTEND.md:256 (PROJ-3283): a comment earns
 # its place only when it says something the code cannot. Restating comments must go.
 #
 # WHY A SCRIPT: judging "why vs what" is a model's job, but ENUMERATING every added comment

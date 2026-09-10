@@ -30,7 +30,7 @@ Parse `$ARGUMENTS` to determine mode:
 
 - **PR number** (e.g. `2581`) — Review a specific PR
 - **No arguments** — Auto-detect PR from current branch: `gh pr view --json number`
-- **Ticket ID** (e.g. `NOVA-2547`) — Review a ticket design (pre-implementation questions only)
+- **Ticket ID** (e.g. `PROJ-2547`) — Review a ticket design (pre-implementation questions only)
 
 ## Config
 

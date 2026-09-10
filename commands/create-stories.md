@@ -120,7 +120,7 @@ Before creating new workspaces, check if any existing worktrees have merged/clos
 
 6. **Also kill any orphan tmux sessions** that don't have a matching worktree:
    ```bash
-   tmux list-sessions -F '#{session_name}' 2>/dev/null | grep -E '^PROJ-|^NOVA-'
+   tmux list-sessions -F '#{session_name}' 2>/dev/null | grep -E '^PROJ-|^PROJ-'
    ```
    For each session without a matching worktree, kill it:
    ```bash

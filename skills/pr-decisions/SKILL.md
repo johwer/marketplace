@@ -66,7 +66,7 @@ Equally: if the alternative was genuinely close, say so. "Both were defensible; 
 
 ## Worked example
 
-From NOVA-3172, where the shipped approach differed from the ticket's proposal.
+From PROJ-3172, where the shipped approach differed from the ticket's proposal.
 
 ```markdown
 ## Decisions

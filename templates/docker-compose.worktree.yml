@@ -45,7 +45,7 @@ x-common-api-environment: &common-api-environment
   JWT__Audience: Repo.Platform
   # localstack S3 endpoints — universal to every api service (each still sets its own
   # buckets + FileStorage below). Kept in the anchor so a newly-added service can't drift
-  # and miss them, which crash-loops the .NET host at 100% CPU on boot (see NOVA-3183).
+  # and miss them, which crash-loops the .NET host at 100% CPU on boot (see PROJ-3183).
   AwsConfig__ServiceUrl: http://localstack:4566
   AwsConfig__OverridePublicEndpoint: http://localhost:${LOCALSTACK_PORT:-4566}
 
@@ -142,8 +142,8 @@ services:
       OpenTelemetry__ServiceName: ServiceD-API-Worktree
       ProviderConfiguration__MockEmail: true
       ProviderConfiguration__DefaultFromEmailAddress: no-reply@polaris-accept.repo.se
-      ProviderConfiguration__RetailerFromEmailAddresses__0__RetailerType: Terveystalo
-      ProviderConfiguration__RetailerFromEmailAddresses__0__Email: no-reply@leo-stg.terveystalo.com
+      ProviderConfiguration__RetailerFromEmailAddresses__0__RetailerType: RetailerB
+      ProviderConfiguration__RetailerFromEmailAddresses__0__Email: no-reply@leo-stg.retailer-b.com
       ProviderConfiguration__CountryProviders__0__Country: SE
       ProviderConfiguration__CountryProviders__0__Channel: Mail
       ProviderConfiguration__CountryProviders__0__Providers__0__Order: 1
@@ -165,7 +165,7 @@ services:
       <<: *common-api-environment
       # AwsConfig S3 endpoints come from *common-api-environment. service-c still needs its bucket +
       # FileStorage mode, or AddRepoS3() falls through to real AWS creds and crash-loops
-      # the host at 100% CPU on boot (NOVA-3183).
+      # the host at 100% CPU on boot (PROJ-3183).
       FileServiceConfig__ExcelExportS3Bucket: repo-service-d-inbox-files
       FileServiceConfig__FileStorage: aws
       ASPNETCORE_URLS: http://+:5001
@@ -239,7 +239,7 @@ services:
       Services__IamServiceApi__Enabled: "true"
       # Talks to the MAIN stack's service-c-service-api over mTLS (pre-existing IamLegacyTokenClient
       # usage, unrelated to any single ticket). "service-c-service-api" is a real SAN on the dev server
-      # cert, so no ServerName override is needed — mirrors service-b-api-wt above. NOVA-3184 briefly
+      # cert, so no ServerName override is needed — mirrors service-b-api-wt above. PROJ-3184 briefly
       # wired this at a worktree service-c-service-api-wt (with a ServerName override) to reach an
       # internal search endpoint on that branch; that endpoint and the internal mTLS hop were
       # deleted in the same ticket (product decision: the client calls Nova and legacy directly
