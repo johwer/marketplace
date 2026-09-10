@@ -66,7 +66,7 @@ Goal: the reader stops scrolling.
 - "think we have a gap when nova hands off to signedin, the JWT is missing `role` entirely"
 
 **Bad hooks (do not produce):**
-- "I wanted to share some findings from NOVA-2830 regarding token exchange behavior." (corporate, vague, no anomaly)
+- "I wanted to share some findings from PROJ-2830 regarding token exchange behavior." (corporate, vague, no anomaly)
 - "Why does the assumable endpoint return tokens without a role claim?" (question, no setup)
 - "Question for auth-service / ServiceC owner — possible gap in /Jwt/assumable/{userAccountId} token minting for legacy-product accounts." (this is the SUBJECT LINE, not a hook — too formal, too long, names the system before the symptom)
 

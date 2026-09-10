@@ -18,7 +18,7 @@ One profile per account/role, named the way the AWS portal names them:
 
 ```
 123456789012_YourRoleName        Repo
-753423979104_RDS-ReadOnly_tt-accept    Terveystalo-Accept
+753423979104_RDS-ReadOnly_tt-accept    RetailerB-Accept
 ```
 
 Set your everyday one as the default in `~/.zshrc`:

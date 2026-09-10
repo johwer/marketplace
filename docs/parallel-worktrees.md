@@ -8,7 +8,7 @@ DTF supports running multiple worktrees simultaneously, each with isolated ports
 
 Each worktree gets a unique **slot** (derived from ticket number mod 99):
 
-| Component | Slot 07 (NOVA-2580) | Slot 08 (NOVA-2581) | Main stack |
+| Component | Slot 07 (PROJ-2580) | Slot 08 (PROJ-2581) | Main stack |
 |-----------|---------------------|---------------------|------------|
 | Vite dev server | 3107 | 3108 | 3000 |
 | Cosmos UI | 3907 | 3908 | 3999 |
@@ -75,7 +75,7 @@ the browser requests a stale `?v=<hash>` and gets `504 (Outdated Optimize Dep)`:
   (a 500 on the renderer). Pinning `vite.mainScriptUrl` does NOT help — the exact match also
   fails on the query.
 
-Fix (NOVA-3105): `allocate-ports.sh` now generates `cosmos.vite.config.worktree.mts` (extends
+Fix (PROJ-3105): `allocate-ports.sh` now generates `cosmos.vite.config.worktree.mts` (extends
 the committed `cosmos.vite.config.mts`, sets `cacheDir: node_modules/.vite-cosmos`) and points
 `cosmos.worktree.config.json`'s `vite.configPath` at it — so the two servers no longer share a
 cache. To recover from a stale state, just run the clean (re)start helper:
@@ -113,7 +113,7 @@ and never affect anyone not using DTF. The fallback is always "use the hardcoded
 
 ## How Services Run in Parallel
 
-Each worktree's Docker containers use a unique `COMPOSE_PROJECT_NAME` (e.g., `repo-nova-2580`), so:
+Each worktree's Docker containers use a unique `COMPOSE_PROJECT_NAME` (e.g., `repo-proj-2580`), so:
 - Containers don't collide (different names)
 - Ports don't collide (different slots)
 - Volumes are namespaced per project
@@ -121,11 +121,11 @@ Each worktree's Docker containers use a unique `COMPOSE_PROJECT_NAME` (e.g., `re
 
 ```bash
 # Worktree A: starts service-b-api on port 10705
-cd ~/Documents/NOVA-2580
+cd ~/Documents/PROJ-2580
 bash ~/.claude/scripts/worktree-service.sh up service-b-api
 
 # Worktree B: starts service-b-api on port 10805 (different container!)
-cd ~/Documents/NOVA-2581
+cd ~/Documents/PROJ-2581
 bash ~/.claude/scripts/worktree-service.sh up service-b-api
 ```
 
@@ -149,13 +149,13 @@ services (`service-c`, `service-a`) a single invocation writes **both** apps' cl
 
 Resolution order is **explicit env var → repo-root `.env` → throw**. There is no fallback to
 the main stack's `500x` ports: regenerating against a stale shared container has silently
-deleted generated members that other people had just added (twice, during NOVA-3366), so an
+deleted generated members that other people had just added (twice, during PROJ-3366), so an
 unset port is a hard error rather than a guess. Start the service you changed first
 (`worktree-service.sh up <svc>`).
 
 > Historical note: this used to require `~/.claude/scripts/generate-api.sh`, which injected the
 > worktree port into a config that hardcoded `localhost:5001`. That script was deleted once
-> NOVA-3438 moved all 13 codegen configs into `scripts/api-codegen/` and made the configs resolve
+> PROJ-3438 moved all 13 codegen configs into `scripts/api-codegen/` and made the configs resolve
 > their own port. If you find a reference to it anywhere, it is stale.
 
 ## Backend builds/tests when the local .NET SDK is pinned
@@ -188,7 +188,7 @@ By default, API proxies point to the **main stack** (500x ports). Only services 
 
 When you add a new `*-wt` service to `~/.claude/templates/docker-compose.worktree.yml`, it
 **must** carry the full env contract or it will boot-crash in confusing ways (a container can
-report `Up` while the .NET host crash-loops at 100% CPU — see the NOVA-3183 incident, where
+report `Up` while the .NET host crash-loops at 100% CPU — see the PROJ-3183 incident, where
 `service-c-api-wt` was missing the S3 endpoint and `AddRepoS3()` fell through to the real AWS
 credential chain and threw on startup).
 
@@ -208,7 +208,7 @@ Checklist for every new api service:
       will fail loudly if the app didn't start listening.
 
 ### `service-a-advisory` and `service-c-service-api`
-Added for NOVA-3184, originally so ServiceA.Advisory could be verified over real HTTP against a
+Added for PROJ-3184, originally so ServiceA.Advisory could be verified over real HTTP against a
 worktree ServiceC.Service.API rather than the main stack's (that ticket added an internal search
 endpoint on `service-c-service-api`). Kept as startable worktree services on their own merits after that
 ticket's product direction changed (see below) — they're useful independently of any one ticket.
@@ -219,7 +219,7 @@ ticket's product direction changed (see below) — they're useful independently 
 - **`service-a-advisory-wt` is wired to the MAIN stack's `service-c-service-api`**
   (`Services__IamServiceApi__BaseUrl: https://service-c-service-api:5009`), same as `service-b-api-wt` and
   every other cross-service client — this is the pre-existing `IamLegacyTokenClient` mTLS usage,
-  unrelated to any single ticket. NOVA-3184 briefly rewired this to the worktree
+  unrelated to any single ticket. PROJ-3184 briefly rewired this to the worktree
   `service-c-service-api-wt` (with a `Services__IamServiceApi__ServerName` override — see below) to
   reach its new internal endpoint; that endpoint and the whole internal mTLS hop were later
   deleted on the same ticket (product decision: the browser-facing client calls Nova and legacy
@@ -255,10 +255,10 @@ var), so the pairing is enforced by the preflight, not by a rewrite step.
 ### Resume (after terminal close or next day)
 ```bash
 # From the orchestrator:
-resume NOVA-2580
+resume PROJ-2580
 
 # Or directly:
-bash ~/.claude/scripts/resume-workspace.sh NOVA-2580
+bash ~/.claude/scripts/resume-workspace.sh PROJ-2580
 ```
 
 The resume script:
@@ -271,14 +271,14 @@ The resume script:
 
 ### Pause (end of day, keep everything)
 ```bash
-bash ~/.claude/scripts/pause-workspace.sh NOVA-2580
+bash ~/.claude/scripts/pause-workspace.sh PROJ-2580
 ```
 Kills tmux + dev servers, preserves worktree, code, notes, git branches.
 
 ### Cleanup (after PR merge)
 ```bash
-/workspace-cleanup NOVA-2580
-# Or from orchestrator: "clean up NOVA-2580"
+/workspace-cleanup PROJ-2580
+# Or from orchestrator: "clean up PROJ-2580"
 ```
 
 ## Resuming After a Closed/Crashed Terminal
@@ -291,8 +291,8 @@ If your terminal dies (crash, restart, accidental close), nothing is lost:
 
 Just resume:
 ```bash
-bash ~/.claude/scripts/open-terminal.sh "Alacritty" "bash ~/.claude/scripts/resume-workspace.sh 'NOVA-2580'"
+bash ~/.claude/scripts/open-terminal.sh "Alacritty" "bash ~/.claude/scripts/resume-workspace.sh 'PROJ-2580'"
 ```
-Or tell the orchestrator: `resume NOVA-2580`
+Or tell the orchestrator: `resume PROJ-2580`
 
 The resume script re-validates ports, checks for conflicts, and launches a new tmux + Claude session that reads the existing `.dream-team/` context.

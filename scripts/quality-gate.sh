@@ -207,7 +207,7 @@ if [[ "$RUN_FRONTEND" == "true" ]]; then
     # tsc resolves the TYPE graph; the bundler resolves the MODULE graph. They agree only
     # while every runtime import has a matching, correctly-scoped package. Declare
     # @types/x without x itself and tsc goes green on a build that cannot bundle.
-    # NOVA-3438: removing a devDependency dropped a hoisted transitive `lodash` that app
+    # PROJ-3438: removing a devDependency dropped a hoisted transitive `lodash` that app
     # code had imported undeclared for months. Prettier, ESLint, tsc and Vitest all passed;
     # only `npm run build` caught it. A static substitute does not work — the broken import
     # was two hops down the transitive chain from the package actually removed.
@@ -229,7 +229,7 @@ fi
 # ── Mobile (apps/mobile) ─────────────────────────
 # The gate had NO mobile coverage at all: a branch touching apps/mobile passed with zero
 # checks run against it. That matters more now that web and mobile share generated API
-# clients (NOVA-3438). Triggered independently of the web section — a branch can touch
+# clients (PROJ-3438). Triggered independently of the web section — a branch can touch
 # either, or both.
 # Note there is no cheap bundler check here: mobile builds via EAS (cloud) or expo run:*
 # (needs a simulator), so the dependency-change build gate above has no mobile equivalent.

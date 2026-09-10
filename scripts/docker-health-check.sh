@@ -176,7 +176,7 @@ if [ -s "$classified_file" ]; then
       echo "      → bash ~/.claude/scripts/docker-cleanup.sh   then: docker restart ${name}"
       echo "      NOTE: restart alone will NOT fix this (same full disk)"
     elif printf '%s' "$logs" | grep -qE '__EFMigrationsHistory|23505|42P07|already exists'; then
-      echo "  • ${name} — [R1] concurrent EF migration race (see NOVA-2980)"
+      echo "  • ${name} — [R1] concurrent EF migration race (see PROJ-2980)"
       echo "      → docker restart ${name}   (alone, it wins the advisory lock)"
     else
       echo "  • ${name} — unrecognised signature; diagnose before acting:"

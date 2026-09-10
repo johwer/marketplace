@@ -41,7 +41,7 @@ These patterns come from team experience and are not in the project-level skills
 
 ### Security — four rules that get flagged in review
 
-These are recurring backend security defects, not style preferences. They are **not** in any repo doc: NOVA-3219 attempted to add them to `docs/CODING_STYLE_BACKEND.md` and the additions were removed (always-loaded context files shouldn't carry this specificity). Re-homing to a repo-resident on-demand skill is tracked in **NOVA-3433**. Until that lands, this is the written home — so apply them before opening a PR rather than discovering them in review.
+These are recurring backend security defects, not style preferences. They are **not** in any repo doc: PROJ-3219 attempted to add them to `docs/CODING_STYLE_BACKEND.md` and the additions were removed (always-loaded context files shouldn't carry this specificity). Re-homing to a repo-resident on-demand skill is tracked in **PROJ-3433**. Until that lands, this is the written home — so apply them before opening a PR rather than discovering them in review.
 
 **1. HTML-encode user-controlled values before email-template substitution.**
 Values like Department or tag names must pass through `HtmlEncode()` before substitution into an email template, or you have HTML injection.
@@ -53,6 +53,6 @@ Values like Department or tag names must pass through `HtmlEncode()` before subs
 Always confirm the supplied `companyIds` belong to the given `customerId` before acting on them. In event/message handlers derive the company from `message.CompanyId` (the trusted envelope), **never** from a caller-supplied field like `roleData.CompanyId` — the payload is attacker-influenced, the envelope is not.
 
 **4. Never use EF Core `SetValues()` for upserts on entities with immutable fields.**
-`SetValues()` overwrites every mapped column, including immutable ones such as `UserId` and `InsertedAt`. Use an explicit conditional create/update that leaves immutable fields untouched. This one is mechanically detectable — an analyzer or CI grep would beat any written rule, see NOVA-3433.
+`SetValues()` overwrites every mapped column, including immutable ones such as `UserId` and `InsertedAt`. Use an explicit conditional create/update that leaves immutable fields untouched. This one is mechanically detectable — an analyzer or CI grep would beat any written rule, see PROJ-3433.
 
-Related: frontend permission gates are **UX only**; the backend enforces every action independently (already documented in `docs/FRONTEND_COMPONENTS.md`). Never treat a hidden control as an authorization boundary. For which registration layer a new action or permission belongs to, see the note in `/ghost-review` and NOVA-3172's comments — `CompanyAction` wiring lives in `DefaultPermissionsMappings.cs` + `TTPermissionsMappings.cs`, while `ProductMap.cs` + `ServicePermissionMap.cs` govern which *permissions* a product tier may assign.
+Related: frontend permission gates are **UX only**; the backend enforces every action independently (already documented in `docs/FRONTEND_COMPONENTS.md`). Never treat a hidden control as an authorization boundary. For which registration layer a new action or permission belongs to, see the note in `/ghost-review` and PROJ-3172's comments — `CompanyAction` wiring lives in `DefaultPermissionsMappings.cs` + `TTPermissionsMappings.cs`, while `ProductMap.cs` + `ServicePermissionMap.cs` govern which *permissions* a product tier may assign.

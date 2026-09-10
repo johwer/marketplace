@@ -131,7 +131,7 @@ if [[ -n "$MONOREPO_PATH" ]] && [[ -d "$MONOREPO_PATH" ]]; then
   ACTIVE_BRANCHES=$(cd "$MONOREPO_PATH" && git worktree list --porcelain 2>/dev/null | grep 'branch refs/heads/' | sed 's|branch refs/heads/||')
   SAFE_PARENT=$(echo "${WORKTREE_PARENT:-$HOME/Documents}" | sed 's|^/||' | sed 's|/|-|g')
   STALE_WORKTREE_DIRS=0
-  for dir in "$HOME/.claude/projects/-${SAFE_PARENT}-PROJ-"* "$HOME/.claude/projects/-${SAFE_PARENT}-NOVA-"*; do
+  for dir in "$HOME/.claude/projects/-${SAFE_PARENT}-PROJ-"* "$HOME/.claude/projects/-${SAFE_PARENT}-PROJ-"*; do
     [ -d "$dir" ] || continue
     base=$(basename "$dir" | sed "s|-${SAFE_PARENT}-||" | sed 's|-apps-web$||')
     is_active=false

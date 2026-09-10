@@ -1,6 +1,6 @@
 # Docker Fast — Start/Restart the Repo Stack Without the OOM
 
-Bring the Repo docker stack up **fast and safely**, avoiding the full-stack parallel rebuild that OOMs Docker Desktop (exit 137) and triggers the R1 EF-migration zombie. Encodes the daily-workflow recommendations from **NOVA-1613 (PROJ-1613 "Make docker fast again")** — whose Dockerfile-level wins (NuGet cache mount + publish-only) are *already merged*; this command adds the two missing pieces (parallel cap + service "categories") at the **orchestration layer only — no repo files are edited, nothing is created on disk**.
+Bring the Repo docker stack up **fast and safely**, avoiding the full-stack parallel rebuild that OOMs Docker Desktop (exit 137) and triggers the R1 EF-migration zombie. Encodes the daily-workflow recommendations from **PROJ-1613 (PROJ-1613 "Make docker fast again")** — whose Dockerfile-level wins (NuGet cache mount + publish-only) are *already merged*; this command adds the two missing pieces (parallel cap + service "categories") at the **orchestration layer only — no repo files are edited, nothing is created on disk**.
 
 ## The core rule (why this exists)
 

@@ -30,7 +30,7 @@ Parse `$ARGUMENTS` to determine mode:
 
 - **PR number** (e.g. `2581`) — Review a specific PR
 - **No arguments** — Auto-detect PR from current branch: `gh pr view --json number`
-- **Ticket ID** (e.g. `NOVA-2547`) — Review a ticket design (pre-implementation questions only)
+- **Ticket ID** (e.g. `PROJ-2547`) — Review a ticket design (pre-implementation questions only)
 
 ## Config
 
@@ -101,7 +101,7 @@ still satisfy the *per-target* check further down? If it grants only the new act
 passes the gate and has every result dropped — they can search and see nothing. That empty result
 is indistinguishable from "no such record", so it fails silently. The permission must grant both.
 
-Concrete: NOVA-3184 gated on `UserRead` (≈8 grantors), narrowed to `UserSearchBySsn` granted only
+Concrete: PROJ-3184 gated on `UserRead` (≈8 grantors), narrowed to `UserSearchBySsn` granted only
 by `CustomerPermission.MedicalAdvisor`, then had to add `UserRead` to that permission too.
 
 **[SILENT-SUPERUSER-INHERIT] A new action silently inherited by CustomerSupport**
@@ -122,7 +122,7 @@ support already holds broader tools. But the inheritance is a silence rather tha
 for anything support should not reach, the exclusion list is where that gets said — and nobody
 will notice it was not.
 
-Concrete: NOVA-3184 added `UserSearchBySsn` for a nurse-only search and customer support acquired
+Concrete: PROJ-3184 added `UserSearchBySsn` for a nurse-only search and customer support acquired
 it automatically. Correct outcome, wrong description, and the PR claimed exclusivity it did not have.
 
 **[SPECULATIVE-GENERALITY] A name or abstraction built for a second consumer that does not exist**
@@ -131,7 +131,7 @@ extracting an abstraction "so the sibling ticket can use it too", confirm the si
 it: check its branch, not the plan. A reuse argument built on a design that has since been
 reverted is worse than no argument, because it bakes a guess into a name.
 
-Concrete: NOVA-3184 modelled a two-key lookup contract, complete with an unimplemented branch
+Concrete: PROJ-3184 modelled a two-key lookup contract, complete with an unimplemented branch
 answering 501, for a sibling ticket that then shipped its lookup on a different service entirely
 and later reverted it. The seam was removed as unused surface. Specific names age better than
 hopefully-general ones — generalise when the second consumer arrives, with the consumer in hand.
@@ -154,7 +154,7 @@ defends against can actually occur:
 - Does the call return early on the sentinel you pass, so the cost you are equalising differs anyway?
 If the justification is false, the mechanism goes — do not rewrite the comment to fit.
 
-Concrete: NOVA-3184 carried a `Guid.Empty` probe justified first on a status-code asymmetry that
+Concrete: PROJ-3184 carried a `Guid.Empty` probe justified first on a status-code asymmetry that
 could not occur (the HTTP adapter catches and returns false) and then on latency (the check returns
 after one lookup miss for `Guid.Empty` but continues for a real hit). Both false; it was defended
 twice before being deleted.
@@ -183,10 +183,10 @@ Look for:
 Look for a user-facing controller/endpoint (or `AuthorizationAdapter` built for user-context auth) being called or reused as a service-to-service (S2S) path. The authorization models differ — user APIs assume a JWT user context; S2S has none. Reusing one for the other violates the Repo bus-driven pattern. Flag if a user-auth endpoint is being consumed internally as if it were an S2S contract.
 
 **[AUTHORIZED-FEATURES-MISUSE] Field added to `authorizedFeatures` for an external/non-FE consumer**
-`customer/{id}/authorizedFeatures` models **Repo's own frontend viewport** (which UI/nav a signed-in user sees). Do NOT add a boolean there for an external system (Seru/Leo, other services) or for a permission the Repo FE doesn't consume — it's noise and doesn't scale. External systems read a user's grants via the existing `authorization/.../action/{action}` endpoints. Flag any new `authorizedFeatures` field whose only consumer is external or non-UI. (NOVA-3183.)
+`customer/{id}/authorizedFeatures` models **Repo's own frontend viewport** (which UI/nav a signed-in user sees). Do NOT add a boolean there for an external system (Seru/Leo, other services) or for a permission the Repo FE doesn't consume — it's noise and doesn't scale. External systems read a user's grants via the existing `authorization/.../action/{action}` endpoints. Flag any new `authorizedFeatures` field whose only consumer is external or non-UI. (PROJ-3183.)
 
 **[PERMISSION-PLACEMENT] Permission modeled at the wrong scope or filed under an unrelated contract**
-Two checks. (1) A company-level capability must be a `CompanyPermission`/`CompanyAction`, not `UserPermission`/`UserAction` — mirror the closest existing feature (e.g. `TTViewInsightsHub` → `InsightsHubRead` for analytics). (2) Don't gate a permission under a `ServiceContractType` it merely *resembles by name* (e.g. parking a "Reporting" permission under `ServiceE`) — `ServiceContractType` reflects the **contract that entitles** it. If it's universal to a retailer, put it in the `AlwaysOn` baseline instead; only use a contract entry if a real contract gates it. Note `ServicePermissionMap.Compose` is a test-only consistency layer (no live callers) — the live grant path is `ProductMap`. (NOVA-3183.)
+Two checks. (1) A company-level capability must be a `CompanyPermission`/`CompanyAction`, not `UserPermission`/`UserAction` — mirror the closest existing feature (e.g. `TTViewInsightsHub` → `InsightsHubRead` for analytics). (2) Don't gate a permission under a `ServiceContractType` it merely *resembles by name* (e.g. parking a "Reporting" permission under `ServiceE`) — `ServiceContractType` reflects the **contract that entitles** it. If it's universal to a retailer, put it in the `AlwaysOn` baseline instead; only use a contract entry if a real contract gates it. Note `ServicePermissionMap.Compose` is a test-only consistency layer (no live callers) — the live grant path is `ProductMap`. (PROJ-3183.)
 
 **[UNIT-OF-WORK] SaveChangesAsync inside a repository, or called multiple times**
 Look for `SaveChangesAsync()` / `SaveChanges()` called inside a `*Repository.cs` method. Repositories must not commit — the Unit of Work boundary belongs at the service/handler layer. He blocks on this. Also flag **more than one `SaveChangesAsync` in a single operation** ("please do not do two SaveChangesAsync here — ideally call it once for the entire update") — multiple saves break atomicity.
@@ -274,7 +274,7 @@ Important nuance he repeats: integration tests should test **round-trips and acc
 He is also strict that tests must **assert real logic, not just pass**: flag mocks/assertions like `It.IsAny<Guid>()`, asserting only that a call happened, or loose matchers that would pass regardless of correctness. "Don't just `IsAny<Guid>`. Please validate your logic in the tests, don't just make the tests pass!" A new endpoint with *no* tests at all is a hard must-fix for him ("makes no sense to not have any tests... please make it a habit").
 
 **[INTEGRATION-TEST-SPARSITY] Too many integration tests where unit tests suffice**
-The flip side of MISSING-TEST: cachpachios treats integration tests as **expensive (time/CI budget)** and wants them **sparse** — usually a single happy-path is enough. When a PR adds several integration tests covering scenario/branch variations (e.g. granted→true, not-granted→false, leak-guard→false all as integration tests), flag it: keep at most ONE happy-path integration test and **move the rest to unit tests** (mapping tests, scope-resolution tests, helper-level assertions). His verbatim: "Drop these tests please, i dont think it adds a lot of value, and a integration test its quite expensive (time budget-wise)... What you can do is move it to a unit test though. Future consideration is to always be sparse with integrationtests, mostly a single one testing a 'happy' path is enough." So default new-behavior coverage to unit tests, reserving integration for one round-trip/access-matrix happy path. (Source: NOVA-3183 review.)
+The flip side of MISSING-TEST: cachpachios treats integration tests as **expensive (time/CI budget)** and wants them **sparse** — usually a single happy-path is enough. When a PR adds several integration tests covering scenario/branch variations (e.g. granted→true, not-granted→false, leak-guard→false all as integration tests), flag it: keep at most ONE happy-path integration test and **move the rest to unit tests** (mapping tests, scope-resolution tests, helper-level assertions). His verbatim: "Drop these tests please, i dont think it adds a lot of value, and a integration test its quite expensive (time budget-wise)... What you can do is move it to a unit test though. Future consideration is to always be sparse with integrationtests, mostly a single one testing a 'happy' path is enough." So default new-behavior coverage to unit tests, reserving integration for one round-trip/access-matrix happy path. (Source: PROJ-3183 review.)
 
 **[SEARCH-IS-GET] Search/read endpoint modeled as POST**
 Look for new search/list/read endpoints implemented as `[HttpPost]` with a request body. He pushes for `GET` with query parameters instead — it's the more typical endpoint shape, and RTK Query defaults such endpoints to a `query` (cache) rather than a `mutation`. Ask: should this be a GET with query params?
@@ -326,7 +326,7 @@ greps, and they catch the class of bug a diff-only review cannot see:
 Flag as MUST FIX when the PR changes a parse/compare and cites no evidence of the producing type or
 the server-side comparison. "It renders correctly now" is not that evidence.
 
-(NOVA-3618: three separate instances in one PR. A dashboard column unioning `inserted_at` with
+(PROJ-3618: three separate instances in one PR. A dashboard column unioning `inserted_at` with
 `planned_at` meant one parse broke whichever half it did not suit; a pause window rewritten to
 bracket local days was inert because the repository compares against `UtcNow.Date`, and skipped a
 day at negative offsets; and a timezone guard asserted a wire shape the DTO never sends. All three
@@ -426,7 +426,7 @@ Before any implementation starts, surface the questions he would ask in review �
 - Is a new containerized service/worker being added? If so, `_deploy.yml` needs updating.
 
 **Architecture fit (push back on the ticket):**
-- Does the ticket prescribe a *mechanism* (a specific field, endpoint shape, or data location) — especially one relayed from product/customer? Treat it as a suggestion, not a spec: model it the way the system actually works and push back if they diverge. (NOVA-3183: the ticket asked for a `hasSuuntaReporting` boolean on `authorizedFeatures` and "per-user"; the correct model was a company-level `CompanyAction` read via the authorization endpoint — three rework cycles for not settling this first.)
+- Does the ticket prescribe a *mechanism* (a specific field, endpoint shape, or data location) — especially one relayed from product/customer? Treat it as a suggestion, not a spec: model it the way the system actually works and push back if they diverge. (PROJ-3183: the ticket asked for a `hasSuuntaReporting` boolean on `authorizedFeatures` and "per-user"; the correct model was a company-level `CompanyAction` read via the authorization endpoint — three rework cycles for not settling this first.)
 - New permission? Decide UP FRONT: User vs Company scope; contract-gated vs always-on; and which existing feature it mirrors.
 - Is anything being added to `authorizedFeatures` for a non-FE consumer? It almost certainly belongs on the authorization endpoints instead.
 
@@ -437,7 +437,7 @@ Output as: *"Before implementation, answer these questions:"* — listed per are
 ## Tips
 
 - Run against a PR before pushing for review: `/ghost-review` (auto-detects current branch)
-- Run against a ticket during architecture phase: `/ghost-review NOVA-2547`
+- Run against a ticket during architecture phase: `/ghost-review PROJ-2547`
 - The "Already handled" section is important — it tells you what you can answer immediately if he asks
 - Auth-order, multi-tenancy, privilege-scope, S2S-vs-user-API, unit-of-work (SaveChanges in repo), and scope-disposal/N+1 findings are almost always must-fix — fix before requesting review
 - Missing integration test findings: cachpachios will always ask. Either add the test (round-trip / access scenario — NOT a unit-logic-path test, which he asks to remove), or pre-empt in the PR description with a linked follow-up ticket

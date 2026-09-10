@@ -51,8 +51,8 @@ These patterns come from team experience and are not in the project-level skills
 ### Dates — use `utils/date.ts`, never raw `new Date()` / bare date-fns
 
 `apps/web/src/utils/date.ts` (~680 lines) is the canonical date layer. Reaching past it into `date-fns`
-or `new Date(str)` is how the same timezone bug keeps coming back — it was fixed in NOVA-3062 and
-reintroduced in NOVA-3382.
+or `new Date(str)` is how the same timezone bug keeps coming back — it was fixed in PROJ-3062 and
+reintroduced in PROJ-3382.
 
 **Parsing.** `getDateWithoutTzConversion(str)` — strips a trailing `Z`, and parses date-only strings
 (`"2026-02-13"`) as **local** midnight. Raw `new Date("2026-02-13")` parses as **UTC** midnight, which

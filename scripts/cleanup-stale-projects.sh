@@ -20,7 +20,7 @@ ACTIVE_BRANCHES=$(cd "$MONOREPO" && git worktree list --porcelain 2>/dev/null | 
 SAFE_PARENT=$(echo "$WORKTREE_PARENT" | sed 's|^/||' | sed 's|/|-|g')
 
 COUNT=0
-for dir in "$HOME/.claude/projects/-${SAFE_PARENT}-PROJ-"* "$HOME/.claude/projects/-${SAFE_PARENT}-NOVA-"*; do
+for dir in "$HOME/.claude/projects/-${SAFE_PARENT}-PROJ-"* "$HOME/.claude/projects/-${SAFE_PARENT}-PROJ-"*; do
   [ -d "$dir" ] || continue
   base=$(basename "$dir" | sed "s|-${SAFE_PARENT}-||" | sed 's|-apps-web$||')
   is_active=false
