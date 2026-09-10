@@ -139,6 +139,15 @@ case "$TEAMMATE_NAME" in
         ERRORS="${ERRORS}Visual verification missing (Phase 4.75): $TSX_CHANGES .tsx file(s) changed but no new Playwright e2e tests or __screenshots__ found.\nWrite e2e tests in apps/web/tests/e2e/<feature>/ that take screenshots, then run: npx playwright test\nDo not skip this — it is a hard gate.\n"
       fi
     fi
+
+    # Comments added by this change must say what the code cannot (CODING_STYLE_FRONTEND.md:256).
+    # Deterministic and complete on purpose: it lists every offender at once so this is one pass.
+    if [ -x "$HOME/.claude/scripts/comment-gate.sh" ]; then
+      CG_OUTPUT=$(cd "$WORKTREE" && bash "$HOME/.claude/scripts/comment-gate.sh" 2>&1)
+      if [ $? -ne 0 ]; then
+        ERRORS="${ERRORS}Restating comments were added. Delete every line listed below in ONE pass:\n$(echo "$CG_OUTPUT" | sed 's/\x1b\[[0-9;]*m//g')\n"
+      fi
+    fi
     ;;
 esac
 
