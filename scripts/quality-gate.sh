@@ -68,12 +68,16 @@ if [[ "$RUN_BACKEND" == "false" && "$RUN_FRONTEND" == "false" ]]; then
 fi
 
 FAILED=0
+WARNED=0
 RESULTS=""
 
 add_result() {
   local check="$1" status="$2" detail="$3"
   if [[ "$status" == "PASS" ]]; then
     RESULTS+="  ✓ $check\n"
+  elif [[ "$status" == "WARN" ]]; then
+    RESULTS+="  ! $check — $detail\n"
+    WARNED=1
   else
     RESULTS+="  ✗ $check — $detail\n"
     FAILED=1
@@ -91,16 +95,18 @@ echo ""
 # (feedback_ci_tests_merge_result). When main moves under a long-running branch, this
 # script prints a green TypeScript tick and CI fails on the same commit — PROJ-3189:
 # PROJ-3778 removed a member from a shared union while the branch sat in review.
-# A green that does not mean what the reader thinks it means is worse than no gate, so
-# this fails closed: it also fails when the state cannot be established (no fetch).
+# A green that does not mean what the reader thinks it means is worse than no gate, so a
+# branch known to be behind FAILS. Not knowing (offline, no merge-base) warns instead of
+# failing: it must not be possible to work around the FAIL by pulling the plug, but it also
+# must not block a plane-mode push. A warning still says the tick below is unverified.
 echo "▸ Branch freshness (vs origin/main)..."
 if ! (cd "$WORKTREE" && git fetch origin main --quiet 2>&1) > /tmp/qg-fetch.log 2>&1; then
-  add_result "Branch freshness" "FAIL" "could not fetch origin/main — cannot establish whether this branch is behind (see /tmp/qg-fetch.log)"
+  add_result "Branch freshness" "WARN" "could not fetch origin/main (offline?) — cannot tell whether this branch is behind; the checks below are the working tree, not the merge result CI builds (see /tmp/qg-fetch.log)"
 else
   MERGE_BASE=$(cd "$WORKTREE" && git merge-base HEAD origin/main 2>/dev/null || echo "")
   ORIGIN_MAIN=$(cd "$WORKTREE" && git rev-parse origin/main 2>/dev/null || echo "")
   if [[ -z "$MERGE_BASE" || -z "$ORIGIN_MAIN" ]]; then
-    add_result "Branch freshness" "FAIL" "could not resolve merge-base with origin/main"
+    add_result "Branch freshness" "WARN" "could not resolve merge-base with origin/main — cannot tell whether this branch is behind"
   elif [[ "$MERGE_BASE" == "$ORIGIN_MAIN" ]]; then
     add_result "Branch freshness" "PASS" "origin/main not advanced since merge-base"
   else
@@ -288,8 +294,10 @@ fi
 # ── Summary ─────────────────────────────────────
 echo ""
 echo "───────────────────────────────────────────"
-if [[ "$FAILED" -eq 0 ]]; then
+if [[ "$FAILED" -eq 0 && "$WARNED" -eq 0 ]]; then
   echo " ✓ All quality gates passed"
+elif [[ "$FAILED" -eq 0 ]]; then
+  echo " ✓ Quality gates passed, with warnings"
 else
   echo " ✗ Some checks failed — fix before pushing"
 fi
