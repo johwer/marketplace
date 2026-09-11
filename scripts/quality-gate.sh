@@ -111,8 +111,45 @@ else
     add_result "Branch freshness" "PASS" "origin/main not advanced since merge-base"
   else
     BEHIND=$(cd "$WORKTREE" && git rev-list --count "$MERGE_BASE..origin/main" 2>/dev/null || echo "?")
-    (cd "$WORKTREE" && git log --oneline "$MERGE_BASE..origin/main" | head -10) > /tmp/qg-behind.log 2>&1
+    (cd "$WORKTREE" && git log --oneline -10 "$MERGE_BASE..origin/main") > /tmp/qg-behind.log 2>&1 || true
     add_result "Branch freshness" "FAIL" "origin/main advanced $BEHIND commit(s) since merge-base — the checks below type-check the working tree, NOT the merge result CI builds. Rebase (git rebase origin/main) and re-run. Commits: $(tr '\n' '; ' < /tmp/qg-behind.log)"
+  fi
+fi
+echo ""
+
+# ── Added comments ──────────────────────────────
+# CI does NOT cover this: lint, type-check and prettier all pass on a comment that
+# merely restates the line below it. The rule is docs/CODING_STYLE_FRONTEND.md:256
+# (PROJ-3283) and until now it was enforced only when a skill happened to tell a model
+# to run the script — which means it was skipped exactly when a model chose to skip it.
+#
+# Runs for both areas: comment-gate filters by extension itself (.ts/.tsx/.cs/.mts/.js/.mjs),
+# so there is no frontend/backend branch to make here.
+#
+# THREE outcomes, not two. comment-gate exits 0 both when nothing was added and when
+# comments were added that it could not confidently call restating — the second prints a
+# "?" list and still wants human eyes. Collapsing that into a silent PASS would hide the
+# findings behind a green tick, which is the failure this script exists to prevent, so it
+# warns. Its output carries ANSI colour, hence the strip before matching.
+#
+# A missing script FAILS rather than warns: deleting the checker must not be the way
+# around a refusal.
+echo "▸ Added comments (restating-comment gate)..."
+COMMENT_GATE="$HOME/.claude/scripts/comment-gate.sh"
+if [[ ! -x "$COMMENT_GATE" ]]; then
+  add_result "Added comments" "FAIL" "comment-gate.sh not found or not executable at $COMMENT_GATE — the gate cannot run, so it refuses rather than passing silently. Restore it (/sync-config) and re-run."
+else
+  (cd "$WORKTREE" && bash "$COMMENT_GATE") > /tmp/qg-comments.log 2>&1
+  CG_EXIT=$?
+  # Strip ANSI so the file:line entries are matchable.
+  sed -E 's/\x1b\[[0-9;]*m//g' /tmp/qg-comments.log > /tmp/qg-comments-plain.log
+  CG_LINES=$(grep -oE '[^[:space:]]+:[0-9]+[[:space:]]+//.*' /tmp/qg-comments-plain.log 2>/dev/null | head -5 | tr '\n' ';' | sed 's/;$//' || true)
+  if [[ $CG_EXIT -ne 0 ]]; then
+    add_result "Added comments" "FAIL" "restating comment(s) added — each says what the line below already says. Delete them in one pass. Full list in /tmp/qg-comments.log: ${CG_LINES:-see log}"
+  elif grep -q 'flagged for judgement' /tmp/qg-comments-plain.log; then
+    add_result "Added comments" "WARN" "added comment(s) the gate could not auto-judge — keep only the non-obvious WHY: ${CG_LINES:-see /tmp/qg-comments.log}"
+  else
+    add_result "Added comments" "PASS" ""
   fi
 fi
 echo ""
@@ -245,9 +282,9 @@ if [[ "$RUN_FRONTEND" == "true" ]]; then
     if echo "$CHANGED" | grep -qE '^apps/web/package(-lock)?\.json$'; then
       echo "  → Production build (dependencies changed)..."
       if (cd "$WEB_DIR" && npm run build 2>&1) > /tmp/qg-build.log 2>&1; then
-        add_result "Production build" "PASS" "$(grep -oE 'built in [0-9.]+m?s' /tmp/qg-build.log | tail -1)"
+        add_result "Production build" "PASS" "$(grep -oE 'built in [0-9.]+m?s' /tmp/qg-build.log 2>/dev/null | tail -1 || true)"
       else
-        BUILD_ERRORS=$(grep -iE 'failed to resolve|error during build|Error:' /tmp/qg-build.log | head -5)
+        BUILD_ERRORS=$(grep -iE 'failed to resolve|error during build|Error:' /tmp/qg-build.log 2>/dev/null | head -5 || true)
         [[ -z "$BUILD_ERRORS" ]] && BUILD_ERRORS=$(tail -5 /tmp/qg-build.log)
         add_result "Production build" "FAIL" "$BUILD_ERRORS"
       fi
