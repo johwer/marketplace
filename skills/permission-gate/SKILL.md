@@ -1,6 +1,6 @@
 ---
 name: permission-gate
-description: Hard stop before writing authorization code in Repo. Answers "does this permission/role/action already exist" from the real ServiceC model in five lines, then forces at most three decisions before implementation continues. Use when a ticket, plan or diff touches Permission, Action, Role, RoleType, scope, [Authorize], CanUserDo*, ServicePermissionMap, or a frontend feature gate. Not an interview — it greps first and asks only what the code cannot answer.
+description: Hard stop before writing authorization code in Repo. Answers "does this permission/role/action already exist" from the real ServiceC model in five lines, then forces at most four decisions before implementation continues, including who may hand the permission out. Use when a ticket, plan or diff touches Permission, Action, Role, RoleType, scope, [Authorize], CanUserDo*, ServicePermissionMap, or a frontend feature gate. Not an interview — it greps first and asks only what the code cannot answer.
 user_invocable: true
 ---
 
@@ -76,6 +76,30 @@ the backend `AuthorizedFeatureService`. It must change in the **same PR** as the
 The parity test (`PARITY_CHECK=1`) is opt-in and does **not** run in CI, so nothing will catch
 a drift for you.
 
+## Step 2.5 — If you are gating a FIELD, find out who already governs it
+
+Skip this only when the thing being protected is a page or an operation. Whenever it is a *field* —
+identity number, date of birth, salary, a medical note — the codebase has almost certainly already
+decided who may see it, and that decision is the answer.
+
+```
+grep -rn "<Field>" services/<Svc> --include='*.cs' | grep -iE "permission|action|canuser|confidential|mask"
+```
+
+Read the **conditions**, not just the projections. The existing rule is often "we will not match on
+it" rather than "we will not return it", which is invisible if you are reasoning about response
+shapes. A search that silently declines to match on a field is enforcing a permission just as much
+as one that nulls the field out.
+
+If an existing right governs the field, reuse it and say so. A new action over the same data is an
+exception to a rule already in force, and it will have to justify itself against that rule
+eventually — better at the gate than at review.
+
+Concrete: PROJ-3184 designed four different gates for a nurse identity-number lookup before finding
+that `UserSearchRepository.BuildSearchConditions` already required `UserReadConfidential` to match
+on that field at all. One grep, available on day one, would have settled it. Everything bespoke was
+deleted at review.
+
 ## Step 3 — Answer in five lines, maximum
 
 Output exactly this shape. No essay. If it does not fit in five lines, you have not found the
@@ -89,7 +113,7 @@ FINNS INTE    — nothing covers <concept>; adding one costs: enum + 2 mapping f
                 ServicePermissionMap + seed + migration + deriveAuthorizedFeatures.ts
 ```
 
-## Step 4 — At most three decisions, each with a recommendation
+## Step 4 — At most four decisions, each with a recommendation
 
 Ask only what the code could not answer. One question at a time, each with the recommended
 answer stated up front so it can be waved through in a word.
@@ -103,8 +127,30 @@ answer stated up front so it can be waved through in a word.
    say explicitly whether a `User`-scoped assignment must *not* grant it; that is the
    Tag-scope-only bucket and it is easy to miss.
 
+4. **Who may hand it out?** — recommended: the narrowest contract whose holders are the intended
+   grantors. This is a **security** question and it is not answered by scope. Scope says over whom
+   the permission applies; assignability says who can give it to someone. A permission can be
+   perfectly scoped and still be self-grantable by the people it was meant to constrain.
+
+   Only applies when you added a new `Permission` (an Action needs no assignability). Resolve it
+   against the seed rather than the name:
+
+   ```
+   grep -n "<ContractType>" scripts/database-init/seed-service-c/seed-0-products.sql
+   ```
+
+   A contract carried by the `Default` product is held by ordinary customers, so filing a permission
+   there lets any customer admin with that service grant it to themselves. A contract that appears
+   only on `Unlocked Service` is internal. For an internal-staff capability the answer is
+   `SupportGrant`, and if the answer is "no contract gates it, everyone at this retailer has it",
+   the answer is the `AlwaysOn` baseline, not an unrelated contract entry.
+
+   State the trust boundary in the decision line, not just the placement: *"assignable only via the
+   customer-support contract, which no customer product carries."*
+
 If it is a RetailerB ticket, add: does this need a `TT`-prefixed twin? The two retailers share
-no permission values.
+no permission values. And note `SupportGrant` is shared by both retailers, so anything placed there
+becomes assignable at RetailerB too.
 
 ## Step 5 — Record the decision, then stop blocking
 
@@ -123,3 +169,6 @@ to reverse-engineer the choice.
 - a new permission is proposed with no named reason the existing one cannot serve
 - a backend rule changed without `deriveAuthorizedFeatures.ts` in the same diff
 - verification was done as a global admin, which passes every check
+- a new Permission is placed under a `ServiceContractType` without checking which product carries
+  that contract — name resemblance is not a trust boundary
+- the thing being protected is a field and nobody has grepped how that field is gated today

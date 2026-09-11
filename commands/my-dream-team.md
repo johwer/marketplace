@@ -994,6 +994,10 @@ If there are conflicts, resolve them (keep both additions for routes/tabs — th
 - **Before marking PR ready**: Final rebase to ensure clean merge.
 - If rebase has conflicts, resolve them. For known conflict magnets (routes, tabs), keep both additions. If conflicts look complex, ask the user.
 
+**A conflict resolution needs the same evidence bar as new code (PROJ-3189).** Resolving a conflict is authoring behaviour, but it arrives disguised as bookkeeping and the reviewed diff shows the resolved state rather than the choice. Taking one side over the other must be justified by a *mechanism*, never by consistency, symmetry or tidiness — "symmetry with the Nova tree" was the whole justification for dropping a catch-all route, and it was an aesthetic claim about shape that was wrong about behaviour. Where a resolution removes a fallback (catch-all/splat route, default branch, `else` arm), grep cannot prove it dead: request an input it used to catch and look at what renders. State the mechanism for each non-trivial resolution in the PR body.
+
+**Deleting a file another ticket just merged is the owner's call (PROJ-3189).** Sequencing does not transfer ownership. Even when your work is exactly what the other ticket's placeholder was waiting for, removing it unilaterally is an unforced decision: flag it to the owner, let them decide, keep your diff additive. Same rule as [[feedback_cross_branch_rename_has_no_safe_unilateral_move]].
+
 **Run the deterministic quality gate** before committing. This script handles formatting, linting, type checks, and builds — no LLM reasoning needed:
 
 ```bash

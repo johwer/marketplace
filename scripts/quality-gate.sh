@@ -86,6 +86,31 @@ echo " Worktree: $WORKTREE"
 echo "═══════════════════════════════════════════"
 echo ""
 
+# ── Branch freshness ────────────────────────────
+# tsc/dotnet here check the WORKING TREE. CI checks the branch MERGED WITH MAIN
+# (feedback_ci_tests_merge_result). When main moves under a long-running branch, this
+# script prints a green TypeScript tick and CI fails on the same commit — PROJ-3189:
+# PROJ-3778 removed a member from a shared union while the branch sat in review.
+# A green that does not mean what the reader thinks it means is worse than no gate, so
+# this fails closed: it also fails when the state cannot be established (no fetch).
+echo "▸ Branch freshness (vs origin/main)..."
+if ! (cd "$WORKTREE" && git fetch origin main --quiet 2>&1) > /tmp/qg-fetch.log 2>&1; then
+  add_result "Branch freshness" "FAIL" "could not fetch origin/main — cannot establish whether this branch is behind (see /tmp/qg-fetch.log)"
+else
+  MERGE_BASE=$(cd "$WORKTREE" && git merge-base HEAD origin/main 2>/dev/null || echo "")
+  ORIGIN_MAIN=$(cd "$WORKTREE" && git rev-parse origin/main 2>/dev/null || echo "")
+  if [[ -z "$MERGE_BASE" || -z "$ORIGIN_MAIN" ]]; then
+    add_result "Branch freshness" "FAIL" "could not resolve merge-base with origin/main"
+  elif [[ "$MERGE_BASE" == "$ORIGIN_MAIN" ]]; then
+    add_result "Branch freshness" "PASS" "origin/main not advanced since merge-base"
+  else
+    BEHIND=$(cd "$WORKTREE" && git rev-list --count "$MERGE_BASE..origin/main" 2>/dev/null || echo "?")
+    (cd "$WORKTREE" && git log --oneline "$MERGE_BASE..origin/main" | head -10) > /tmp/qg-behind.log 2>&1
+    add_result "Branch freshness" "FAIL" "origin/main advanced $BEHIND commit(s) since merge-base — the checks below type-check the working tree, NOT the merge result CI builds. Rebase (git rebase origin/main) and re-run. Commits: $(tr '\n' '; ' < /tmp/qg-behind.log)"
+  fi
+fi
+echo ""
+
 # ── Backend checks ──────────────────────────────
 if [[ "$RUN_BACKEND" == "true" ]]; then
   echo "▸ Backend checks..."
