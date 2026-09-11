@@ -104,6 +104,13 @@ is indistinguishable from "no such record", so it fails silently. The permission
 Concrete: PROJ-3184 gated on `UserRead` (≈8 grantors), narrowed to `UserSearchBySsn` granted only
 by `CustomerPermission.MedicalAdvisor`, then had to add `UserRead` to that permission too.
 
+**And then deleted the new action entirely**, which is the part worth learning. The shipped gate is
+`UserAction.UserReadConfidential`, an action that already existed, because
+`UserSearchRepository.BuildSearchConditions` already refuses to match on SSN unless the performer
+holds it. The bespoke action was an exception to a rule the codebase already enforced. So run this
+pattern *after* the check below, not before it — exclusivity is worth buying only once you have
+confirmed nothing already governs the data.
+
 **[SILENT-SUPERUSER-INHERIT] A new action silently inherited by CustomerSupport**
 `CustomerPermission.CustomerSupport` is mapped in a blanket loop over
 `Enum.GetValues<UserAction>()` minus a two-member exclusion list
@@ -136,6 +143,40 @@ answering 501, for a sibling ticket that then shipped its lookup on a different 
 and later reverted it. The seam was removed as unused surface. Specific names age better than
 hopefully-general ones — generalise when the second consumer arrives, with the consumer in hand.
 
+**[DATA-ALREADY-GOVERNED] A new gate designed around a field that already has one**
+Before designing any gate for access to a *field* — identity number, date of birth, salary, a
+medical note — grep how that field is already treated in the code that reads it today, not how the
+permission model is organised:
+
+```
+grep -rn "<Field>" services/<Svc> --include='*.cs' | grep -iE "permission|action|canuser|confidential|mask"
+```
+
+Read the search and read layers, and read the *conditions*, not just the projections — the rule is
+often "we will not match on it" rather than "we will not return it", and that is easy to miss when
+you are reasoning about responses. If an existing right already governs the field, reuse it. A new
+action gating the same data is an exception to an existing rule, and it will be asked to justify
+itself against that rule sooner or later.
+
+Concrete: PROJ-3184 spent four gate designs and two enum renames on a nurse SSN lookup before
+finding `UserSearchRepository.BuildSearchConditions`, one grep away, which already required
+`UserReadConfidential` to match on SSN at all. Everything bespoke was then deleted.
+
+**[DEFER-OWN-MESS] Cleanup of a duplication the PR itself introduced, pushed to a follow-up ticket**
+He accepts deferring cleanup you inherited. He does not accept deferring cleanup you created:
+*"You cant add stuff and then defer cleanup to a future PR imo?"* The line is ownership, not size
+and not risk.
+
+So when a PR adds a second copy of something, check `git log -S` or the merge base to see whether
+the duplication is older than the branch. If it is not, the follow-up ticket is not a plan, it is a
+handoff of your own mess — and the arguments that feel strongest for deferring ("it touches another
+team's path", "it changes nothing functional", "it would block the sibling ticket") are exactly the
+arguments that apply equally well to never doing it.
+
+Concrete: PROJ-3184 added a caller-scope resolver that was `GlobalSearchService.GetAuthorizedCustomerIdsAsync`
+minus the retailer resolution, and opened PROJ-3829 to merge them later. Reviewer refused; merging
+them in the PR removed 89 net lines and the follow-up ticket was closed unneeded.
+
 **[REUSE-FIRST] A new action or class where an existing one fits**
 He asks "could this reuse X?" before accepting anything new. Before adding an Action, enum member,
 helper or class, search for an existing one and either use it or state in the PR why it does not
@@ -160,11 +201,22 @@ after one lookup miss for `Guid.Empty` but continues for a real hit). Both false
 twice before being deleted.
 
 **[VACUOUS-TEST] A test whose inputs cannot exercise what it claims**
-For any test named after a guard, check the inputs could actually trigger it. He caught a
-century-collision test using two different birth dates, which can never collide either way.
+For any test named after a guard, check the inputs could actually trigger it. Read the assertion
+against the property: if the inputs cannot produce the failure, the test is green for the wrong
+reason. Either construct the real case or delete the test and its claim.
 
-Read the assertion against the property: if the inputs cannot produce the failure, the test is
-green for the wrong reason. Either construct the real case or delete the test and its claim.
+The operational check, because reading is not enough — **name the input that would make it fail,
+and confirm the fixture contains it.** For a "does not collide" test that means: is there a stored
+value that is a candidate for *both* searches? If every seeded row can only ever match one of them,
+nothing is being guarded. Equivalently: break the implementation on purpose and watch the test go
+red before you trust it green.
+
+He caught this twice on the same ticket, the second time on the *fix* for the first. PROJ-3184's
+century test first used two different birth dates 90 years apart, which could never collide. The
+replacement seeded two 12-digit rows, which also cannot collide, because both carry their century.
+The real case is a row stored as ten digits: it carries no century, so it is a candidate for both
+`19…` and `20…` and comes back for each. Two rounds of review to notice that the fixture, not the
+assertion, was doing the lying.
 
 **[REDUNDANT-RESPONSE-FIELD] A field constant across every row**
 A response field set from the request is the caller's own input echoed back. Flag it. Do not accept
@@ -185,8 +237,20 @@ Look for a user-facing controller/endpoint (or `AuthorizationAdapter` built for 
 **[AUTHORIZED-FEATURES-MISUSE] Field added to `authorizedFeatures` for an external/non-FE consumer**
 `customer/{id}/authorizedFeatures` models **Repo's own frontend viewport** (which UI/nav a signed-in user sees). Do NOT add a boolean there for an external system (Seru/Leo, other services) or for a permission the Repo FE doesn't consume — it's noise and doesn't scale. External systems read a user's grants via the existing `authorization/.../action/{action}` endpoints. Flag any new `authorizedFeatures` field whose only consumer is external or non-UI. (PROJ-3183.)
 
-**[PERMISSION-PLACEMENT] Permission modeled at the wrong scope or filed under an unrelated contract**
-Two checks. (1) A company-level capability must be a `CompanyPermission`/`CompanyAction`, not `UserPermission`/`UserAction` — mirror the closest existing feature (e.g. `TTViewInsightsHub` → `InsightsHubRead` for analytics). (2) Don't gate a permission under a `ServiceContractType` it merely *resembles by name* (e.g. parking a "Reporting" permission under `ServiceE`) — `ServiceContractType` reflects the **contract that entitles** it. If it's universal to a retailer, put it in the `AlwaysOn` baseline instead; only use a contract entry if a real contract gates it. Note `ServicePermissionMap.Compose` is a test-only consistency layer (no live callers) — the live grant path is `ProductMap`. (PROJ-3183.)
+**[PERMISSION-PLACEMENT] Permission modeled at the wrong scope, or filed under a contract its holders do not hold**
+Three checks.
+
+(1) A company-level capability must be a `CompanyPermission`/`CompanyAction`, not `UserPermission`/`UserAction` — mirror the closest existing feature (e.g. `TTViewInsightsHub` → `InsightsHubRead` for analytics).
+
+(2) Don't gate a permission under a `ServiceContractType` it merely *resembles by name* (e.g. parking a "Reporting" permission under `ServiceE`) — `ServiceContractType` reflects the **contract that entitles** it. If it's universal to a retailer, put it in the `AlwaysOn` baseline instead; only use a contract entry if a real contract gates it. (PROJ-3183.)
+
+(3) **Assignability is a trust boundary, not a taxonomy — this is the security check.** The contract you file a permission under decides **who may hand it out**, because `CustomerRoleService` validates every assignment against the `AssignableCustomer`/`AssignableUser` set that `ServicePermissionMap.Compose` returns. So the question is never "which contract is this about" but **"is this contract held only by the people who should be able to grant it?"**
+
+Resolve it against the seed, not the name: `grep -n "<ContractType>" scripts/database-init/seed-service-c/seed-0-products.sql` and look at which product carries it. A contract on the `Default` product is held by ordinary customers, so a permission filed there is **self-grantable by any customer admin whose company activated that service**. A contract that appears only on `Unlocked Service` is internal. Internal-staff capabilities belong on the internal contract, which today means `SupportGrant`.
+
+Concrete: PROJ-3184 filed `CustomerPermission.MedicalAdvisor` — a nurse capability for Repo's own staff — under `MedicalAdvisoryCallback`, the contract customers buy to *receive* callbacks. Name matched, trust boundary inverted. Once the gate moved to `UserReadConfidential`, that made confidential read of identity numbers self-grantable inside any customer that had the callback service. Reviewer caught it; the fix was moving it into `SupportGrant`.
+
+**Do not repeat the claim this block used to carry, that `ServicePermissionMap` is a test-only consistency layer with `ProductMap` as the live path.** `ProductMap.cs` was deleted by PROJ-2912 and `ServicePermissionMap.Compose` has one live caller, `AssignablePermissionProvider`, injected into `UserService`, `RoleService` and `DefaultRoles`. That stale sentence sat inside this very pattern and is the reason PROJ-3184 read a placement bug as cosmetic — the rule was right and its own footnote repealed it. Re-verify a rule's stated stakes whenever you trust the rule.
 
 **[UNIT-OF-WORK] SaveChangesAsync inside a repository, or called multiple times**
 Look for `SaveChangesAsync()` / `SaveChanges()` called inside a `*Repository.cs` method. Repositories must not commit — the Unit of Work boundary belongs at the service/handler layer. He blocks on this. Also flag **more than one `SaveChangesAsync` in a single operation** ("please do not do two SaveChangesAsync here — ideally call it once for the entire update") — multiple saves break atomicity.
