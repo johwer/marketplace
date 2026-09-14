@@ -23,6 +23,35 @@ description: Infrastructure and DevOps conventions — Terraform, AWS, CI/CD, mo
 - Use `prevent_destroy` lifecycle for critical resources
 - Tag all resources with `environment`, `service`, `managed-by`
 
+### NEVER run `terraform init` inside `infra/*` for a validation-only check
+
+There is no `terraform` or `tofu` binary on this machine, so validating HCL means a Docker image —
+and `terraform validate` wants an `init` first. Running that `init` in place is the trap.
+
+**Even `init -backend=false` rewrites the committed `.terraform.lock.hcl`.** It rewrote recorded
+provider *constraints* (`~> 5.0` → `~> 5.94`) and added platform hashes, landing in `git diff` as
+unrelated collateral on an otherwise 4-file change. It also leaves a `.terraform/` directory behind.
+
+Copy the project to the scratchpad and validate there:
+
+```bash
+SP=<scratchpad>/tfv && rm -rf $SP && cp -R infra/tf-frontend $SP
+docker run --rm -v "$SP":/w -w /w hashicorp/terraform:latest init -backend=false -input=false
+docker run --rm -v "$SP":/w -w /w hashicorp/terraform:latest validate
+```
+
+`terraform fmt -check -recursive` is safe in place (no init needed). It currently flags pre-existing
+`enable_waf` / `waf_log_retention_days` misalignment in three `tf-frontend` tfvars files; CI runs
+`validate` but **not** `fmt -check`, so those are noise, not your change.
+
+### The real verification for an infra change is the PR, not a local plan
+
+Name `.github/workflows/terraform-plan.yml` as THE verification vehicle up front, in the PR body. It
+plans every changed project against **all four environments** with real AWS state and posts each
+rendered plan as a PR comment — strictly better evidence than anything reproducible locally.
+
+A green check only means the plan *succeeded*. Read the comment and diff the rendered value.
+
 ## AWS Conventions
 
 ### Security

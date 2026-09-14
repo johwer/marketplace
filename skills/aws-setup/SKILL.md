@@ -93,6 +93,29 @@ region = <defaultRegion>
 
 **Credentials are shared across all worktrees** — they live on disk in `~/.aws/credentials` / `~/.aws/sso/cache/`, NOT per-tmux/per-session. Before prompting anyone, re-check (`aws-check.sh`): if the parent or another worktree already logged in and the token is still valid, you already have access — just use it and continue, don't stop.
 
+### "I'm already logged in" but the CLI disagrees
+
+This is almost always a **console** login, not a **CLI** login — the user really is signed in, in a
+browser tab, and the CLI has no token. Do not argue and do not re-ask; read the cache and say which
+one you found:
+
+```bash
+ls -la ~/.aws/sso/cache/*.json
+for f in ~/.aws/sso/cache/*.json; do
+  python3 -c "import json,sys; d=json.load(open('$f')); print('$f', d.get('expiresAt','(no expiresAt)'))"
+done
+```
+
+An `expiresAt` in the past, or no cache file at all, means console-not-CLI. The mtime tells you when
+the CLI last had a token.
+
+Then offer to run the login **backgrounded**, so the browser session the user already has carries
+it through without a second sign-in:
+
+```bash
+aws sso login --sso-session <profileName> &
+```
+
 ### Preferred: SSO login (nothing secret to copy)
 
 When an `[sso-session <profileName>]` exists in `~/.aws/config` (it does for the standard setup), refresh via SSO — the user runs this in-session (e.g. `! aws sso login ...`) and approves in the browser; no keys are copied anywhere:
@@ -198,6 +221,22 @@ python3 scripts/sync_lokalise_translations.py \
 ```
 
 **Important:** The AWS env vars don't persist between shell invocations. If using temporary credentials, prepend them to the command or export them in the same `&&` chain.
+
+> **The sync script's success output is not proof the consumer artifact changed.** "Synced N keys"
+> describes what the script sent, not what any app can now fetch. The two come apart for real
+> reasons: a prefix mismatch (the app requests `no/no.json` while the sync writes `nb/nb.json` —
+> PROJ-3478), a cached object, or a key written to one locale only. **Verify per consumer with a
+> curl against the URL the app actually requests** — this belongs in the i18n step of the ticket,
+> not only in the "is the key in TranslationService" step. Check every locale the feature ships to, not just
+> `en`:
+>
+> ```bash
+> for loc in en sv fi no; do
+>   printf '%s: ' "$loc"
+>   curl -s "https://<s3TranslationsBucket>.s3.<defaultRegion>.amazonaws.com/$loc/$loc.json" \
+>     | python3 -c "import sys,json;print(json.load(sys.stdin).get('YOUR_KEY_HERE','NOT FOUND'))"
+> done
+> ```
 
 ### Verify a translation key exists in S3
 

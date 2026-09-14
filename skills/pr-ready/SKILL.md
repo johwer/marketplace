@@ -83,6 +83,18 @@ So: **open decision → stays in the body. Resolved decision → one line in the
 The record survives (you will want it when someone asks in three months why the column landed
 where it did), it just stops costing 400 words above the fold.
 
+> ⚠️ **But `pr-body-gate.sh` bans the `## Decisions` heading unconditionally, and it will refuse.**
+> `Decisions` is in `BANNED_HEADINGS` with no open/resolved distinction — the gate cannot tell them
+> apart, so "keep it in the body" and "go ready" are mutually exclusive states. That is deliberate,
+> and the gate's own inline comment resolves it: *"An OPEN domain-model decision belongs in the body
+> — but you should not be going ready with one unresolved. If this refuses on a live open gate, the
+> answer is to resolve the gate, not to soften the pattern."*
+>
+> Read the rule above as: **an open `## Decisions` means you are not ready yet.** Resolve the gate,
+> move the decision to the notes comment as one line, then go ready. Do not edit the gate's pattern,
+> and do not silently delete an unresolved question to get past the refusal — that is the one
+> failure mode this whole section exists to prevent (PROJ-3217).
+
 ## Safety — this is the only destructive write in the flow
 
 Every other PR skill is told *compose, never replace*. This one deletes, and the screenshots you

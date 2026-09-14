@@ -276,3 +276,64 @@ playwright-cli close
 * **Test generation** [references/test-generation.md](references/test-generation.md)
 * **Tracing** [references/tracing.md](references/tracing.md)
 * **Video recording** [references/video-recording.md](references/video-recording.md)
+
+## Gotchas found the hard way (Repo sessions)
+
+These are behaviours of this CLI that cost real time to rediscover. Each one produced a false
+result — a passing check on broken code, or a failing check on working code — not just a slowdown.
+
+### Timezone
+
+`TZ=<zone> playwright-cli ...` gives a genuinely non-UTC browser. There is no `--timezone` flag and
+you do not need one. Combined with `route` mocking this reproduces timezone bugs end to end:
+
+```bash
+TZ=America/Los_Angeles playwright-cli -s=tz open http://localhost:3000/...
+```
+
+Use a **negative-offset** zone. A positive-offset zone (Europe/Stockholm) leaves most off-by-one
+date bugs invisible, so the test passes on broken code.
+
+### Route mocking
+
+- **`route` has no `--method`.** A PUT-only mock has to go through `run-code`.
+- **`~` is NOT expanded in `--filename`.** Pass an absolute path or the file lands somewhere
+  surprising, or nowhere.
+- **Routes installed via `run-code` appear to be cleared by CLI route management** — install them
+  after any `goto`, and re-install after each navigation.
+- **`requests` output can be minutes stale.** Do not use it to prove a request did or did not
+  happen just now.
+- RTK Query passes a `Request` object as **arg 0**, so a `window.fetch` wrapper must read method and
+  body from `args[0]`, not `args[1]`. Reinstall the wrapper after every `goto`.
+- **Mocking is not always the cheapest path.** To verify a threshold in a live app, temporarily move
+  the threshold instead of faking data up to it — fewer moving parts and it exercises the real code
+  path. Revert afterwards and confirm with `git show HEAD:<file>`. Three attempts at faking a
+  16383-char blob through route interception all fell through to a fallback path and proved nothing.
+
+### Toasts and other self-dismissing UI
+
+`react-toastify` autocloses at **5 seconds**. A screenshot poll is slower than that, so you will
+record a confident "no toast appeared" for a toast that appeared and left. Either assert within
+~1 second, or install a `MutationObserver` that records toast text before you trigger the action.
+
+### Verifying colours and tokens
+
+For a "switching X changes the colours" acceptance criterion, do not eyeball screenshots. Grep the
+**token source** to find which value actually differs between the two states, pick the retailer or
+theme that shows that difference, then measure **computed styles** via iframe refs. Two themes that
+look different can share the token under test.
+
+### Measuring layout and reachability
+
+Verify per element — `scrollIntoView`, then assert the element sits inside both its container box
+and the viewport. One bulk measurement at one scroll position flags items that scrolled off the
+**top** and makes a working fix look broken.
+
+Echo the value **the page itself reports** (`innerHeight`) from inside the measurement loop. A shell
+loop that silently fails to change the viewport produces a run of identical PASSes, which is
+indistinguishable from a real pass unless the page states its own size.
+
+### Localhost
+
+See the `reference_playwright_localhost_ipv6_cors` memory — IPv6/CORS resolution on `localhost`
+bites in a specific, recurring way.
