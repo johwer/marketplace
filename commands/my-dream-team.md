@@ -114,7 +114,7 @@ Check if the arguments contain `--lite`. If present:
   - **Phase 4.9**: De-sloppify pass (cleanup over-engineering, dead code, defensive bloat)
   - **Phase 4.95**: Feature flag gating (if Amara set `needs_feature_flag: true`) — create the PostHog flag via `posthog-create-flag.sh` and verify the FE guards are wired. Applies in lite mode too.
   - **Phase 5**: Commit, push, drift detection, rebase
-  - **Phase 5.5**: Full GitHub review cycle — trigger AI bot reviews (Gemini `/gemini review`), poll for AI feedback, fix any issues, poll CI checks, mark PR ready only after user confirms. Human reviewers are auto-assigned by `.github/CODEOWNERS` on ready — do NOT manually assign from `reviewers.json` (use the opt-in `/reviewers` command only if extra reviewers are explicitly wanted)
+  - **Phase 5.5**: Full GitHub review cycle — poll for AI bot reviews (Copilot is the bot that answers on this repo; Gemini has never responded), poll for AI feedback, fix any issues, poll CI checks, mark PR ready only after user confirms. Human reviewers are auto-assigned by `.github/CODEOWNERS` on ready — do NOT manually assign from `reviewers.json` (use the opt-in `/reviewers` command only if extra reviewers are explicitly wanted)
   - **Phase 6**: User review loop — ask user for feedback, route fixes, iterate until "ship it"
   - **Phase 6.5**: Summary (write it yourself instead of spawning Tane)
   - **Phase 4.75 (Visual verification)**: **Drive the LIVE app in a real browser via `playwright-cli` and save screenshots to `~/Downloads/<TICKET_ID>/`** — that IS the verification. Navigate the worktree dev app (port 31xx), exercise the changed UI, and check network + console (not just the DOM). Save one screenshot per relevant state to `~/Downloads/<TICKET_ID>/` (user-visible folder; NEVER the repo, NEVER `/tmp`). **Do NOT** write committed Playwright e2e specs, `toHaveScreenshot` baselines, `page.screenshot()` artifacts in the repo, or GIF/video by default — that is the wrong default and contradicts how this team verifies (see memory `feedback_dtf_visual_verification_contradiction`, `feedback_real_browser_verification_mandatory`, `feedback_screenshots_user_visible_paths`). **New component → add a Cosmos fixture** (Vite/Cosmos for component states) instead of an e2e spec, plus a unit test if it has interactive logic. A committed `toHaveScreenshot` regression test is the rare EXCEPTION — only when the user explicitly asks for one. See `~/.claude/skills/playwright-cli/SKILL.md`.
@@ -125,7 +125,7 @@ Check if the arguments contain `--lite`. If present:
 - **Lead independently re-verifies in the real browser.** Never trust a dev agent's "looks good" — the team lead (and lite-mode solo) MUST personally drive the live app via `playwright-cli` and see the rendered state (+ network/console clean) before push. A claimed pass without an independent real-browser check has shipped user-facing bugs (retro PROJ-3043).
 - **New shared `ui/` primitives with interactive/conditional logic ship a unit test in the SAME PR.** Consumer tests miss the primitive's own logic (e.g. a FormSection collapsible path). Hard gate for any new `ui/` component with behavior, not just static rendering.
 - **Spawn-time prompts are frozen.** A subagent only sees its prompt as it was at spawn — relay any decision made AFTER spawn via `SendMessage`, never by assuming the agent re-reads context. And an agent→lead message may surface only as an `idle_notification`: on idle, the lead verifies progress via files/git/journal rather than waiting for a delivered DONE (retro PROJ-2924).
-- **Phase 6.9 gate is mandatory in lite mode.** Before Phase 7, you MUST output completion markers for both Phase 4.75 and Phase 6.75. No markers = Phase 7 blocked. See Phase 6.9 section.
+- **Phase 6.9 gate is mandatory in lite mode.** Before Phase 7, you MUST output completion markers for Phase 4 (review pass), Phase 4.75, Phase 6.75 and PR body assembly. No markers = Phase 7 blocked. See Phase 6.9 section.
 - The key principle: minimize agent overhead for small/medium tasks while keeping all quality gates, feedback loops, and process steps intact.
 - **Context management in lite mode**: Since you're doing all the work yourself (no subagents with separate context windows), context fills up faster. Follow the `strategic-compact` skill:
   - Compact after Phase 1 (architecture) → before starting implementation
@@ -194,6 +194,14 @@ This phase runs instead of the normal Phase 1-7 workflow when `--resume` is dete
    git log --oneline -10
    git status --short
 
+   # Diff each commit SEPARATELY — never judge the branch in aggregate.
+   # PROJ-3279: context.md framed both commits as scope drift; only one was. Acting on the
+   # aggregate framing would have moved 222 lines of ON-SCOPE tests to the wrong ticket.
+   for c in $(git log --format=%H origin/main..HEAD); do
+     echo "=== $c: $(git log -1 --format=%s $c)"
+     git show --stat $c
+   done
+
    # PR status (if exists)
    cd ~/Documents/Repo && gh pr list --head <TICKET_ID> --state all --json number,title,state,url,body
 
@@ -210,6 +218,25 @@ This phase runs instead of the normal Phase 1-7 workflow when `--resume` is dete
    # Check if Docker services are still running from previous session
    docker ps --format '{{.Names}}' | grep -i "<TICKET_ID>" 2>/dev/null
    ```
+
+4.5. **Compile what the previous session pushed — BEFORE any planning.**
+
+   ```bash
+   bash ~/.claude/scripts/quality-gate.sh "$(pwd)"
+   ```
+
+   A resumed branch may never have compiled at all. PROJ-3279 inherited a branch carrying a hard
+   C# compile error and two broken tests — all committed, all pushed, none visible from `git
+   diff`, notes or PR state, which is everything step 4 gathers. Planning on top of a red branch
+   means the first thing you "fix" is somebody else's build break, discovered halfway through.
+
+   Report the result as one of three states, and do not merge them:
+   - **green** — proceed.
+   - **red** — the previous session pushed a regression. That is now the first work item, ahead of
+     whatever the ticket says.
+   - **unverified** — the toolchain could not run (SDK pin mismatch, missing container runtime).
+     This is NOT a pass. Say "backend unverified" explicitly; `quality-gate.sh` reports it through
+     the same ".NET build failed" path as a real regression, which reads as an environment nit.
 
 5. **Assess what phase the previous session was in** based on the gathered context:
    - **No code changes, no PR** → Previous session barely started. Start fresh from Phase 1.
@@ -327,6 +354,9 @@ bash ~/.claude/scripts/phase-cost-tracker.sh log "<TICKET_ID>" "<phase-name>" "<
      - **Verified file paths**: For every key file you reference in your report, verify the path exists using Read or Glob. Include the full resolved path (e.g., `apps/web/src/pages/employees/pages/employeecard/pages/medicalcertificate/components/CertificateAttachments.tsx`), not just the filename. Downstream agents will use these paths directly — wrong paths cause silent Read failures and wasted round-trips.
      - **If both backend and frontend are needed**, define the API contract upfront: endpoint paths, HTTP methods, request/response DTOs with field names and types, **and sample JSON payloads** (not just field lists — exact shapes including nested objects and arrays). This allows frontend and backend to work in parallel — Ingrid builds components against the contract while Kenji implements the API. When `needs_docker_rebuild: true`, Ingrid should use manual types from the contract first, then swap to generated types after Kenji's Docker service is ready.
      - **Response contract completeness**: For every endpoint in the API contract, explicitly include: (a) **pagination metadata** if the response is a list (`offset`, `limit`, `totalCount`, `hasMore`), (b) **display name resolution targets** — any ID field that the frontend will need to resolve to a human-readable name (e.g., "userId resolves to user.displayName via /api/service-c/users/{id}"). Missing pagination metadata forces frontend to guess, and missing resolution targets cause extra API calls or blank labels.
+     - **Endpoint precedent — name the neighbour, state COPY or DEVIATE**: For every endpoint you design, name the nearest same-shape endpoint **in the same controller** and state explicitly whether you are copying or deviating from its auth and status-code behaviour — quoting the precedent's relevant line verbatim, as a decision the implementer must not re-derive. PROJ-3713: the neighbouring `GetUserByExternalId` collapses 403 into 404; copying it by proximity would have silently routed unauthorized nurses to legacy. Flagging it up front meant the deviation was implemented deliberately and the reviewer could see it was intentional.
+     - **Authorization changes get their review at the PLAN stage, not the diff stage**: If the ticket touches a Permission, Action, Role, RoleType, scope, `[Authorize]`, `CanUserDo*`, `ServicePermissionMap`, or a frontend feature gate, invoke the **`permission-gate`** skill and run `/ghost-review` + `/owl-review` **on your architecture report** before anyone implements. PROJ-3452: both reviews independently caught the same MUST FIX — but only after implement, verify, push, and a user-facing "it's cheap" claim, forcing a full revert. The finding was available from the plan alone. Also verify that the action you propose gating on actually guards the endpoints the page calls: `grep`ping an action name and finding it near "migration endpoints" is not the same as it guarding *this* page's `PUT /company/{id}`.
+     - **Verification plans must name the literal seed login AND check the role grants the happy path**: Do not write "log in as a nurse". Write the exact seed username, and state whether that seeded role actually holds the permission the happy path needs. PROJ-3713: the seeded nurse role has `NurseWebUse` and no read permission, so every local lookup 404s and silently redirects to legacy — which looks exactly like a working feature. A verification plan that cannot distinguish "works" from "silently falls back" is not a verification plan.
      - **Known UI/UX patterns**: Before evaluating approaches, check if the codebase already has an established pattern for the ticket's UI problem. Run a quick Glob/Grep for relevant component names (e.g., `RoutingTabMenu`, `TabMenu`, `Modal`, `Drawer`). If an established pattern exists, default to extending it rather than evaluating alternatives — document it in your report as "use existing `XComponent` pattern" and skip the alternatives analysis.
      - **Conventions summary**: Instead of having each agent read all docs independently, include a concise summary of the relevant conventions for each agent in your report. Bullet-point the key rules they must follow (naming, patterns, folder structure, etc.) so they don't waste context re-reading entire docs.
      - **Known deviations from standard patterns**: If the implementation intentionally breaks conventions, document each deviation in your report with: (a) what the standard pattern is, (b) what you're doing instead, (c) why. Examples: using a different state management approach, skipping a normally-required abstraction layer, non-standard folder structure. This prevents the PR reviewer from flagging intentional choices as bugs.
@@ -341,6 +371,8 @@ bash ~/.claude/scripts/phase-cost-tracker.sh log "<TICKET_ID>" "<phase-name>" "<
        - **Spawn a second frontend dev (Elsa)** only if: there are 2+ distinct UI areas (e.g., admin views vs user-facing views), OR the frontend scope spans 8+ files across different feature areas
        - **Spawn the data engineer (Mei)** when the ticket involves: complex database queries, report generation, data aggregation/service-e, data mapping between models, or features in the Reports & ServiceE / Analytics Dashboard area. Mei handles the data layer (query services, data mappers, report generators) while Kenji focuses on API endpoints/controllers. If the backend work is primarily data-heavy (mostly queries and transformations), spawn Mei instead of a second backend dev — not both.
        - **Bias toward fewer agents.** Each extra agent costs coordination overhead and token budget. Only add one if the work is genuinely parallelizable (not just large). When in doubt, use one dev.
+       - **Size on edit VOLUME as well as conceptual complexity — they are two counts and they disagree.** PROJ-3515 was sized as "one hook, two components in one folder", which was true. What shipped was that plus 15 consumer migrations, a folder move touching 45 import lines, and 5 test files. Both counts were available; only the concept count was used. State both in your report: *concepts* (how hard is the thinking) and *edits* (how many files and call sites move). A conceptually trivial change across 60 call sites is not a one-agent ticket.
+       - **Declining a specialist is a correctness decision, not a cost saving.** When `context.md` or the ticket recommends a specialist (ui-designer, ux-researcher, security-auditor) and you decline, say what you are giving up, not just what you are saving. PROJ-3515 declined the recommended ui-designer — and the retro's own conclusion was that a ui-designer asked for a loading affordance would likely have designed a *skeleton*, which mounts MORE, deepening the exact defect that shipped. The specialist would have changed the answer, not just polished it.
        - **Check team sizing history**: Read `your project memory directory (see Config Resolution above) for `dream-team-history.json`` (if it exists). If past sessions with similar ticket types used extra devs, check whether it helped (fewer review rounds) or hurt (coordination issues in journal highlights). Calibrate accordingly.
        - **Tiny scope (<30 lines, 1-2 files)**: Recommend `--lite` mode — spawning 3+ agents for a 1-file change wastes coordination overhead. Flag this in your report: "Recommend --lite for this scope."
        - **Full-stack tickets with 15+ files**: Consider recommending `--lite` mode to the team lead — coordination overhead from multiple agents can exceed the parallelism benefit on large tickets, and context exhaustion mid-session is a known risk.
@@ -1033,19 +1065,26 @@ Then **commit, push, and generate the initial PR summary**:
 
 The PR stays as a draft through AI review and CI. Only marked ready when everything is green.
 
-**Note:** Copilot only triggers on non-draft PRs. To get both AI reviews: mark ready → Copilot + Gemini review → fix → optionally convert back to draft.
+**Note:** Copilot only triggers on non-draft PRs. To get its review: mark ready → Copilot reviews → fix → optionally convert back to draft.
 
 **Step A: Request AI review on the draft PR**
 
-Trigger Gemini review explicitly by commenting on the PR:
+> ⚠️ **Copilot is the reviewer that answers on this repo. Gemini is not.** `/gemini review` has been
+> commented on this repo and produced no response on #3432, #3441 and #3461 (PROJ-3217). Poll for
+> **the bot that actually answers**, not the one the instructions used to name — and if the poll
+> returns nothing, check whether any bot responded before concluding "no findings". Silence from a
+> bot that was never going to answer is not a clean review.
+
+Copilot self-triggers when the PR is marked ready; there is nothing to comment. If you want to try
+Gemini anyway it costs one comment, but do not wait on it or treat its silence as a signal:
 ```bash
-gh pr comment <PR_NUMBER> --body "/gemini review"
+gh pr comment <PR_NUMBER> --body "/gemini review"   # optional; historically unanswered here
 ```
-Then poll for the response:
+Poll for whatever responds:
 ```bash
 bash ~/.claude/scripts/poll-ai-reviews.sh <OWNER>/<REPO> <PR_NUMBER> 6 45
 ```
-If it times out, proceed — bots may be slow or not configured.
+If it times out, say **which** bots did and did not answer, then proceed.
 
 **Step B: Handle AI bot feedback**
 
@@ -1412,7 +1451,28 @@ Before shutting down the team, run a retrospective to capture learnings that imp
 
 > **This gate only applies when running with `--lite`.** In full Dream Team mode, TeammateIdle and TaskCompleted hooks enforce Phase 4.75 and 6.75 automatically. In lite mode there are no named agents, so those hooks never fire. You must self-enforce here — explicitly.
 
-**You MAY NOT enter Phase 7 until BOTH markers below have been output in this session.**
+**You MAY NOT enter Phase 7 until ALL FOUR markers below have been output in this session.**
+
+---
+
+**Marker 0 — Phase 4 (Review pass):**
+
+Lite mode has no Maya, so nothing forces a review — and nothing used to ask for one here either.
+PROJ-3217 skipped Phase 4 entirely until the user asked for it; running it then produced **three
+real findings**. A solo session does not need less review than a team session, it needs the same
+review with fewer people doing it.
+
+Run a review pass over your own diff — `/ghost-review` for backend, `/owl-review` for the
+tech-lead lens, or the `pr-reviewer` subagent — and output exactly:
+```
+✓ PHASE 4 COMPLETE (review pass)
+  ran:      <ghost-review | owl-review | pr-reviewer subagent — which, and on what diff>
+  findings: <N> (<must-fix count> MUST FIX, <suggestion count> suggestions)
+  resolved: <how each MUST FIX was handled, or "none found">
+```
+
+"Nothing found" is a legitimate result — but it must be the result of a pass that ran, not of a
+pass that never happened. If you have not run a review pass — **STOP. Go do it now.**
 
 ---
 
@@ -1468,7 +1528,7 @@ If the gate exits 1 — **STOP. Run `pr-ready` properly. Do not hand-edit around
 
 ---
 
-**All three markers must appear in your output before you write the first line of Phase 7.** If any is missing, Phase 7 has been entered prematurely and the session is incomplete.
+**All four markers must appear in your output before you write the first line of Phase 7.** If any is missing, Phase 7 has been entered prematurely and the session is incomplete.
 
 ### Phase 7: Cleanup & Workspace Teardown
 
@@ -1750,6 +1810,74 @@ If the **team lead itself** is running low on context, use Phase 6.75 (retrospec
   3. **Write it back**: `gh pr edit <PR_NUMBER> --body-file /tmp/pr-body.md`
   This prevents wiping user-added screenshots and images.
 
+## Changing Shared Code — the failure moves, it does not leave
+
+- **"Match the reference pattern from PR #X" means match the BEHAVIOUR.** Before promising a port,
+  check that the reference's preconditions actually hold in the target. PROJ-3560: #3362 serialized
+  inside the hook; the dashboard serializes in a shared write chain, so the check had to move to a
+  different layer. Same pattern, different place — a literal copy would have guarded nothing.
+- **When a fix lands in shared code, enumerate every caller and ask what the NEW failure mode does
+  to each.** A fix that converts a silent failure into a thrown error has not removed the failure
+  for callers that were relying on the silence — it has moved it one file over and made it louder
+  somewhere nobody was looking. List the call sites; say what each now does.
+- **For infra tickets, name `terraform-plan.yml` on the PR as THE verification vehicle, up front.**
+  It plans all four environments against real AWS state and posts the rendered output as a PR
+  comment — strictly better evidence than a local plan, and on PROJ-3816 there was no local
+  terraform binary at all. Do not run `terraform init` inside `infra/*` to "just validate"; it
+  rewrites the committed `.terraform.lock.hcl` as collateral (copy the directory to the scratchpad
+  first). See the `infra-conventions` skill.
+
+## Verification Discipline — a harness that fails silently reports success
+
+**This is the single most-repeated failure in this command's retro history — four incidents across
+PROJ-3515, PROJ-3736, PROJ-3763 and PROJ-3823.** Each time it was fixed at the one line where it
+bit, and each time the rule went unwritten, so it came back somewhere else. It is not a shell
+trivia item; it is the mechanism by which a green result reaches the user with red underneath it.
+
+- **Never read an exit status through a pipe.** `npx vitest run | tail -25` returns *tail's* status.
+  A suite with 41 failures reported exit 0 and was relayed to the user as clean (PROJ-3515).
+  Redirect to a file, capture `$?` on the bare command, then read the file:
+  ```bash
+  npx vitest run > /tmp/vitest.log 2>&1; RC=$?
+  tail -25 /tmp/vitest.log
+  [[ $RC -eq 0 ]] || echo "FAILED with $RC"
+  ```
+- **`cmd | head` under `set -euo pipefail` kills the script.** `head` closes the pipe, `cmd` takes
+  SIGPIPE, exit 141, and every later check is skipped with no output saying so. This has bitten
+  `quality-gate.sh` twice (lines 114 and 146). Append `|| true` to any such pipeline, or avoid the
+  pipe (`git log -10 <range>` rather than `git log <range> | head -10`).
+- **A harness that cannot change reports the last thing that worked.** In zsh, `set -- $var` does
+  not word-split, so a viewport loop silently kept the previous size and produced four identical
+  PASS results (PROJ-3763). Echo the value **the system under test itself reports** — the page's
+  own `innerHeight`, the serving process's own PID — from inside the measurement, so a stuck
+  harness is visible rather than unanimously green.
+- **A suite result is a count and a duration, never a bare "passed".** `7 passed` from a parity
+  script counted users it could never log in at all; real coverage was 6/7 (PROJ-3452). Read
+  per-item results before reporting an aggregate, and say how many of what ran for how long.
+- **Ask "which fixture would fail if this were wrong?"** If no seed user, no test case, no input
+  discriminates between the correct and the broken behaviour, the harness proves nothing no matter
+  how green it is. PROJ-3452's parity check was structurally blind to the very rule it was editing:
+  no seed user held "some platform action but not `MigrateData`".
+- **Assert on the process you think you reached.** After restarting a dev server for an env change,
+  check the serving PID's start time (`lsof -ti :PORT` → `ps -o lstart`), not just HTTP 200 — a 200
+  from the *old* process looks identical (PROJ-3671).
+- **Measure per element, never in one bulk pass.** Verify reachability by `scrollIntoView` then
+  asserting the element sits inside both its container box and the viewport. A single measurement at
+  one scroll position flags items that scrolled off the *top* and makes a working fix look broken
+  (PROJ-3763).
+- **Classify an infrastructure failure before debugging your own code.** On
+  `vitest [vitest-pool] Failed to start forks worker`, run an **untouched existing test** first to
+  tell env-from-mine, then retry with `--no-file-parallelism` (PROJ-3671).
+- **For extract/rename PRs claiming no visual change, a class-string diff is the standard
+  evidence.** Dump the rendered class strings before and after and diff them; "it looks the same"
+  is not a result (PROJ-3671).
+- **A stale screenshot is not a captioning problem — re-capture, because the new capture is a fresh
+  test.** Re-shooting a loading state after a behaviour change revealed a 160px page spinner
+  rendered where a button belonged. The unit tests ("nothing before the delay, something after")
+  were equally true of the giant ring (PROJ-3515).
+- **On agent death, check untracked files, not just commits.** Ingrid crashed twice; her last
+  in-progress file was untracked and was exactly the right test (PROJ-3515).
+
 ## Context Management Protocol
 
 All agents MUST follow these rules to stay within context limits:
@@ -1775,6 +1903,12 @@ All agents MUST follow these rules to stay within context limits:
    ```
 
    Write decisions and findings to the relevant section as you work. If you need to recall something later, read the file instead of keeping it all in context.
+
+   **PASTE the matched line next to every `file:line` citation a teammate will build on.** A path
+   and a line number are a claim; the line's text is the evidence. PROJ-3713: Amara cited a caching
+   decorator as the authorization mechanism — and the line she quoted contains the word "caching".
+   Pasting it would have exposed the misattribution at write time, for free, instead of downstream.
+   Any citation a downstream agent is told to *act on* carries its line text.
 
    **Notes accuracy — mark unverified claims `[inferred]`.** When you state something in your notes that you have NOT verified by reading the full call chain (e.g., "this effect does not fire mutations [inferred from effect body only]"), tag it `[inferred]`. Downstream readers (reviewer, tester) treat untagged claims as code-verified ground truth — an untagged wrong claim propagates into reviews and test plans. (Retro PROJ-3040: an untagged inference contradicted the architecture notes and cost the reviewer a full file read to adjudicate.)
 
@@ -1910,7 +2044,31 @@ So:
 - **If the team lead sends something marked URGENT or asks you to STOP, that outranks your current task.** Finish nothing, commit what you have, do what they asked, then wait for the go-ahead. Do not "just finish this file first."
 - Do NOT stage or commit another agent's files to satisfy this — commit only paths you own.
 
-The team lead should treat repeated non-response across several minutes as a signal to verify progress via `git status`/notes rather than assume a crash, and may use `TaskStop` as a last resort.
+- **Drain your mailbox BEFORE you send DONE.** "Done" is a claim about the current requirements, and
+  a long edit burst makes you unreachable at exactly the moment upstream decisions change. On
+  PROJ-3514 three agents sent DONE with MUST FIX items sitting unread in their mailboxes — each one
+  a claim that was already false when it was made. Read pending messages, then report.
+
+The team lead should treat repeated non-response across several minutes as a signal to verify
+progress via `git status`/notes rather than assume a crash, and may use `TaskStop` as a last resort.
+**But slow is not stalled, and "idle" does not mean "did the last thing asked."** PROJ-3452 saw both
+errors in one session: an agent idled without executing an instruction just sent, and later the lead
+read 5-hour-stale notes plus uncommitted work as dead and nearly redid the work — the agent
+committed moments later. Verify through git and docker before concluding either way. On a session
+limit or an idle failure, read the **worktree**, not the agent's last words.
+
+### Two tickets sharing one resource — coordinate explicitly
+
+When two concurrent sessions share a resource (one Postgres instance, one Docker stack, one seed
+database, one shared config file), say so **at the start**, in both sessions' notes, naming the
+resource and who owns writes to it. PROJ-3514 ran this ad-hoc over ~15 `SendMessage` exchanges and
+caught 4 bugs neither ticket would have found alone — the coordination was worth its cost, it just
+had no shape. Minimum viable version:
+
+- Name the shared resource and the owning session in each side's notes file on day one.
+- The non-owner asks before any destructive operation on it (drop, reseed, rebuild, migrate).
+- Both sides re-read the shared artefact **after writing it** — concurrent worktree sessions have
+  clobbered `dream-team-learnings.md` wholesale before, losing an entire session's history.
 
 ## Browser Automation — Playwright CLI
 

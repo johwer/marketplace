@@ -28,6 +28,22 @@ Patterns & Conventions:
 - EF Core: Async patterns, proper includes
 - API conventions from `docs/API_CONVENTIONS.md`
 
+Ask what the diff CAUSES, not only whether it matches the contract:
+
+- A checklist built from the architect's plan can only re-verify the plan. Every item on it asks
+  "does this diff match the contract"; none asks "what does this diff do that is NOT in the
+  contract". Reserve part of every review for the second question.
+- **Trace any new non-terminal render state through 2-3 REAL call sites.** A new loading, pending,
+  empty or denied branch behaves differently in a 300-line page than in the toy case the author had
+  in mind. PROJ-3515: a delayed-spinner state that read fine in the diff rendered a 160px page
+  spinner in place of a button at a real call site, and the guarded children stayed mounted and kept
+  fetching on the denied branch.
+- **For gates, check what MOUNTS, not what is visible.** `inert`, `hidden`, `opacity-0`,
+  `pointer-events-none` and disabled wrappers all still mount children, run effects and fire
+  queries. A test asserting `queryByText(...)` is null passes with all of that happening.
+- **Verify a "must fix" before you call it one.** Check the type, read the call site, confirm the
+  symbol exists. A confidently wrong MUST FIX costs the author more than a missed suggestion.
+
 For each issue, categorize as:
 - **MUST FIX** — Bugs, security issues, broken patterns
 - **SUGGESTION** — Style improvements, nice-to-haves

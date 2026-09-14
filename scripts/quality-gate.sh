@@ -8,7 +8,8 @@
 #
 # Exit codes:
 #   0 — all checks passed
-#   1 — one or more checks failed (details in output)
+#   1 — one or more checks failed OR could not run (details in output; ⊘ = UNVERIFIED,
+#       meaning that area was never checked — not a pass, and not a regression)
 
 set -euo pipefail
 
@@ -69,6 +70,7 @@ fi
 
 FAILED=0
 WARNED=0
+UNVERIFIED=0
 RESULTS=""
 
 add_result() {
@@ -78,6 +80,13 @@ add_result() {
   elif [[ "$status" == "WARN" ]]; then
     RESULTS+="  ! $check — $detail\n"
     WARNED=1
+  elif [[ "$status" == "UNVERIFIED" ]]; then
+    # NOT a pass. The check could not run, so it refuses rather than staying silent —
+    # but it is worded differently from FAIL because the meanings are opposite:
+    # UNVERIFIED = environment gap, nothing is known. FAIL = a real regression, something IS known.
+    RESULTS+="  ⊘ $check — UNVERIFIED (could not run): $detail\n"
+    FAILED=1
+    UNVERIFIED=1
   else
     RESULTS+="  ✗ $check — $detail\n"
     FAILED=1
@@ -161,7 +170,30 @@ if [[ "$RUN_BACKEND" == "true" ]]; then
   # Find .sln files in services/
   SLN_FILES=$(find "$WORKTREE/services" -maxdepth 3 -name "*.sln" 2>/dev/null || echo "")
 
-  if [[ -n "$SLN_FILES" ]]; then
+  # ── Toolchain precheck: "cannot build" and "build is broken" are opposite findings ──
+  # PROJ-3279: a resumed branch had a hard C# compile error AND a global.json SDK pin the host
+  # could not satisfy. Both exited through the same ".NET build FAILED" line, which reads as an
+  # environment nit — so the real regression was dismissed. Separate them BEFORE building:
+  # UNVERIFIED still fails the gate (nothing is known, so it must not pass), but it says the
+  # backend was never checked instead of claiming a regression that may not exist.
+  DOTNET_OK=true
+  DOTNET_WHY=""
+  if ! command -v dotnet >/dev/null 2>&1; then
+    DOTNET_OK=false
+    DOTNET_WHY="no dotnet on PATH"
+  elif ! (cd "$WORKTREE" && dotnet --version) > /tmp/qg-sdk.log 2>&1; then
+    # `dotnet --version` resolves global.json from the CWD, so a pin the host cannot satisfy
+    # fails right here — before any compilation, and with the SDK's own explanation.
+    DOTNET_OK=false
+    PINNED=$(grep -oE '"version"[[:space:]]*:[[:space:]]*"[^"]+"' "$WORKTREE/global.json" 2>/dev/null | head -1 | grep -oE '[0-9][^"]*' || echo "see global.json")
+    DOTNET_WHY="global.json pins SDK $PINNED; host has $(dotnet --list-sdks 2>/dev/null | tr '\n' ' ' | cut -c1-120 || echo 'none'). rollForward cannot go backwards. $(head -2 /tmp/qg-sdk.log | tr '\n' ' ')"
+  fi
+
+  if [[ "$DOTNET_OK" == "false" ]]; then
+    add_result ".NET toolchain" "UNVERIFIED" "$DOTNET_WHY — the backend was NOT checked. This is not a regression and not a pass: nothing is known about the C# in this branch. CI is the only gate; say 'backend unverified' rather than 'build failed'."
+  fi
+
+  if [[ "$DOTNET_OK" == "true" && -n "$SLN_FILES" ]]; then
     # CSharpier formatting
     echo "  → CSharpier format check..."
     if (cd "$WORKTREE" && dotnet csharpier --check . 2>&1) > /tmp/qg-csharpier.log 2>&1; then
@@ -188,7 +220,7 @@ if [[ "$RUN_BACKEND" == "true" ]]; then
     else
       add_result ".NET build" "FAIL" "$BUILD_OUTPUT"
     fi
-  else
+  elif [[ "$DOTNET_OK" == "true" ]]; then
     add_result "Backend (no .sln found)" "PASS" "skipped"
   fi
 fi
@@ -335,6 +367,10 @@ if [[ "$FAILED" -eq 0 && "$WARNED" -eq 0 ]]; then
   echo " ✓ All quality gates passed"
 elif [[ "$FAILED" -eq 0 ]]; then
   echo " ✓ Quality gates passed, with warnings"
+elif [[ "$UNVERIFIED" -eq 1 ]]; then
+  echo " ⊘ Some checks could NOT RUN — do not report this as a pass or as a regression."
+  echo "   An UNVERIFIED line means that area is unchecked, not that it is broken."
+  echo "   Read the ⊘ lines below and say which area is unverified when you report."
 else
   echo " ✗ Some checks failed — fix before pushing"
 fi
