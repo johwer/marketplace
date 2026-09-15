@@ -119,7 +119,7 @@ Check if the arguments contain `--lite`. If present:
   - **Phase 6.5**: Summary (write it yourself instead of spawning Tane)
   - **Phase 4.75 (Visual verification)**: **Drive the LIVE app in a real browser via `playwright-cli` and save screenshots to `~/Downloads/<TICKET_ID>/`** — that IS the verification. Navigate the worktree dev app (port 31xx), exercise the changed UI, and check network + console (not just the DOM). Save one screenshot per relevant state to `~/Downloads/<TICKET_ID>/` (user-visible folder; NEVER the repo, NEVER `/tmp`). **Do NOT** write committed Playwright e2e specs, `toHaveScreenshot` baselines, `page.screenshot()` artifacts in the repo, or GIF/video by default — that is the wrong default and contradicts how this team verifies (see memory `feedback_dtf_visual_verification_contradiction`, `feedback_real_browser_verification_mandatory`, `feedback_screenshots_user_visible_paths`). **New component → add a Cosmos fixture** (Vite/Cosmos for component states) instead of an e2e spec, plus a unit test if it has interactive logic. A committed `toHaveScreenshot` regression test is the rare EXCEPTION — only when the user explicitly asks for one. See `~/.claude/skills/playwright-cli/SKILL.md`.
   - **Phase 6.75**: Retrospective — write your own retro learnings using the same 4 categories with destination hints: instruction improvements (`dream-team`/`agent:<name>`/`skill:<name>`), convention discoveries (`project-claude`/`agents-md:<path>`/`repo-docs`), doc gaps (`repo-docs`/`agents-md:<path>`), process improvements (`dream-team`/`memory`). Tag each item with a suggested destination so [`/retro-proposals`](commands.md#team-review) can route it later.
-  - **Phase 7**: Cleanup — runs the **Completion Gate** first (see `dev-workflow-checklist.md` Section 9): all PR comments resolved, visual-verification screenshots present in `~/Downloads/<TICKET_ID>/`, retro done, CI green, PR description complete. Then posts a **Jira completion comment** with PR link + summary, @mentioning the ticket creator if different from assignee. Then transitions ticket to Klart.
+  - **Phase 7**: Completion — runs the **Completion Gate** first (see `dev-workflow-checklist.md` Section 9): all PR comments resolved, visual-verification screenshots present in `~/Downloads/<TICKET_ID>/`, retro done, CI green, PR description complete. Then posts a **Jira completion comment** with PR link + summary, @mentioning the ticket creator if different from assignee. Then transitions ticket to Klart. **Stops there** — no worktree, branch or session teardown (that is `/workspace-cleanup` from the orchestrator; a session cannot remove the worktree it is running in).
 - **Visual verification applies in lite mode too.** The same Phase 4.75 gate (real-browser `playwright-cli` check + `~/Downloads/<TICKET_ID>/` screenshots) applies whether you're in full Dream Team or lite mode. Don't skip it just because you're working solo.
 - **PR body assembly applies in lite mode too.** `pr-ready` + `pr-body-gate.sh` run before `gh pr ready` in **both** modes — full mode enforces it at the Phase 6 ready step and Completion Gate item 6b, lite mode at Phase 6.9 Marker 3. A solo session produces the same wall of text a full team does; the reader can't tell which mode wrote it.
 - **Lead independently re-verifies in the real browser.** Never trust a dev agent's "looks good" — the team lead (and lite-mode solo) MUST personally drive the live app via `playwright-cli` and see the rendered state (+ network/console clean) before push. A claimed pass without an independent real-browser check has shipped user-facing bugs (retro PROJ-3043).
@@ -160,7 +160,7 @@ This phase runs instead of the normal Phase 1-7 workflow when `--resume` is dete
    ```bash
    bash ~/.claude/scripts/aws-check.sh
    ```
-   Credentials are **shared across worktrees** (on disk in `~/.aws`, not per-tmux) — if the parent or another worktree already logged in and the token is valid, you already have access; don't re-prompt. If it fails, prefer the SSO refresh (nothing secret to copy): suggest `! aws sso login --sso-session repo`, then use `AWS_PROFILE=repo-sso` for aws/S3 commands. Only fall back to paste-temp-creds (in the user's own terminal) if SSO login genuinely fails. Treat a mid-session expiry as "refresh and continue," not a hard human blocker. See memory `reference_aws_creds_shared_sso_refresh`.
+   Credentials are **shared across worktrees** (on disk in `~/.aws`, not per-tmux) — if the parent or another worktree already logged in and the token is valid, you already have access; don't re-prompt. If it fails, prefer the SSO refresh (nothing secret to copy): suggest `! aws sso login --sso-session repo`, then use `AWS_PROFILE=repo-sso` for aws/S3 commands. Only fall back to paste-temp-creds (in the user's own terminal) if SSO login genuinely fails. Treat a mid-session expiry as "refresh and continue," not a hard human blocker.
 
 2. **Verify working directory** — confirm you are running from the worktree, not the main repo:
    ```bash
@@ -1172,7 +1172,7 @@ The decision is split into TWO user-confirmable steps (PROJ-3039 retro, user-man
      gh api repos/<OWNER>/<REPO>/pulls/<PR_NUMBER>/reviews --jq '.[] | select(.user.type != "Bot") | "Reviewer: \(.user.login) | State: \(.state)\nBody: \(.body)\n"'
      ```
    - Proceed to Phase 6.4 (Tester Handoff), Phase 6.5 (Final Summary), and Phase 6.75 (Retrospective) — all part of "mark ready"
-   - Then **ask the user separately** before shipping: "Ship it? (moves Jira to Klart and shuts the team down)" — Phase 7 (Cleanup) runs only on that second confirmation
+   - Then **ask the user separately** before shipping: "Ship it? (moves Jira to Klart and shuts the team down)" — Phase 7 (Completion) runs only on that second confirmation
 4. **If "I have feedback":** Ask the user to describe what needs to change, then:
    - Route the feedback to **Maya** (PR reviewer) for assessment
    - Maya categorizes each item and identifies which agent(s) should handle it
@@ -1530,11 +1530,24 @@ If the gate exits 1 — **STOP. Run `pr-ready` properly. Do not hand-edit around
 
 **All four markers must appear in your output before you write the first line of Phase 7.** If any is missing, Phase 7 has been entered prematurely and the session is incomplete.
 
-### Phase 7: Cleanup & Workspace Teardown
+### Phase 7: Completion (NOT workspace teardown)
 
 Only triggered when the user confirms they are done:
 
-**IMPORTANT:** Run Phase 6.75 (retrospective) BEFORE this phase. The retrospective needs `.dream-team/` files (journals, notes) which get deleted here.
+**IMPORTANT:** Run Phase 6.75 (retrospective) BEFORE this phase.
+
+**This phase does NOT remove the worktree, the branch, or the tmux session.** It ends at the Jira
+transition to Klart. Worktree/branch/session teardown is `/workspace-cleanup`, run from the
+ORCHESTRATOR session (or `/create-stories` Step 0.5 on the next batch) — never from here.
+
+**Why it cannot be done here:** `git worktree remove <path>` cannot remove the worktree it is being
+run from. A session inside `~/Documents/<TICKET_ID>` is standing on the directory it would delete, so
+the teardown either fails or leaves a half-removed worktree plus a dangling branch and a stale
+`workspace-status` file. The orchestrator sits in the main repo and can.
+
+Leaving the worktree in place is deliberate, not an oversight: the PR may still get review comments,
+and the branch is the only copy of anything not yet pushed. It costs nothing to keep until the next
+`/create-stories` run sweeps it.
 
 1. **Run the Completion Checklist** — See `~/.claude/docs/dev-workflow-checklist.md` Section 9 (Completion Gate). This is a **HARD GATE** — every item must be confirmed before proceeding. The checklist covers: PR review comments resolved, screenshots on disk, retro completed, Jira comment posted.
 
