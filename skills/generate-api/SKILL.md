@@ -59,11 +59,18 @@ Each service has three file types in `apps/web/src/store/rtk-apis/{service}/`:
    done
    ```
 
-5. **Run the generation script** from the api config directory:
+5. **Run the generation script** from either app:
    ```bash
-   cd apps/web/src/api && npm run generate:{service}
+   cd apps/web && npm run generate:api:{service}
    ```
-   This runs `@rtk-query/codegen-openapi` with the config from `openapi-config-{service}.ts`.
+   Works from `apps/mobile` too — same result. The script `cd`s into `scripts/api-codegen/` itself,
+   which is what makes ts-node resolve the right tsconfig (see the TS5011 note below).
+
+   Worktree ports resolve automatically: the configs call `resolvePort()`
+   (`scripts/api-codegen/resolvePort.ts`), which takes an explicit env var, else the repo-root `.env`
+   that `allocate-ports.sh` writes, else **throws**. An unset port is a hard error rather than a
+   silent regen against the shared main stack — so start the service you changed first
+   (`worktree-service.sh up {service}`).
 
 6. **Check for Enhanced file conflicts.** If `{service}ApiEnhanced.ts` exists, verify:
    - Manually added types still match generated ones
@@ -101,13 +108,15 @@ docker compose up -d --build service-c-api service-a-api
 | Problem | Fix |
 |---------|-----|
 | Swagger returns 404 | Service hasn't started yet — wait longer or check `docker compose logs {service}-api` |
-| Codegen crashes | Check that `apps/web/src/api/node_modules` exists — run `cd apps/web/src/api && npm install` |
+| Codegen crashes | Deps live in `scripts/api-codegen/` — run `cd scripts/api-codegen && npm install` |
+| "neither esbuild-runner nor ts-node are installed" | Misleading. Usually an un-deduped nested `typescript` under `ts-node` — check `npm ls typescript`. |
+| TS5011 | You ran the generator with CWD outside `scripts/api-codegen/`. Use the `npm run generate:api:{service}` form. |
 | Types don't match runtime | Backend may use JSONB with snake_case serializer — check `EntityFrameworkExtensions.JsonbSerializerOptions` |
 | Enhanced file has stale overrides | Compare Enhanced types with generated types, remove duplicates |
 
 ## Config Files
 
-Generation configs live in `apps/web/src/api/openapi-config-{service}.ts`. Each defines:
+Generation configs live in `scripts/api-codegen/openapi-config-{service}.ts` (all 13 were consolidated there by PROJ-3438 / PR #3299). Each defines:
 - `schemaFile` — Swagger JSON URL (localhost)
 - `apiFile` — Path to the BaseApi file
 - `outputFile` — Path to the generated Api file
