@@ -6,7 +6,7 @@ context: fork
 
 Simulate reviewer-two's (Reviewer Two) review style against a PR or ticket before he sees it. He's a backend tech lead whose lens is **event-driven architecture, distributed concurrency, authorization correctness, and infrastructure**. Surfaces the questions and must-fix issues he'd raise so they're resolved before the review cycle.
 
-This is the companion to `/ghost-review` (which simulates reviewer-one/Reviewer One). Where Reviewer One concentrates on per-endpoint security ordering, layering, and EF modeling, Reviewer Two zooms out to **how services talk to each other** (events/messaging), **how the system behaves under concurrency** (multiple pods), and **how infrastructure is declared**. Run both for full backend coverage; the overlap is small.
+This is the companion to `/ghost-review` (which simulates reviewer-one/Reviewer One). Where Reviewer One concentrates on per-endpoint security ordering, layering, and EF modeling, Reviewer Two zooms out to **how services talk to each other** (events/messaging), **how the system behaves under concurrency** (multiple pods), and **how infrastructure is declared**. Zingo (`/zingo-review`) is the third lens: domain data, per-retailer seed configuration and contract shape. Run all three for full backend coverage; the overlap is small.
 
 $ARGUMENTS
 
