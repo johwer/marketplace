@@ -61,7 +61,11 @@ bash ~/.claude/scripts/phase-cost-tracker.sh log "<TICKET_ID>" "pre-hydration" "
 
 ### Step 0: AWS Session Check
 
-Before starting any work, verify the AWS session is active. Translations are fetched from S3 at runtime, so an expired session will cause issues during verification.
+**Applies to Nova-monorepo tickets only (PROJ-*, `~/Documents/Repo`).** The Nova web app fetches translations from S3 at runtime, so an expired session breaks verification there.
+
+**SKIP this entire step when the ticket does not target the Nova monorepo.** A `MEDH-*` ticket belongs to the SignedIn repo (`~/Documents/Repo.SignedIn.Web`), which uses **no AWS at all** — its `src/i18n.ts` passes statically imported JSON as `resources` and the `i18next-http-backend` `loadPath` is commented out; translations are committed under `src/locales/{sv,en,da,no}/*.json`. Running `aws-check.sh` / `aws-profiles.sh sso` there leaves AWS consent pages ("Allow **botocore-client-repo** to access your data?") in the user's browser that they never initiated. If the prefix is ambiguous, check which repo the ticket targets before running anything here — the same rule applies to every other Nova-monorepo-specific step (worktree Docker stack, `generate-api`, `write-worktree-claude-md.sh`).
+
+If the ticket IS a Nova-monorepo ticket, verify the AWS session before starting any work:
 
 ```bash
 bash ~/.claude/scripts/aws-check.sh
@@ -614,7 +618,7 @@ When the user indicates a story is done or merged (e.g., "PROJ-1234 is merged", 
 - [ ] merged worktrees/branches removed (safe `pause-workspace.sh`, not broad kill)
 - [ ] Docker pass: health check, **CPU-load fix** (restart any single R1 zombie worker), port-scoped leak check, conservative prune (images + build cache only), log recurring
 - [ ] `/retro-proposals` run/offered
-- [ ] AWS session valid (via `aws-setup` skill if it needs a refresh)
+- [ ] AWS session valid (Nova-monorepo tickets only — via `aws-setup` skill if it needs a refresh; N/A for MEDH-*/SignedIn)
 
 ### Bulk cleanup
 
