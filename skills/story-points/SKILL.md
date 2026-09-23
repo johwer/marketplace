@@ -49,7 +49,7 @@ editJiraIssue(
 )
 ```
 
-NOVA field ids: `customfield_10437` = Story point estimate, `customfield_10122` = Sprint (takes
+Project field ids: `customfield_10437` = Story point estimate, `customfield_10122` = Sprint (takes
 the numeric sprint id, e.g. `3082` for Sprint 35).
 
 One call per issue. Confirm the batch with the user before writing — points are a shared signal
@@ -60,20 +60,12 @@ kopplas till en sprint" and it follows its parent instead. Set the parent's spri
 land there. A PUT that mixes the sprint field with others fails as a whole, so set the assignee
 in its own call rather than losing it to the sprint rejection.
 
-For a batch, the REST API is far cheaper than one MCP call per issue. The ACLI OAuth token comes
-from the macOS keychain, and note the prefix — the stored value starts with `go-keyring-base64:`,
-which must be stripped before the base64/gzip decode:
+**There is already a script for this — use it rather than hand-rolling curl:**
 
 ```bash
-acli jira workitem view <ANY-TICKET> >/dev/null   # refresh the token first
-TOKEN=$(security find-generic-password -s "acli" -w | python3 -c "
-import sys,json,base64,gzip
-d=sys.stdin.read().strip().split('go-keyring-base64:',1)[-1]
-print(json.loads(gzip.decompress(base64.b64decode(d)))['access_token'])")
-curl -X PUT "https://api.atlassian.com/ex/jira/<CLOUD_ID>/rest/api/3/issue/PROJ-1234" \
-  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -d '{"fields":{"customfield_10437":2}}'
+bash ~/.claude/scripts/jira-set-field.sh <TICKET_ID> customfield_10437 2
 ```
 
-NOVA cloud id: `00000000-0000-0000-0000-000000000000`. A successful write returns HTTP 204 with
-an empty body.
+It handles the ACLI OAuth token from the macOS keychain and the cloud id, and its header
+documents the known field ids. Loop it for a batch. Reach for the REST API directly only for
+something the script does not cover.
