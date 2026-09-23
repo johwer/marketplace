@@ -27,7 +27,7 @@ set -euo pipefail
 TICKET="${1:?Usage: $0 <TICKET_ID> <FIELD_ID> <VALUE>}"
 FIELD_ID="${2:?Usage: $0 <TICKET_ID> <FIELD_ID> <VALUE>}"
 VALUE="${3:?Usage: $0 <TICKET_ID> <FIELD_ID> <VALUE>}"
-CLOUD_ID="4f617dfc-e4b4-4019-826c-6d9df112d610"
+CLOUD_ID="00000000-0000-0000-0000-000000000000"
 
 # Refresh ACLI token by running a lightweight command
 acli jira workitem view "$TICKET" --fields summary > /dev/null 2>&1 || {

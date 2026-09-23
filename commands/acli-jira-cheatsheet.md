@@ -116,7 +116,7 @@ ACCESS_TOKEN=$(security find-generic-password -s "acli" -w | python3 -c "
 import sys, base64, gzip, json
 d = sys.stdin.read().strip()[len('go-keyring-base64:'):]
 print(json.loads(gzip.decompress(base64.b64decode(d)))['access_token'])")
-CLOUD_ID="4f617dfc-e4b4-4019-826c-6d9df112d610"
+CLOUD_ID="00000000-0000-0000-0000-000000000000"
 curl -s -H "Authorization: Bearer $ACCESS_TOKEN" \
   "https://api.atlassian.com/ex/jira/$CLOUD_ID/rest/api/3/field" | \
   python3 -c "import sys,json;[print(f'{f[\"id\"]}: {f[\"name\"]}') for f in json.load(sys.stdin) if 'keyword' in f['name'].lower()]"

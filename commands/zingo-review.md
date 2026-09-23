@@ -93,6 +93,13 @@ count — he asks for the reason.
 
 ### Step 3 — Apply the checklist
 
+> **Before this checklist, run `/ghost-review`'s [NECESSITY] check** (its first item): does the
+> change need to exist at all, or does something already provide the capability? All three lenses
+> here read whether the code is *correct*; none of them asks whether it is *needed*. On PROJ-3952
+> all three passed a PR that was then closed as unnecessary. If [NECESSITY] fires, say so and stop
+> — reviewing the craft of a change that should not ship wastes the author's time twice.
+
+
 Only flag a check when the diff actually shows the pattern. Cite exact file and line.
 
 ---

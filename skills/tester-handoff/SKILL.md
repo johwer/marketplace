@@ -203,7 +203,7 @@ d = sys.stdin.read().strip()
 d = d[len('go-keyring-base64:'):]
 print(json.loads(gzip.decompress(base64.b64decode(d)))['access_token'])
 ")
-CLOUD_ID="4f617dfc-e4b4-4019-826c-6d9df112d610"
+CLOUD_ID="00000000-0000-0000-0000-000000000000"
 curl -s -X POST "https://api.atlassian.com/ex/jira/$CLOUD_ID/rest/api/3/issue/<TICKET>/attachments" \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "X-Atlassian-Token: no-check" \

@@ -383,6 +383,29 @@ mkdir -p ~/Documents/<TICKET_ID>/.dream-team
 ```
 
 Use the Write tool to create `~/Documents/<TICKET_ID>/.dream-team/jira-ticket.md` with the full Jira output from Step 1 (summary, description, acceptance criteria, attachments, raw acli output). This file persists in the worktree and is read by every agent — no more pasting ticket text into prompts.
+#### Hydrate the local implementation spec
+
+The Jira text above is the human summary. The **implementation spec** — extracted
+requirements, contracts, what is out of scope, decisions so far — lives locally at
+`~/Downloads/<TICKET_ID>/spec.md`, and a subtask's spec names its parent story.
+
+```bash
+bash ~/.claude/scripts/ticket-spec.sh hydrate <TICKET_ID> <WORKTREE_PATH>
+```
+
+This appends the spec and the parent story's goal/out-of-scope/decisions into
+`jira-ticket.md`, marked as taking precedence over the Jira text. It is deterministic,
+idempotent (safe to re-run after the spec changes), and costs no tokens.
+
+- Prints `NO_SPEC` — there is no spec file. That is fine for a self-contained ticket; carry
+  on with the Jira text alone. If the ticket is a subtask of a larger story, offer to create
+  one with `ticket-spec.sh init <TICKET_ID> --type subtask --parent <PARENT_ID>` first.
+- Exits non-zero — the spec's frontmatter is malformed (missing/invalid `type`, a subtask
+  with no `parent`, a parent cycle). Fix the spec before launching; do not proceed on a
+  ticket whose declared scope does not parse.
+
+See the `ticket-spec` skill for the frontmatter contract and the type semantics.
+
 
 Then write the pre-hydration results from Step 3 to `.dream-team/context.md` in the worktree. This file is consumed by `/my-dream-team` to skip redundant exploration.
 

@@ -64,6 +64,48 @@ Run each check below against the actual diff/patches. Only flag a check if the c
 
 ---
 
+#### RUN THIS FIRST — [NECESSITY] Does the change need to exist?
+
+Every other check below asks whether the code is built correctly. This one asks whether it should
+be built. Run it before reading a single line of implementation, because if it fires, the rest of
+the review is wasted effort on both sides.
+
+reviewer-one raises this as a **blocking** finding, and his characterisation above already says why:
+a mechanism relayed from product, from a customer, or **from the ticket itself** is a *suggestion,
+not a spec*. A ticket that names its own mechanism has not thereby justified it.
+
+For every capability the diff adds, answer all four:
+
+1. **What already provides this?** Search for the capability, not the name. An endpoint, a role, a
+   flag, an existing scope combination. "There is no X" is only true after grepping for what X does.
+2. **Is the constraint the ticket cites a constraint, or a convention?** A DB check constraint, an
+   enum, a type signature are constraints. A seed comment, a naming pattern, an existing row's
+   shape, a doc line are **conventions** — they explain a past choice and can be changed. Read the
+   artefact that enforces it; if nothing enforces it, the ticket is describing a habit.
+3. **Is this a config job rather than a code job?** If the capability can be reached by seeding,
+   assigning, or configuring what already exists, the code is not the smaller change however clean
+   it is.
+4. **Does it change a shared authorization, permission or domain rule?** If yes, that needs
+   prealignment before implementation, not review after. Flag it as MUST-FIX regardless of quality.
+
+Write the finding as: *what the change adds → what already provides it → the cheaper route*. Do not
+soften it into a suggestion; a correct implementation of an unnecessary change still gets closed.
+
+> **The incident this came from (PROJ-3952, 2026-09-21).** A narrow ServiceC endpoint was designed,
+> built, unit- and integration-tested against real Postgres, passed 20 CI checks, and was reviewed
+> favourably by the domain lens — then closed by reviewer-one: *"This is a huge architectural
+> intrusion into the role and permission system without any prealignment or discussion afaik.
+> Please do not do that again."* The capability already existed: `RoleScopeRules` forbids only
+> **customer-level** roles at Retailer scope, and the nurse roles were customer-owned because a
+> **seed comment** said they were "retailer-wide rather than tied to a single company" — a
+> rationale, not a constraint (`ck_roles_owner_xor` was satisfied either way). A company-level role
+> carrying the same platform action could always be assigned at retailer scope with the existing
+> endpoint. Check 2 would have caught it by reading the constraint; check 3 by asking whether it was
+> config. All three pre-emptive lenses passed the PR, because all three asked only whether it was
+> built well. It was.
+
+---
+
 #### MUST-FIX patterns (reviewer-one blocks approval on these)
 
 **[AUTH-ORDER] Permission check after data fetch**

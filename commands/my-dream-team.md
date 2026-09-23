@@ -306,6 +306,17 @@ bash ~/.claude/scripts/phase-cost-tracker.sh log "<TICKET_ID>" "<phase-name>" "<
    ```
    Then use the Write tool to create `.dream-team/jira-ticket.md` with the full output (summary, description, acceptance criteria, attachments, raw output). This file will be read by every agent in the team.
 
+   **Then hydrate the local implementation spec** (deterministic, idempotent, no tokens):
+   ```bash
+   bash ~/.claude/scripts/ticket-spec.sh hydrate <TICKET_ID> .
+   ```
+   `~/Downloads/<TICKET_ID>/spec.md` holds the extracted requirements, contracts and
+   decisions; Jira holds only the human summary. For a subtask this also pulls in the parent
+   story's goal, out-of-scope and decisions — **binding constraints**, even though the
+   subtask does not repeat them. `NO_SPEC` means there is no spec file; proceed on the Jira
+   text. A non-zero exit means the spec's frontmatter is malformed — fix it before spawning
+   agents. See the `ticket-spec` skill.
+
    **Also check for pre-hydrated context**: Look for `.dream-team/context.md`. If it exists, this ticket was pre-analyzed by `/create-stories` during parallel pre-hydration.
    ```bash
    cat .dream-team/context.md 2>/dev/null
@@ -1161,6 +1172,13 @@ The decision is split into TWO user-confirmable steps (PROJ-3039 retro, user-man
      bash ~/.claude/scripts/pr-body-gate.sh <PR_NUMBER>   # exit 1 = REFUSED, do not go ready
      ```
      A median DTF PR body was measured at 1,700 words / 13 headings before this step existed. That is an eight-minute read a reviewer does not start, which is why they skip to the diff or skip the PR.
+   - **Write decisions back to Jira (if the ticket has a spec file)**: the spec at
+     `~/Downloads/<TICKET_ID>/spec.md` is local — no PO, tester or reviewer can see it, so the
+     ticket cannot be accepted from it. Post the `goal` line plus any `## Decisions` added
+     during implementation as a comment on the Jira ticket. Also check the branch against the
+     spec's `## Out of scope` and any struck-through (`~~...~~`) decision: code still doing
+     what those say it should not is a leftover from an earlier shape of the ticket — remove
+     it before going ready.
    - **Mark the PR as ready**: `gh pr ready <PR_NUMBER>`
    - **Do NOT manually assign reviewers.** The repo's `.github/CODEOWNERS` auto-requests the right reviewers the moment the PR goes ready — manual assignment from `reviewers.json` is redundant and risks over-pinging. After `gh pr ready`, confirm who CODEOWNERS picked:
      ```bash
