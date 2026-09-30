@@ -180,20 +180,41 @@ This uses the self-contained launcher script at `~/.claude/scripts/launch-worksp
 **Check the user's terminal preference** in `~/.claude/CLAUDE.md` under "Workspace Preferences" for the configured terminal app. Then open a new window running the launcher script:
 
 ```bash
-bash ~/.claude/scripts/open-terminal.sh "<TERMINAL_APP>" "bash ~/.claude/scripts/launch-workspace.sh '<TICKET_ID>'"
+bash ~/.claude/scripts/open-terminal.sh "<TERMINAL_APP>" "bash ~/.claude/scripts/launch-workspace.sh '<TICKET_ID>' '/my-dream-team <TICKET_ID>'"
 ```
 
 Replace `<TERMINAL_APP>` with the configured app (Alacritty, Terminal, iTerm, Warp, Kitty, WezTerm, or Ghostty).
 
-### Step 8: Provide Dream Team Instructions
+**Always pass the Dream Team command as the second argument.** The launcher waits for Claude
+to boot and then types it into the tmux window for you. Do NOT launch with the ticket ID alone
+and then tell the user to type `/my-dream-team` themselves — that is a manual step the script
+already automates, and it is the single most-repeated hand-off in the whole flow.
 
-Tell the user to run the following command in the new Claude session:
+Append flags to that second argument when the situation calls for them:
 
+- `--interview` — the ticket carries unsettled product/security decisions that an agent would
+  otherwise guess at. Pass it whenever the ticket text contains open questions or a
+  "decisions to make" section.
+- `--lite`, `--no-worktree`, `--local` — only when the user asked for them.
+
+If the user has said which flags they want, honour that over the defaults above.
+
+### Step 8: Verify the Dream Team Actually Started
+
+The launcher has already typed `/my-dream-team <TICKET_ID>` into the new window. Confirm it
+landed rather than assuming it did — `open-terminal.sh` blocks while the window is attached, so
+it will usually be reported as a background task. Check the session exists:
+
+```bash
+tmux ls | grep <TICKET_ID>
 ```
-/my-dream-team <TICKET_ID>
-```
 
-The full ticket text is already saved at `.dream-team/jira-ticket.md` in the worktree — no need to paste it. The Dream Team will read it from disk.
+Then report to the user what is running, not what they should type. Only if the session is
+missing, or Claude booted too slowly for the send-keys to land, fall back to telling them to
+run `/my-dream-team <TICKET_ID>` manually in that window.
+
+The full ticket text is already saved at `.dream-team/jira-ticket.md` in the worktree — no need
+to paste it. The Dream Team will read it from disk.
 
 ## Important Rules
 

@@ -148,8 +148,12 @@ COMMENT_GATE="$HOME/.claude/scripts/comment-gate.sh"
 if [[ ! -x "$COMMENT_GATE" ]]; then
   add_result "Added comments" "FAIL" "comment-gate.sh not found or not executable at $COMMENT_GATE — the gate cannot run, so it refuses rather than passing silently. Restore it (/sync-config) and re-run."
 else
-  (cd "$WORKTREE" && bash "$COMMENT_GATE") > /tmp/qg-comments.log 2>&1
-  CG_EXIT=$?
+  # `|| CG_EXIT=$?` is load-bearing: comment-gate exits non-zero BY DESIGN when it
+  # refuses, and under `set -e` a bare failing command kills the script before the
+  # next line can read `$?`. That produced an exit-1 with nothing printed past the
+  # step header, hiding a real refusal behind what looks like a crash.
+  CG_EXIT=0
+  (cd "$WORKTREE" && bash "$COMMENT_GATE") > /tmp/qg-comments.log 2>&1 || CG_EXIT=$?
   # Strip ANSI so the file:line entries are matchable.
   sed -E 's/\x1b\[[0-9;]*m//g' /tmp/qg-comments.log > /tmp/qg-comments-plain.log
   CG_LINES=$(grep -oE '[^[:space:]]+:[0-9]+[[:space:]]+//.*' /tmp/qg-comments-plain.log 2>/dev/null | head -5 | tr '\n' ';' | sed 's/;$//' || true)

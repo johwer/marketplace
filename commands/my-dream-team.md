@@ -323,10 +323,13 @@ bash ~/.claude/scripts/phase-cost-tracker.sh log "<TICKET_ID>" "<phase-name>" "<
    ```
    If the file exists and contains a valid analysis, **use it instead of spawning Amara for exploration**. Skip to step 5b below. This saves significant startup time — the scope, key files, conventions, and team recommendations are already determined.
 
-3. **Move ticket to Pågående** (In Progress) in Jira:
+3. **Move ticket to Pågående** (In Progress) in Jira — and confirm it landed:
    ```bash
-   acli jira workitem transition --key "<TICKET_ID>" --status "Pågående"
+   bash ~/.claude/scripts/jira-status-gate.sh "<TICKET_ID>" "Pågående" --fix
    ```
+   This transitions the ticket if it is not there yet and prints `✓`. **Paste the output.** A bare
+   `acli ... transition` that silently fails leaves the board showing "Att göra" while a team is
+   working — use the gate, not the raw command.
 
 4. **Create the team** using TeamCreate with name `dream-team-<TICKET_ID>` (e.g., `dream-team-PROJ-1234`). This ensures multiple worktrees can run teams simultaneously without collision.
 
@@ -412,6 +415,14 @@ bash ~/.claude/scripts/phase-cost-tracker.sh log "<TICKET_ID>" "<phase-name>" "<
 Immediately after receiving Amara's analysis, create a **draft PR** so the user and colleagues can follow progress on GitHub:
 
 > **If Amara's report proposes a stack** (see her Stacked-PR assessment in Phase 1), follow the **`stacked-prs`** skill instead of this phase's single-PR flow: create the layer branches with `gh stack init`, and open the draft PR for the **bottom layer only**. Upper layers get their PRs from `gh stack submit` as they become reviewable. Note that `validate-title` does not run on drafts, so a malformed title only fails when the PR goes ready.
+
+0. **HARD GATE — the ticket must be Pågående before a PR exists.** Opening a PR while the
+   board still says "Att göra" is how a skipped Step 3 goes unnoticed; it was caught by hand on
+   PROJ-3978, which reached this phase with the ticket untouched.
+   ```bash
+   bash ~/.claude/scripts/jira-status-gate.sh "<TICKET_ID>" "Pågående" --fix
+   ```
+   Exit 1 = do not create the PR until the status is right. **Paste the output.**
 
 1. **Create an empty commit** to have something to push:
    ```bash
@@ -1149,7 +1160,7 @@ Only after both AI review and CI are clean:
 2. **Do NOT manually assign human reviewers — ever.** When the PR is marked ready in Phase 6, `.github/CODEOWNERS` auto-requests reviewers. Manual assignment is redundant; only the opt-in `/reviewers` command should add extras, and only if explicitly asked.
 3. **Move ticket to Under granskning** (In Review):
    ```bash
-   acli jira workitem transition --key "<TICKET_ID>" --status "Under granskning"
+   bash ~/.claude/scripts/jira-status-gate.sh "<TICKET_ID>" "Under granskning" --fix   # paste the output
    ```
 4. **Notify the user** that AI review and CI are clean, and the PR is ready for their review. The PR is still a draft — it will be marked ready (and CODEOWNERS will auto-assign reviewers) once they confirm.
 5. See `~/.claude/docs/dev-workflow-checklist.md` Section 4 for the full PR lifecycle.
