@@ -139,11 +139,17 @@ acli jira workitem view PROJ-1234
 # Add UAT finding as comment
 acli jira workitem comment PROJ-1234 "UAT Finding: [description]. See bug ticket PROJ-5678."
 
-# Create a bug ticket
+# Create a bug ticket (a real subtask of the feature under test when it is an open story)
 acli jira workitem create --project PLRS --type Bug --summary "UAT: [description]" --description "[full report]"
+acli jira workitem create --project PLRS --type Subtask --parent PROJ-1234 --summary "UAT: [description]" --description "[full report]"
 
-# Link bug to parent feature
-acli jira workitem link PROJ-5678 PROJ-1234 --type "is caused by"
+# Assign and point it (--assignee fails; points 1-4 per the story-points skill)
+bash ~/.claude/scripts/jira-assign.sh PROJ-5678
+bash ~/.claude/scripts/jira-set-field.sh PROJ-5678 customfield_10437 2
+
+# Link bug to the feature, then READ IT BACK: the direction often comes out reversed
+acli jira workitem link create --out PROJ-5678 --in PROJ-1234 --type Relates
+acli jira workitem view PROJ-1234 --fields issuelinks --json | jq '.fields.issuelinks[] | {type: .type.name, out: .outwardIssue.key, in: .inwardIssue.key}'
 
 # Download test evidence (screenshots from ticket)
 bash ~/.claude/scripts/jira-download-attachments.sh PROJ-1234

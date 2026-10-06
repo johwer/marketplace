@@ -43,11 +43,14 @@ acli jira workitem create \
   --type "Bug" \
   --summary "Login broken" \
   --description "Steps to reproduce..." \
-  --assignee "user@example.com" \
   --label "bug,critical"
 
-# Self-assign
-acli jira workitem create --project "TEAM" --type "Task" --summary "My task" --assignee @me
+# A real subtask under an open story
+acli jira workitem create --project "TEAM" --type "Subtask" --parent "KEY-100" --summary "Part of the story"
+
+# Every created ticket: assign + story points (see "Assigning" below)
+bash ~/.claude/scripts/jira-assign.sh KEY-123
+bash ~/.claude/scripts/jira-set-field.sh KEY-123 customfield_10437 2
 
 # From a JSON template (generate one first, then edit it)
 acli jira workitem create --generate-json
@@ -62,11 +65,10 @@ acli jira workitem create --project "TEAM" --type "Task" --editor
 ```bash
 # Edit by key
 acli jira workitem edit --key "KEY-123" --summary "Updated title"
-acli jira workitem edit --key "KEY-123" --assignee "user@example.com"
 acli jira workitem edit --key "KEY-123" --description "New description"
 
 # Bulk edit by JQL
-acli jira workitem edit --jql "project = TEAM AND status = 'To Do'" --assignee @me --yes
+acli jira workitem edit --jql "project = TEAM AND status = 'To Do'" --labels "triage" --yes
 
 # Change status (transition)
 acli jira workitem transition --key "KEY-123" --status "In Progress"
@@ -80,7 +82,7 @@ acli jira workitem transition --key "KEY-1,KEY-2,KEY-3" --status "Done" --yes
 
 | Action | Command |
 |---|---|
-| **Assign** | `acli jira workitem assign --key KEY-123 --assignee @me` |
+| **Assign** | `bash ~/.claude/scripts/jira-assign.sh KEY-123 [accountId]` (see below) |
 | **Add comment** | `acli jira workitem comment create --key KEY-123 --body "my comment"` |
 | **Add labels** | `acli jira workitem edit --key KEY-123 --labels "bug,urgent"` |
 | **Clone** | `acli jira workitem clone --key KEY-123` |
@@ -88,6 +90,27 @@ acli jira workitem transition --key "KEY-1,KEY-2,KEY-3" --status "Done" --yes
 | **List sprint items** | `acli jira sprint list-workitems --sprint-id 123` |
 
 Append `--help` to any command to see its full options.
+
+## Assigning
+
+`--assignee` fails in acli: on `create`, on `edit` and on `assign`. Use the helper. It calls `PUT /issue/<KEY>/assignee` over REST, with the account id from `GET /myself` when none is given, and reads the assignee back:
+
+```bash
+bash ~/.claude/scripts/jira-assign.sh KEY-123              # assign to me
+bash ~/.claude/scripts/jira-assign.sh KEY-123 <accountId>  # assign to someone else
+```
+
+## Links: read the direction back
+
+`link create` can come out reversed. You may pass `--out A --in B` and get "B blocks A". Always read the link back after creating it, and delete and recreate it if it is the wrong way round:
+
+```bash
+acli jira workitem link create --out KEY-1 --in KEY-2 --type Blocks
+acli jira workitem view KEY-2 --fields issuelinks --json \
+  | jq '.fields.issuelinks[] | {type: .type.name, outward: .type.outward, out: .outwardIssue.key, in: .inwardIssue.key}'
+```
+
+Link types that exist: `acli jira workitem link type`. There is no "is caused by"; use `Relates` or `Problem/Incident`.
 
 ## Custom Fields via REST API
 

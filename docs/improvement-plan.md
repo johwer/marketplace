@@ -39,7 +39,7 @@ Living document tracking Claude Code platform features, how DTF relates to them,
 **Decision:** Adopt Chrome Integration as primary. It solves every pain point documented in `visual-testing.md` (coordinates, permissions, tab management, GIF recording). AppleScript remains as fallback if Chrome extension is unavailable.
 
 **Action items:**
-- [ ] Test `claude --chrome` with the MedHelp frontend
+- [ ] Test `claude --chrome` with the Repo frontend
 - [ ] Update `dev-workflow-checklist.md` Section 1 to prefer Chrome integration
 - [ ] Update `visual-testing.md` to document Chrome approach first, AppleScript as fallback
 - [ ] Test GIF recording via Chrome vs current ffmpeg workflow

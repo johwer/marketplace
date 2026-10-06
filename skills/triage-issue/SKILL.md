@@ -79,9 +79,15 @@ Create a new bug ticket in Jira using ACLI:
 acli jira workitem create \
   --project PLRS \
   --type Bug \
-  --title "<concise bug title>" \
-  --body-file /tmp/triage-<slug>.txt
+  --summary "<concise bug title>" \
+  --description-file /tmp/triage-<slug>.txt
+
+# then, with the key from the create output:
+bash ~/.claude/scripts/jira-assign.sh <KEY>
+bash ~/.claude/scripts/jira-set-field.sh <KEY> customfield_10437 <1-4>
 ```
+
+If the bug belongs to an open story, create a real subtask instead: `--type Subtask --parent <STORY_KEY>`. Points follow the `story-points` skill (1–4). Do not use `--assignee`; it fails.
 
 Write the body to `/tmp/triage-<slug>.txt` first using this template:
 

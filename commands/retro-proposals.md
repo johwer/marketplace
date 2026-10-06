@@ -278,8 +278,13 @@ Learnings split into two tracks based on who they affect:
       acli jira workitem create --project PLRS --type Uppgift \
         --summary "Apply retro learnings to repo docs and conventions" \
         --description "<description with the table of proposed changes>"
+      # then, with the key from the create output:
+      bash ~/.claude/scripts/jira-assign.sh <KEY>
+      bash ~/.claude/scripts/jira-set-field.sh <KEY> customfield_10437 <1-4>
       ```
-      Output: `✓ STEP 1 COMPLETE: Jira ticket [PROJ-XXXX] created`
+      If the learnings belong to an open story, create a real subtask instead: `--type Subtask --parent <STORY_KEY>`.
+      Points follow the `story-points` skill (1–4, complexity and unknowns). Do not use `--assignee`; it fails.
+      Output: `✓ STEP 1 COMPLETE: Jira ticket [PROJ-XXXX] created, assigned, <n> points`
       If `acli` fails, try `Task` or `Story` as the type. If unavailable, tell the user the details to create manually — do NOT skip silently.
 
    b. **STEP 2 — Create branch**:

@@ -108,9 +108,15 @@ Write the plan to `/tmp/refactor-plan-<slug>.txt` then create the ticket:
 acli jira workitem create \
   --project PLRS \
   --type Task \
-  --title "Refactor: <concise title>" \
-  --body-file /tmp/refactor-plan-<slug>.txt
+  --summary "Refactor: <concise title>" \
+  --description-file /tmp/refactor-plan-<slug>.txt
+
+# then, with the key from the create output:
+bash ~/.claude/scripts/jira-assign.sh <KEY>
+bash ~/.claude/scripts/jira-set-field.sh <KEY> customfield_10437 <1-4>
 ```
+
+If the refactor belongs to an open story, create a real subtask instead: `--type Subtask --parent <STORY_KEY>`. Points follow the `story-points` skill (1–4). Do not use `--assignee`; it fails.
 
 Use this template for the body (plain text — no Jira wiki markup):
 

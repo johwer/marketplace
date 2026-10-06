@@ -29,6 +29,8 @@ Before this skill can run, you MUST re-invoke it with args: --ack
 
 By passing --ack you commit to executing ALL 7 steps for every Ticket+PR item:
   1. Create Jira ticket   → acli jira workitem create --project PLRS --type Uppgift
+                            (or --type Subtask --parent <STORY> when it belongs to an open story)
+                          → jira-assign.sh <KEY> + jira-set-field.sh <KEY> customfield_10437 <1-4>
   2. Create branch        → git checkout -b retro-learnings-<date>
   3. Edit destination files on the branch
   4. Commit with Jira ref → git commit -m "PROJ-XXXX: ..."
