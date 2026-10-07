@@ -23,14 +23,25 @@
 #   --description   Human description. Convention: start with the ticket id.
 #                   Auto-derived from --ticket + slug if omitted.
 #
+# Release condition — $initial_host, NOT $host:
+#   The condition is a PERSON property. PostHog stores $initial_host on the person profile by
+#   itself; $host only exists on events and Nova never sends it for flags, so a $host condition
+#   never matches a logged-in user (PROJ-4013: flag "on" for app-accept, tab never showed).
+#   $initial_host only exists after login (identify) — a flag read before login cannot use it.
+#
 # Options:
-#   --hosts h1,h2   Comma-separated $host values to enable for.
+#   --hosts h1,h2   Comma-separated $initial_host values to enable for.
 #                   Default: polaris-accept.repo.se,leo-stg.retailer-b.com
+#                   Repo accept is app-accept.repo.se (polaris-accept is TT accept).
 #   --rollout N     Rollout percentage for the matched group (default 100)
 #   --project ID    PostHog project id (default 42565)
 #   --api-host URL  PostHog API host (default https://eu.posthog.com)
 #   --inactive      Create the flag disabled (default: active)
 #   --dry-run       Print the payload, don't call the API
+#
+# Updating an existing flag keeps its description unless --description is passed explicitly.
+# After writing, the flag is evaluated against PostHog's /flags endpoint for every host; the
+# script exits non-zero if it does not come back enabled for each of them.
 #
 # API key resolution (first hit wins):
 #   1. $POSTHOG_PERSONAL_API_KEY
@@ -43,7 +54,7 @@
 #
 set -euo pipefail
 
-KEY="" ; DESC="" ; TICKET="" ; HOSTS="polaris-accept.repo.se,leo-stg.retailer-b.com"
+KEY="" ; DESC="" ; DESC_EXPLICIT=false ; TICKET="" ; HOSTS="polaris-accept.repo.se,leo-stg.retailer-b.com"
 ROLLOUT=100 ; ACTIVE=true ; DRY_RUN=false
 
 # Project id / API host default from dtf-config.json (posthog section), else built-in.
@@ -58,7 +69,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --key)         KEY="$2"; shift 2 ;;
     --ticket)      TICKET="$2"; shift 2 ;;
-    --description) DESC="$2"; shift 2 ;;
+    --description) DESC="$2"; DESC_EXPLICIT=true; shift 2 ;;
     --hosts)       HOSTS="$2"; shift 2 ;;
     --rollout)     ROLLOUT="$2"; shift 2 ;;
     --project)     PROJECT="$2"; shift 2 ;;
@@ -88,7 +99,6 @@ if [ -n "$TICKET" ]; then
 fi
 
 [ -n "$KEY" ]  || { echo "ERROR: provide --key, or --ticket (+ --key slug or --description) to derive it" >&2; exit 2; }
-[ -n "$DESC" ] || { echo "ERROR: --description is required (or pass --ticket to derive it)" >&2; exit 2; }
 
 # Guard the convention: a derived/standard key must carry a ticket number.
 echo "$KEY" | grep -Eq '[a-z]+-[0-9]+' || echo "WARNING: flag key '$KEY' has no ticket number — convention is <ticket>-<slug>, e.g. proj-2831-legacy-user-redirect" >&2
@@ -130,7 +140,7 @@ resolve_key() {
 APIKEY="$(resolve_key)"
 [ -n "$APIKEY" ] || { echo "ERROR: no API key provided" >&2; exit 1; }
 
-# --- Build the standard filters payload (single $host property = OR over hosts) ---
+# --- Build the standard filters payload (single $initial_host property = OR over hosts) ---
 HOSTS_JSON=$(printf '%s' "$HOSTS" | python3 -c "import sys,json; print(json.dumps([h for h in sys.stdin.read().split(',') if h]))")
 BODY=$(python3 - "$KEY" "$DESC" "$ACTIVE" "$ROLLOUT" "$HOSTS_JSON" <<'PY'
 import json, sys
@@ -142,7 +152,7 @@ print(json.dumps({
     "filters": {
         "groups": [{
             "variant": None,
-            "properties": [{"key": "$host", "type": "person",
+            "properties": [{"key": "$initial_host", "type": "person",
                             "value": json.loads(hosts_json), "operator": "exact"}],
             "rollout_percentage": int(rollout),
             "aggregation_group_type_index": None,
@@ -174,8 +184,13 @@ print(next((str(f['id']) for f in d.get('results',[]) if f.get('key')=='$KEY'), 
 
 if [ -n "$EXISTING_ID" ]; then
   echo "Flag '$KEY' already exists (id $EXISTING_ID) — updating to standard config..."
+  if [ "$DESC_EXPLICIT" = false ]; then
+    BODY=$(printf '%s' "$BODY" | python3 -c "import sys,json; b=json.load(sys.stdin); b.pop('name'); print(json.dumps(b))")
+    echo "→ keeping the existing description (pass --description to change it)"
+  fi
   RESP=$(auth -X PATCH -H "Content-Type: application/json" -d "$BODY" "$BASE/$EXISTING_ID/")
 else
+  [ -n "$DESC" ] || { echo "ERROR: --description is required for a new flag (or pass --ticket to derive it)" >&2; exit 2; }
   echo "Creating flag '$KEY'..."
   RESP=$(auth -X POST -H "Content-Type: application/json" -d "$BODY" "$BASE/")
 fi
@@ -191,3 +206,32 @@ if 'id' in r:
 else:
     print('ERROR:', json.dumps(r)[:500]); sys.exit(1)
 "
+
+# --- Verify: ask PostHog's /flags endpoint, as the app would, whether it is on for each host ---
+[ "$ACTIVE" = true ] || exit 0
+PUBLIC_TOKEN=$(auth "$API_HOST/api/projects/$PROJECT/" | python3 -c "import sys,json; print(json.load(sys.stdin).get('api_token',''))" 2>/dev/null || true)
+if [ -z "$PUBLIC_TOKEN" ]; then
+  echo "WARNING: could not read the project's public token — flag NOT verified. Check it in the app." >&2
+  exit 0
+fi
+INGEST_HOST=$(printf '%s' "$API_HOST" | sed -E 's#https://(eu|us)\.posthog\.com#https://\1.i.posthog.com#')
+FAILED=0
+probe() {
+  curl -s -X POST "$INGEST_HOST/flags/?v=2" -H "Content-Type: application/json" \
+    -d "{\"api_key\":\"$PUBLIC_TOKEN\",\"distinct_id\":\"flag-verify\",\"person_properties\":{\"\$initial_host\":\"$1\"}}" \
+    | python3 -c "import sys,json; f=json.load(sys.stdin).get('flags',{}).get('$KEY') or {}; print('%s %s' % (f.get('enabled'), (f.get('reason') or {}).get('code')))"
+}
+# PostHog's /flags serves cached flag definitions for a few seconds after a write — retry before failing.
+for h in $(printf '%s' "$HOSTS" | tr ',' ' '); do
+  for attempt in 1 2 3 4 5 6; do
+    RESULT=$(probe "$h")
+    case "$RESULT" in True*) break ;; esac
+    [ "$attempt" -lt 6 ] && sleep 5
+  done
+  case "$RESULT" in
+    True*) echo "     verified: on for $h" ;;
+    *)     echo "ERROR: flag is NOT on for $h ($RESULT)" >&2; FAILED=1 ;;
+  esac
+done
+[ "$ROLLOUT" = 100 ] || echo "     note: rollout is $ROLLOUT% — a single probe user may fall outside it" >&2
+exit $FAILED

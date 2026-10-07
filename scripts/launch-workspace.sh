@@ -14,11 +14,13 @@ fi
 source "$(dirname "$0")/dtf-env.sh" 2>/dev/null || true
 WORKTREE_PARENT="${DTF_WORKTREE_PARENT:-$HOME/Documents}"
 
-cd "$WORKTREE_PARENT/$TICKET_ID" || exit 1
+WORKTREE="$WORKTREE_PARENT/$TICKET_ID"
+cd "$WORKTREE" || exit 1
 unset CLAUDECODE
 
 # Start tmux detached, send claude, wait, send dream team command, then attach
-tmux new-session -d -s "$TICKET_ID"
+tmux new-session -d -s "$TICKET_ID" -c "$WORKTREE"
+tmux send-keys -t "$TICKET_ID" "cd \"$WORKTREE\"" Enter
 # Select the project's pinned Node (apps/web/.nvmrc) before starting Claude, so the
 # session and anything Claude spawns match the repo's version — not the nvm default.
 tmux send-keys -t "$TICKET_ID" 'source "${NVM_DIR:-$HOME/.nvm}/nvm.sh" >/dev/null 2>&1; [ -f apps/web/.nvmrc ] && nvm use "$(cat apps/web/.nvmrc)" >/dev/null 2>&1' Enter
