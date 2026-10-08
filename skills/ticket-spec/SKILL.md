@@ -35,6 +35,10 @@ Sections, in this order: `## Goal`, `## Requirements`, `## Contracts`, `## Out o
 `## Decisions`, `## Open questions`. The section names are load-bearing — `hydrate` extracts
 `Goal`, `Out of scope` and `Decisions` from parents by exact heading.
 
+Tag each open question with who answers it, `[PO]` or `[tech lead]`. Questions to send on are
+written with the `stakeholder-questions` skill, and its answers move to `## Decisions` as
+`PO <date>: …` / `Tech lead <date>: …`.
+
 **Never infer `type` from the Jira issue type.** Jira's issue type says how the ticket is
 tracked; `type` here says how much context the work needs. Set it explicitly.
 

@@ -1656,7 +1656,7 @@ When any agent (Kenji, Diego, or others) needs to change the domain model (entit
    acli jira workitem transition --key "<TICKET_ID>" --status "BLOCKED"
    acli jira workitem comment --key "<TICKET_ID>" --comment "Blocked by domain model decision. See PR for proposal with options and diagrams."
    ```
-6. Present the diagrams and trade-offs to the **team lead (you)**, who presents them to the **user** for a decision
+6. Present the diagrams and trade-offs to the **team lead (you)**, who presents them to the **user** for a decision. If the decision belongs to the PO or the tech lead rather than the user, also give the user the questions written with the **`stakeholder-questions`** skill, ready to paste, and record the answers with it when they come back.
 7. Once decided, update the `## Questions` section to show the chosen option (e.g., "**Decided: Option A**")
 8. **Unblock the ticket** — Move back to Pågående:
    ```bash

@@ -284,6 +284,8 @@ Categorize all findings into:
 - What sections were missing
 - What format would have helped (table, mockup, flow diagram)
 
+**Questions owned by someone other than the user** (BLOCKERs and QUESTIONs that only the PO or tech lead can answer): when the user wants to send them on rather than have them posted, write them with the `stakeholder-questions` skill. The tech lead gets English yes/no questions, the PO gets Swedish ones with an example.
+
 ### Step 8 — Format and post to Jira (ALL depths)
 
 **IMPORTANT:** ACLI sends comment body as plain text — Jira wiki markup will NOT render. Use plain text formatting:
