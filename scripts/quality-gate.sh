@@ -200,12 +200,18 @@ if [[ "$RUN_BACKEND" == "true" ]]; then
   if [[ "$DOTNET_OK" == "true" && -n "$SLN_FILES" ]]; then
     # CSharpier formatting
     echo "  → CSharpier format check..."
-    if (cd "$WORKTREE" && dotnet csharpier --check . 2>&1) > /tmp/qg-csharpier.log 2>&1; then
+    # CSharpier 1.x syntax (repo pins 1.2.6): `check` / `format`. The 0.x `--check` and
+    # bare `dotnet csharpier .` both exit 1 on 1.x, which this gate used to report as
+    # "PASS (auto-fixed)" without anything being fixed (PROJ-3847: CI failed on 3 files).
+    if (cd "$WORKTREE" && dotnet csharpier check . 2>&1) > /tmp/qg-csharpier.log 2>&1; then
       add_result "CSharpier formatting" "PASS" ""
     else
-      # Auto-fix formatting
-      (cd "$WORKTREE" && dotnet csharpier . 2>&1) > /dev/null 2>&1 || true
-      add_result "CSharpier formatting" "PASS" "(auto-fixed)"
+      (cd "$WORKTREE" && dotnet csharpier format . 2>&1) > /tmp/qg-csharpier-fix.log 2>&1 || true
+      if (cd "$WORKTREE" && dotnet csharpier check . 2>&1) > /tmp/qg-csharpier.log 2>&1; then
+        add_result "CSharpier formatting" "PASS" "(auto-fixed — review and stage the reformatted files)"
+      else
+        add_result "CSharpier formatting" "FAIL" "still unformatted after 'dotnet csharpier format .' — see /tmp/qg-csharpier.log and /tmp/qg-csharpier-fix.log"
+      fi
     fi
 
     # .NET build

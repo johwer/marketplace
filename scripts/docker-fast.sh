@@ -18,7 +18,7 @@
 #   recover | restart   `down --remove-orphans` then `up -d` (no build). Fixes a broken
 #                       half-up state. Volumes/data preserved (never -v).
 #   infra               only postgres redis rabbitmq localstack localstack-init (+tools)
-#   <domain>...         one+ of: service-c service-a service-b service-d service-e → that domain's
+#   <domain>...         one+ of: service-c service-a service-b service-d service-e billing → that domain's
 #                       api+workers plus infra (no build unless --build)
 #   <service>...        exact compose service name(s) → infra + just those
 #   reset <domain|svc>  drop+recreate ONE service's DB, bring it up, EF re-migrates from
@@ -53,13 +53,14 @@ PG_USER="postgres"
 # ---- service groups (categories) -------------------------------------------
 INFRA=(postgres redis rabbitmq localstack localstack-init)
 TOOLS=(pgadmin dozzle aspire-dashboard)
-ServiceC=(service-c-api service-c-sync-api service-c-sync-worker service-c-worker-data-erasure service-c-worker-quarantine)
-ABSENCE=(service-a-api service-a-sync-api service-a-worker-data-erasure service-a-worker-deviant service-a-worker-deviant-engine service-a-worker-quarantine)
+ServiceC=(service-c-api service-c-service-api service-c-sync-api service-c-sync-worker service-c-worker-data-erasure service-c-worker-quarantine)
+ABSENCE=(service-a-api service-a-advisory-api service-a-sync-api service-a-worker-callback-engine service-a-worker-data-erasure service-a-worker-deviant service-a-worker-deviant-engine service-a-worker-quarantine service-a-worker-social-insurance)
 ServiceB=(service-b-api service-b-worker service-b-worker-data-erasure service-b-worker-quarantine)
 MESSENGER=(service-d-api service-d-worker-quarantine service-d-worker-sms-delivery)
 STATISTICS=(service-e-api)
+BILLING=(billing-api)
 WEB=(web-app nginx)
-BACKEND=("${ServiceC[@]}" "${ABSENCE[@]}" "${ServiceB[@]}" "${MESSENGER[@]}" "${STATISTICS[@]}")
+BACKEND=("${ServiceC[@]}" "${ABSENCE[@]}" "${ServiceB[@]}" "${MESSENGER[@]}" "${STATISTICS[@]}" "${BILLING[@]}")
 
 # ---- defaults / flag state --------------------------------------------------
 PARALLEL=4
@@ -83,6 +84,7 @@ domain_services() {
     service-b)        echo "${ServiceB[@]}" ;;
     service-d)  echo "${MESSENGER[@]}" ;;
     service-e) echo "${STATISTICS[@]}" ;;
+    billing)    echo "${BILLING[@]}" ;;
     *)          echo "" ;;
   esac
 }
@@ -99,6 +101,7 @@ domain_of() {
     service-b-*|service-b)               echo "service-b" ;;
     service-d-*|service-d)   echo "service-d" ;;
     service-e-*|service-e) echo "service-e" ;;
+    billing-*|billing)       echo "billing" ;;
     *)                       echo "" ;;
   esac
 }
