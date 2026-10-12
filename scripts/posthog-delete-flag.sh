@@ -25,7 +25,7 @@
 # Options:
 #   --restore       Un-delete instead of delete (PATCH deleted:false).
 #   --yes           Skip the confirmation prompt (required in non-interactive runs).
-#   --project ID    PostHog project id (default from dtf-config.json, else 42565).
+#   --project ID    PostHog project id (default from dtf-config.json, else 247029).
 #   --api-host URL  PostHog API host (default from dtf-config.json, else https://eu.posthog.com).
 #   --dry-run       Print the matched flag and intended action, don't call the API.
 #
@@ -43,9 +43,9 @@ KEY="" ; TICKET="" ; FLAG_ID="" ; ACTION="delete" ; ASSUME_YES=false ; DRY_RUN=f
 
 # Project id / API host default from dtf-config.json (posthog section), else built-in.
 DTF_CONFIG="$HOME/.claude/dtf-config.json"
-PROJECT=42565 ; API_HOST="https://eu.posthog.com"
+PROJECT=247029 ; API_HOST="https://eu.posthog.com"
 if [ -f "$DTF_CONFIG" ]; then
-  _cfg=$(python3 -c "import json;d=json.load(open('$DTF_CONFIG')).get('posthog',{});print((d.get('projectId') or '42565')+'|'+(d.get('apiHost') or 'https://eu.posthog.com'))" 2>/dev/null || true)
+  _cfg=$(python3 -c "import json;d=json.load(open('$DTF_CONFIG')).get('posthog',{});print((d.get('projectId') or '247029')+'|'+(d.get('apiHost') or 'https://eu.posthog.com'))" 2>/dev/null || true)
   if [ -n "${_cfg:-}" ]; then PROJECT="${_cfg%%|*}"; API_HOST="${_cfg##*|}"; fi
 fi
 

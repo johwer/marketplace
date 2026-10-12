@@ -33,7 +33,7 @@ fi
 read -rs -p "PostHog personal API key (scoped feature_flag:write, phx_...): " APIKEY < /dev/tty; echo
 [ -n "$APIKEY" ] || { echo "No key entered — aborting." >&2; exit 1; }
 
-read -r -p "PostHog project id [42565]: " PROJECT < /dev/tty; PROJECT="${PROJECT:-42565}"
+read -r -p "PostHog project id [247029]: " PROJECT < /dev/tty; PROJECT="${PROJECT:-247029}"
 read -r -p "PostHog API host [$DEFAULT_API_HOST]: " API_HOST < /dev/tty; API_HOST="${API_HOST:-$DEFAULT_API_HOST}"
 
 # Store the secret in keychain only.

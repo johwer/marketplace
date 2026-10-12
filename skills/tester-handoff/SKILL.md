@@ -1,6 +1,6 @@
 ---
 name: tester-handoff
-description: Generate a non-developer-friendly test guide for a PR or Jira ticket. Outputs a structured text file with self-testable visual checks, developer-required dev-tools checks, and non-testable items. Each scenario has a plain-language explanation, a clickable URL into the QA/accept environment, step-by-step instructions, expected behavior, and "what could be wrong". Use when handing off a PR to QA, writing test scenarios for a tester, preparing UAT instructions, or creating a "how to test" document to attach to Jira. Pulls QA environment URL + test user + customer ID from `~/.claude/dtf-config.json` (`qaEnvironment` section).
+description: Generate a non-developer-friendly test guide for a PR or Jira ticket. Outputs a structured text file with self-testable visual checks, developer-required dev-tools checks, and non-testable items. Each scenario has a plain-language explanation, a clickable URL into the QA/accept environment, step-by-step instructions, expected behavior, and "what could be wrong". Use when handing off a PR to QA, writing test scenarios for a tester, preparing UAT instructions, or creating a local "how to test" document. Never posts it anywhere. Pulls QA environment URL + test user + customer ID from `~/.claude/dtf-config.json` (`qaEnvironment` section).
 autoTrigger:
   - when user asks to write a test guide, tester handoff, QA handoff, or "how to test" doc
   - when user wants to give a non-developer tester clear test instructions for a PR
@@ -12,6 +12,10 @@ globs:
 # Tester Handoff — Non-Developer Test Guide Generator
 
 Generate a structured, plain-language test guide for a PR or Jira ticket. The output is aimed at a **non-developer tester** — assume the reader does NOT understand "render", "state", "memo", "effect", "dep array", "cascade", "memoization". Use everyday words: "flicker", "blinks", "stays", "doesn't update", "is left over".
+
+## Never post the guide
+
+The guide is a **local file only**. Do not attach it to Jira, do not post a Jira comment about it (not even a skip-reason comment), and do not add a `Test guide:` pointer to the PR body. Do not offer to post it either. (User decision, 2026-10-12, PROJ-4231: "We should not post test guides at all".) If the user wants it shared, they do it themselves.
 
 ## Output
 
@@ -78,17 +82,15 @@ Pull these data points:
 
 ### Step 1.5 — Check skip conditions (avoid generating useless guides)
 
-Before generating a full guide, check the PR diff. If ALL changed files match one of the categories below, **skip the full guide** and instead post a one-line Jira comment explaining why no tester walkthrough is needed.
+Before generating a full guide, check the PR diff. If ALL changed files match one of the categories below, **skip the full guide** and tell the user in one line why no tester walkthrough is needed. Do not post it to Jira.
 
-| Category | Match rule | Jira comment to post instead |
+| Category | Match rule | One-line reason to tell the user |
 |---|---|---|
 | Backend-only | No files under `apps/web/src/**` changed | "Backend-only PR — verified via API tests and regression suite. No tester walkthrough needed." |
 | Docs-only | Only `*.md`, `docs/**`, `*.txt`, `README*` changed | "Documentation update — no functional test needed." |
 | Deps-only | Only `package.json`, `package-lock.json`, `*.csproj`, `Directory.Packages.props` changed | "Dependency bump — covered by CI build + existing test suite." |
 | Test-only | Only `*.test.ts*`, `*.spec.ts*`, `*Test.cs`, `*IntegrationTests.cs` changed | "Test-only change — covered by the test suite itself." |
 | i18n-only | Only translation/TranslationService files (`*.json` under translation paths) | "Translation update — verify in the target language(s) at the affected pages." |
-
-Localize the comment to the configured `qaEnvironment.defaultLanguage`.
 
 If the PR has a mix (e.g., backend + some frontend), DO generate the guide — but scope only to the frontend-visible surface.
 
@@ -187,34 +189,9 @@ Write to `<repo-root>/howtotest-<TICKET-ID>.txt`. If the user is in a worktree (
 
 Use the section dividers exactly as in the template (`═══` for major sections, `───` for scenarios) so the file is scannable.
 
-### Step 7 — Offer Jira attach
+### Step 7 — Hand over the path, post nothing
 
-After writing the file, **ask** if the user wants to attach it to the related Jira ticket. If yes, upload via the Atlassian REST API. **`acli` cannot upload attachments** (only `attachment list`/`delete`), so the REST call is the only path.
-
-**REQUIRED first: warm up the token.** The `access_token` in the keychain expires, and a stale one returns **401 Unauthorized** on the attachment POST. Running any `acli` command first forces acli to refresh the keychain token — do the `acli … view` line BELOW immediately before extracting, never skip it. (Confirmed PROJ-3062: skipping the warm-up → 401; warming up → 200.) If the POST still 401s after a warm-up, the acli session itself is expired — tell the user to re-auth acli, and fall back to posting the guide's 3-part summary as an inline Jira comment (which always works via `acli jira workitem comment create`).
-
-```bash
-# Token from ACLI keychain (same pattern as ~/.claude/scripts/jira-download-attachments.sh)
-# The view call is NOT optional — it refreshes the keychain token so the POST won't 401.
-acli jira workitem view <TICKET> --fields summary > /dev/null 2>&1
-ACCESS_TOKEN=$(security find-generic-password -s "acli" -w 2>/dev/null | python3 -c "
-import sys, base64, gzip, json
-d = sys.stdin.read().strip()
-d = d[len('go-keyring-base64:'):]
-print(json.loads(gzip.decompress(base64.b64decode(d)))['access_token'])
-")
-CLOUD_ID="00000000-0000-0000-0000-000000000000"
-curl -s -X POST "https://api.atlassian.com/ex/jira/$CLOUD_ID/rest/api/3/issue/<TICKET>/attachments" \
-  -H "Authorization: Bearer $ACCESS_TOKEN" \
-  -H "X-Atlassian-Token: no-check" \
-  -F "file=@<path-to-file>"
-```
-
-If attachment succeeds, also offer to **add a Jira comment** that points to the file:
-
-> "Testguide bifogad som `howtotest-<TICKET-ID>.txt` — innehåller [N] tester du kan göra själv (Del A), [M] tester som behöver utvecklare bredvid (Del B), och [K] punkter som inte är testbara (Del C)."
-
-(Localize to the chosen language.)
+Tell the user the file path and the counts per part (A/B/C). Do not attach the file to Jira, do not comment on the ticket, and do not link it from the PR. See "Never post the guide" above.
 
 ### Step 8 — Verify file is readable
 

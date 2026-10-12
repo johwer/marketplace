@@ -28,7 +28,7 @@ PR="${1:-}"
 
 # --- Sections that must not survive the ready transition -------------------------------
 # Session scaffolding, reviewer detail that belongs in the notes comment, and audiences
-# served elsewhere (test guide -> Jira via tester-handoff).
+# served elsewhere. Test guides are never posted (tester-handoff writes a local file only).
 #
 # `Decisions` is on this list deliberately. An OPEN domain-model decision belongs in the
 # body — but you should not be going ready with one unresolved. If this refuses on a live

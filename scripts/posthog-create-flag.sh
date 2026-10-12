@@ -34,7 +34,7 @@
 #                   Default: polaris-accept.repo.se,leo-stg.retailer-b.com
 #                   Repo accept is app-accept.repo.se (polaris-accept is TT accept).
 #   --rollout N     Rollout percentage for the matched group (default 100)
-#   --project ID    PostHog project id (default 42565)
+#   --project ID    PostHog project id (default 247029)
 #   --api-host URL  PostHog API host (default https://eu.posthog.com)
 #   --inactive      Create the flag disabled (default: active)
 #   --dry-run       Print the payload, don't call the API
@@ -59,9 +59,9 @@ ROLLOUT=100 ; ACTIVE=true ; DRY_RUN=false
 
 # Project id / API host default from dtf-config.json (posthog section), else built-in.
 DTF_CONFIG="$HOME/.claude/dtf-config.json"
-PROJECT=42565 ; API_HOST="https://eu.posthog.com"
+PROJECT=247029 ; API_HOST="https://eu.posthog.com"
 if [ -f "$DTF_CONFIG" ]; then
-  _cfg=$(python3 -c "import json;d=json.load(open('$DTF_CONFIG')).get('posthog',{});print((d.get('projectId') or '42565')+'|'+(d.get('apiHost') or 'https://eu.posthog.com'))" 2>/dev/null || true)
+  _cfg=$(python3 -c "import json;d=json.load(open('$DTF_CONFIG')).get('posthog',{});print((d.get('projectId') or '247029')+'|'+(d.get('apiHost') or 'https://eu.posthog.com'))" 2>/dev/null || true)
   if [ -n "${_cfg:-}" ]; then PROJECT="${_cfg%%|*}"; API_HOST="${_cfg##*|}"; fi
 fi
 

@@ -47,7 +47,6 @@ ticket if there is one.>
 ## Scope
 
 Not covered: <one line>. Follow-up: PROJ-XXXX.
-Test guide: PROJ-XXXX Jira comment.
 ```
 
 Image captions do not count toward the budget. Neither does anything inside `<details>`.
@@ -65,7 +64,7 @@ Image captions do not count toward the budget. Neither does anything inside `<de
 | `## Pre-emptive review`, ghost/owl findings, `One suggestion deliberately not taken` | **move** — this is what buys off a review round; do not lose it |
 | `## What the audit turned up`, `## Also landed, beyond the ticket's ask`, `## Pre-existing issues found` | **move** |
 | Long enumerations — `## All 40 bumps`, dependency tables, `## Deliberately left behind` | **move** |
-| `## How to Test`, `### Prerequisites`, `### Steps`, `### What to Look For` | **drop** — replaced by the one-line `Test guide:` pointer |
+| `## How to Test`, `### Prerequisites`, `### Steps`, `### What to Look For` | **drop** — no pointer replaces it; test guides are never posted (see `tester-handoff`) |
 | `## Progress` checklist | **drop** — 100% checked and worthless by the time a human reads it |
 | `## Architecture` (scope / agents / key files) | **drop** — a session artifact, not reader-facing |
 | `## Questions` (answered, or `_No open questions yet._`) | **drop** |
@@ -190,9 +189,9 @@ does — the reader cannot tell which mode wrote it, so neither can the gate.
 
 ## Ordering — what must have run first
 
-- **`tester-handoff` runs BEFORE this skill.** It reads the body's `## How to Test` as one of its
-  inputs, and this skill deletes that section. Reverse the order and the test guide loses source
-  material. (`tester-handoff` already writes to Jira, not the body — nothing to retarget.)
+- **If a local test guide is wanted, `tester-handoff` runs BEFORE this skill.** It reads the
+  body's `## How to Test`, which this skill deletes. The guide stays a local file: never attach it
+  to Jira, comment about it, or add a `Test guide:` line to the body.
 - **`pr-screenshot-captions` runs BEFORE this skill**, so the images are already grouped and
   captioned when the body is assembled.
 - **`code-walkthrough` writes straight into the notes comment** in the DTF flow, so its output
@@ -217,5 +216,5 @@ does — the reader cannot tell which mode wrote it, so neither can the gate.
 - `pr-decisions` — writes the decision entries this skill relocates once they are resolved
 - `code-walkthrough` — targets the notes comment, not the body
 - `pr-screenshot-captions` — owns everything under `## Visual verification`
-- `tester-handoff` — owns the test guide, in Jira
+- `tester-handoff` — owns the test guide, as a local file only (never posted)
 - `scripts/pr-body-gate.sh` — the fail-closed check; DTF Phase 6 and the Completion Gate both run it

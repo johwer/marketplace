@@ -1172,7 +1172,7 @@ Only after both AI review and CI are clean:
 
 After AI review and CI are clean, enter a feedback loop with the user:
 
-The decision is split into TWO user-confirmable steps (PROJ-3039 retro, user-mandated): **"Mark ready"** runs the publication work (PR ready + tester handoff + final summary + retro) while human review is still pending; **"Ship"** runs the closeout (Jira → Klart + shutdown) and is asked later, typically after human review/merge readiness.
+The decision is split into TWO user-confirmable steps (PROJ-3039 retro, user-mandated): **"Mark ready"** runs the publication work (PR ready + final summary + retro) while human review is still pending; **"Ship"** runs the closeout (Jira → Klart + shutdown) and is asked later, typically after human review/merge readiness.
 
 1. Present the current PR status to the user (AI review done, CI green, no human reviewers assigned yet)
 2. Ask the user for feedback using AskUserQuestion:
@@ -1203,7 +1203,7 @@ The decision is split into TWO user-confirmable steps (PROJ-3039 retro, user-man
      ```bash
      gh api repos/<OWNER>/<REPO>/pulls/<PR_NUMBER>/reviews --jq '.[] | select(.user.type != "Bot") | "Reviewer: \(.user.login) | State: \(.state)\nBody: \(.body)\n"'
      ```
-   - Proceed to Phase 6.4 (Tester Handoff), Phase 6.5 (Final Summary), and Phase 6.75 (Retrospective) — all part of "mark ready"
+   - Proceed to Phase 6.5 (Final Summary) and Phase 6.75 (Retrospective) — both part of "mark ready". Phase 6.4 does not run automatically.
    - Then **ask the user separately** before shipping: "Ship it? (moves Jira to Klart and shuts the team down)" — Phase 7 (Completion) runs only on that second confirmation
 4. **If "I have feedback":** Ask the user to describe what needs to change, then:
    - Route the feedback to **Maya** (PR reviewer) for assessment
@@ -1217,25 +1217,11 @@ The decision is split into TWO user-confirmable steps (PROJ-3039 retro, user-man
 
 **The team stays alive until the user explicitly says "done" or "ship it".**
 
-### Phase 6.4: Tester Handoff — Generate Test Guide (auto)
+### Phase 6.4: Tester Handoff — no posting, on request only
 
-**Runs automatically** as soon as the user confirms "mark ready" in Phase 6, BEFORE the final summary. Goal: every PR that goes ready also has a tester-friendly test guide attached to the Jira ticket so QA doesn't have to ask "how do I test this?".
+**Test guides are never posted** (user decision, 2026-10-12, PROJ-4231: "We should not post test guides at all"). Do not attach a guide to Jira, do not post a Jira comment about one (including skip-reason comments), and do not add a `Test guide:` line to the PR body. Do not offer to post one.
 
-**Why here:** implementation is locked, visual verification is done (screenshots exist in `~/Downloads/<TICKET_ID>/`), and PR hasn't gone ready yet — so the test guide is attached to Jira BEFORE the tester sees the ticket transition.
-
-**How:** invoke the `tester-handoff` skill against the current PR. The skill:
-1. Reads the PR diff + Jira ticket + existing comments
-2. Checks skip-conditions (backend-only / docs / deps / test-only / i18n-only) — if matched, just posts a short Jira comment explaining no walkthrough is needed and EXITS
-3. Reads `qaEnvironment` from `~/.claude/dtf-config.json` silently (no prompts; soft-warns in the file if missing)
-4. Generates `howtotest-<TICKET_ID>.txt` at the worktree root with three parts: A) tester-can-verify-themselves, B) needs-developer-tools, C) not-testable
-5. Uploads the file to Jira as an attachment
-6. Posts a short Jira comment pointing to the attachment
-
-**Applies to both lite and team mode.** Lite users especially benefit — small UI fixes are the ones a tester most often doesn't know how to test.
-
-**Do NOT prompt the user during this step.** If `qaEnvironment` is missing, generate the file with placeholder URLs + a soft warning at the top, attach anyway, and continue.
-
-If the skill exits because of a skip-condition, that's success — no file generated, just a short Jira comment, and you proceed to Phase 6.5.
+This phase does **not** run automatically at "mark ready". Run the `tester-handoff` skill only when the user explicitly asks for a test guide; it writes `howtotest-<TICKET_ID>.txt` locally and you hand over the path. Sharing it is the user's call.
 
 ### Phase 6.5: Final Summary
 
@@ -1545,7 +1531,7 @@ If you have not yet done Phase 6.75 — **STOP. Go do it now. Then come back her
 
 **Marker 3 — PR body assembly (`pr-ready` + body gate):**
 
-The description a human actually reads is not optional in lite mode. Run `pr-ready` (after `tester-handoff` and `pr-screenshot-captions`), then the gate, and output exactly — with the **real pasted gate output**, not a paraphrase:
+The description a human actually reads is not optional in lite mode. Run `pr-ready` (after `pr-screenshot-captions`), then the gate, and output exactly — with the **real pasted gate output**, not a paraphrase:
 
 ```
 ✓ PR BODY ASSEMBLED
