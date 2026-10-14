@@ -1,0 +1,254 @@
+<title>Lyft blicken</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column, three numbered sections (a real sequence: altitude → layers → DTO), diagrams in scrollable frames */
+:root{
+  --bg:#f5f6f3; --surface:#ffffff; --fg:#1d2320; --muted:#5d6762; --line:#d6dbd7; --accent:#2f5d50;
+  --client:#3b82c4; --controller:#34465e; --service:#2f9e5b; --domain:#7a5bb5; --repo:#d9822b; --db:#c0392b; --gate:#e0a526;
+  --warn-bg:#fff4dc; --warn-fg:#7a4b00; --ok-bg:#e3f3e8; --ok-fg:#1d5e35; --dim:.28;
+  --f-display:"Fraunces",Georgia,serif; --f-body:"IBM Plex Sans",system-ui,sans-serif; --f-mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#141917; --surface:#1c2320; --fg:#e6ebe8; --muted:#9aa5a0; --line:#2f3935; --accent:#8cc7b3;
+  --client:#5fa3e0; --controller:#8ea3c0; --service:#4cc27c; --domain:#a88be0; --repo:#f0a050; --db:#e86a5c; --gate:#f2c14e;
+  --warn-bg:#3a2e12; --warn-fg:#f6d38a; --ok-bg:#163223; --ok-fg:#8fe0ad; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141917; --surface:#1c2320; --fg:#e6ebe8; --muted:#9aa5a0; --line:#2f3935; --accent:#8cc7b3;
+  --client:#5fa3e0; --controller:#8ea3c0; --service:#4cc27c; --domain:#a88be0; --repo:#f0a050; --db:#e86a5c; --gate:#f2c14e;
+  --warn-bg:#3a2e12; --warn-fg:#f6d38a; --ok-bg:#163223; --ok-fg:#8fe0ad; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:15px/1.6 var(--f-body);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:32px 64px}
+main{max-width:980px;margin:0 auto;display:flex;flex-direction:column;gap:56px}
+h1,h2{font-family:var(--f-display);font-weight:600;text-wrap:balance;margin:0}
+h1{font-size:clamp(30px,5vw,44px);line-height:1.1}
+h2{font-size:26px}
+h2 .n{font-family:var(--f-mono);font-size:14px;color:var(--accent);margin-right:10px;vertical-align:middle}
+p{margin:0;max-width:66ch}
+.lede{color:var(--muted);font-size:17px;margin-top:12px}
+section{display:flex;flex-direction:column;gap:18px}
+.frame{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;overflow-x:auto}
+svg{display:block;width:100%;height:auto;min-width:640px}
+svg text{font-family:var(--f-body);fill:var(--fg)}
+code,.mono{font-family:var(--f-mono);font-size:13px}
+.layer{cursor:pointer;transition:opacity .2s}
+.layer:focus{outline:none}
+.layer:focus-visible rect.box{stroke:var(--fg);stroke-width:3}
+.layer.sel rect.box{stroke:var(--fg);stroke-width:3}
+.panel{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
+.panel>div{min-width:0}
+.panel h3{margin:0 0 6px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.panel ul{margin:0;padding-left:18px}
+.panel li{margin:3px 0}
+.tag{display:inline-block;font-size:12px;font-weight:600;padding:2px 8px;border-radius:99px}
+.tag.ok{background:var(--ok-bg);color:var(--ok-fg)}
+.tag.warn{background:var(--warn-bg);color:var(--warn-fg)}
+.ladder{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:20px}
+@media (max-width:760px){.ladder{grid-template-columns:1fr}}
+.rungs{display:flex;flex-direction:column;gap:6px;list-style:none;margin:0;padding:0}
+.rung button{all:unset;box-sizing:border-box;width:100%;display:grid;grid-template-columns:28px 1fr;gap:10px;align-items:baseline;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--surface);cursor:pointer;transition:opacity .2s,background .2s}
+.rung button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.rung .num{font-family:var(--f-mono);color:var(--muted);font-size:13px}
+.rung .t{font-weight:600}
+.rung .s{display:block;font-size:13px;color:var(--muted)}
+.rung.gate button{background:var(--warn-bg);border-color:var(--gate)}
+.rung.gone button{opacity:var(--dim)}
+.rung.gone .t{text-decoration:line-through}
+.result{display:flex;flex-direction:column;gap:14px;min-width:0}
+.result .box{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px}
+.result h3{margin:0 0 8px;font-size:15px}
+.trap{border-left:3px solid var(--gate);padding:6px 0 6px 12px;font-size:14px}
+.scenario{font-size:14px;color:var(--muted)}
+.dto-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.dto-grid>div{min-width:0}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.tablewrap{overflow-x:auto}
+.legend{display:flex;flex-wrap:wrap;gap:16px;font-size:13px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:22px;height:0;border-top:2px solid}
+.sw.d{border-top-style:dashed}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<main>
+<header>
+  <h1>Lyft blicken</h1>
+  <p class="lede">Innan vi frågar <em>vilken controller eller service</em> som ska ändras: kan beslutet tas högre upp, så att lagren under aldrig behöver hantera det? Och för koden som blir kvar: vilket lager hör den hemma i?</p>
+</header>
+
+<section id="hojd">
+  <h2><span class="n">1</span>Var ska beslutet ligga?</h2>
+  <p class="scenario">Exempel: en ny funktion som bara en retailer ska ha. Klicka på en nivå för att sätta spärren där. Allt under den blir kod vi slipper skriva för alla andra.</p>
+  <div class="ladder">
+    <ol class="rungs" id="rungs"></ol>
+    <div class="result" id="result" aria-live="polite"></div>
+  </div>
+</section>
+
+<section id="lager">
+  <h2><span class="n">2</span>Lagren i en Repo-tjänst</h2>
+  <p>Ett anrop går in genom controllern och ner till databasen; svaret går samma väg tillbaka. Workers och Rebus-handlers går in en sidodörr och hoppar över controllern. Klicka på ett lager.</p>
+  <div class="frame">
+    <svg viewBox="0 0 980 330" role="img" aria-labelledby="lt">
+      <title id="lt">Klient, Controller, Service, Domain och Repository, Databas, med anrop åt höger och svar åt vänster samt en worker som går direkt in i Service</title>
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--client)"/></marker>
+        <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--db)"/></marker>
+        <marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--domain)"/></marker>
+      </defs>
+      <g id="layers"></g>
+      <g id="arrows"></g>
+    </svg>
+  </div>
+  <div class="legend">
+    <span><i class="sw" style="border-color:var(--client)"></i>Anrop (request DTO in)</span>
+    <span><i class="sw d" style="border-color:var(--db)"></i>Svar (response DTO ut)</span>
+    <span><i class="sw d" style="border-color:var(--domain)"></i>Sidodörr: worker / Rebus-handler</span>
+  </div>
+  <div class="frame panel" id="lpanel" aria-live="polite"></div>
+</section>
+
+<section id="dto">
+  <h2><span class="n">3</span>Varför en DTO?</h2>
+  <p>Entiteten är hur databasen lagrar något. DTO:n är det vi lovar frontend. De ändras av olika skäl, så de ska vara olika typer. Mappningen sker vid controllerns gräns.</p>
+  <div class="frame">
+    <svg viewBox="0 0 980 300" role="img" aria-labelledby="dt">
+      <title id="dt">Entiteten ServiceA med alla kolumner till höger, DTO:n ServiceAResponse med ett urval till vänster, och mappning i controllern mellan dem</title>
+      <g id="dtosvg"></g>
+    </svg>
+  </div>
+  <div class="tablewrap frame">
+    <table>
+      <thead><tr><th>Utan DTO (entiteten rakt ut)</th><th>Med DTO</th></tr></thead>
+      <tbody>
+        <tr><td>En migrering som döper om en kolumn döper om JSON-fältet. Frontend går sönder utan varning.</td><td>Entiteten kan ändras. Mappningen tar smällen, kontraktet står kvar.</td></tr>
+        <tr><td>Alla kolumner läcker, även känsliga personuppgifter och interna flaggor.</td><td>Bara fälten vi valt lämnar tjänsten.</td></tr>
+        <tr><td>Navigationsproperties ger cykler, stora svar och N+1-laddningar.</td><td>Platt, formad för skärmen.</td></tr>
+        <tr><td>Frontendtyperna från <code>generate-api</code> följer databasschemat.</td><td>Frontendtyperna följer ett kontrakt vi designat.</td></tr>
+        <tr><td>Request: klienten kan skicka fält den aldrig ska få sätta, som <code>CustomerId</code> eller <code>CreatedBy</code>.</td><td>Request-DTO:n har bara det klienten får sätta.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="scenario">Kostnad: en mappning per DTO, på ett ställe och utan AutoMapper. Värt det vid API-gränsen. Behövs inte mellan två privata metoder inne i en service.</p>
+</section>
+</main>
+
+<script>
+const RUNGS=[
+  {t:"Scope",s:"Ticketen själv",slip:"Hela funktionen för alla som ändå inte har tillgång",gate:"PO bekräftar att bara retailern X ska ha den, någonsin."},
+  {t:"Avtal / entitlement",s:"ServiceContract, SubContract, ICallbackEntitlementReader",slip:"Null-hantering och tomma tillstånd för kunder utan avtalet, i API, export och statistik",gate:"Kunden har köpt tjänsten. Permanent regel, delas av API och workers via Domain."},
+  {t:"Retailer",s:"RetailerType, CanDoActionOnRetailer",slip:"Specialfall för övriga retailers i service och repository",gate:"Bara RetailerB (t.ex.). Permanent, men kodad per retailer."},
+  {t:"Feature flag",s:"PostHog, i frontend (backend bara i ServiceD)",slip:"Menyval, sidor och knappar för alla utan flaggan",gate:"En utrullning. PO kan slå av och på utan deploy.",fe:true,temp:true},
+  {t:"ServiceC-behörighet",s:"CanDoActionOn* i backend, SettingsMap i frontend",slip:"Egna rollkontroller i varje endpoint",gate:"Får just den här användaren göra det?"},
+  {t:"Endpoint",s:"[AcceptTokens], [Authorize], validering i controllern",slip:"Ogiltiga anrop som annars kraschar djupt ner",gate:"Anropet är välformat och tillåtet."},
+  {t:"Service / Policy",s:"*.API/Services, *.Domain/Policies",slip:"Regeln upprepad i repository-frågor",gate:"Affärsregeln själv."},
+  {t:"Repository",s:"*.Domain/Repository",slip:"",gate:"Vilka rader. Här är det sent att stoppa något."},
+];
+const TRAPS={
+  fe:"En frontendspärr är UX, inte säkerhet. Endpointen går fortfarande att anropa med curl. Är datan känslig behövs även ServiceC eller endpointkontroll. Se SupportController i ServiceD, där valet var medvetet.",
+  temp:"En flagga är tillfällig. Den dag den tas bort får alla koden. Antingen är koden under korrekt för alla då, eller så måste flaggan bli ett avtal eller en behörighet.",
+  side:"Workers och Rebus-handlers går förbi controllern. En spärr på endpointnivå täcker inte dem. Behöver båda vägarna regeln hör den hemma i Domain.",
+  data:"Data som skrivits medan spärren var på finns kvar. Statistik, export och dataradering ser den ändå."
+};
+let gateAt=2;
+const rEl=document.getElementById("rungs"), resEl=document.getElementById("result");
+function esc(s){return s.replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]))}
+function renderRungs(){
+  rEl.innerHTML=RUNGS.map((r,i)=>`<li class="rung ${i===gateAt?"gate":""} ${i>gateAt?"gone":""}"><button type="button" id="rung-${i}" data-i="${i}" aria-pressed="${i===gateAt}"><span class="num">${i}</span><span><span class="t">${esc(r.t)}</span><span class="s">${esc(r.s)}</span></span></button></li>`).join("");
+  const g=RUNGS[gateAt];
+  const gone=RUNGS.slice(gateAt).map(r=>r.slip).filter(Boolean);
+  const traps=[];
+  if(g.fe)traps.push(TRAPS.fe);
+  if(g.temp)traps.push(TRAPS.temp);
+  if(gateAt===5)traps.push(TRAPS.side);
+  if(gateAt>=1&&gateAt<=4)traps.push(TRAPS.data);
+  resEl.innerHTML=`
+    <div class="box"><span class="tag warn">Spärr på nivå ${gateAt}</span><h3 style="margin-top:8px">${esc(g.t)}</h3><p>${esc(g.gate)}</p></div>
+    <div class="box"><span class="tag ok">Det här slipper vi</span><ul style="margin:8px 0 0;padding-left:18px">${gone.length?gone.map(x=>`<li>${esc(x)}</li>`).join(""):"<li>Inget. Spärren ligger så lågt att alla lager ovanför ändå måste hantera fallet.</li>"}</ul></div>
+    ${traps.length?`<div class="box"><h3>Fällor att ta ställning till</h3>${traps.map(t=>`<p class="trap">${esc(t)}</p>`).join("")}</div>`:""}`;
+}
+rEl.addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;gateAt=+b.dataset.i;renderRungs();document.getElementById("rung-"+gateAt).focus()});
+renderRungs();
+
+const LAYERS=[
+  {k:"client",n:"Klient",sub:"React + RTK Query",step:"",col:"--client",
+   home:["Visa och dölja via PostHog-flagga och SettingsMap","Typer genererade från Swagger (generate-api)"],
+   wrong:["Säkerhet. Det som döljs här går ändå att anropa"],ex:["apps/web"]},
+  {k:"controller",n:"Controller",sub:"*.API/Controllers",step:"1. Routa och validera",col:"--controller",
+   home:["HTTP, [AcceptTokens], [Authorize]","Validera formen: obligatoriska fält, datum i rätt ordning","Fråga ServiceC: CanDoActionOnCompany(...)","Anropa en servicemetod, svara med ApiResponse<T>"],
+   wrong:["Affärsregler som if (retailer == …)","EF-frågor och DbContext","Samma mappning kopierad i flera actions"],ex:["RepoController","SupportController"]},
+  {k:"service",n:"Service",sub:"*.API/Services",step:"2. Affärslogik",col:"--service",
+   home:["Affärsregeln","Orkestrera repository, andra tjänster, ServiceC","Publicera Rebus-events"],
+   wrong:["ApiResponse, statuskoder, HttpContext","Rå SQL","En regel som en worker också behöver (dupliceras eller missas)"],ex:["ServiceAReportService"]},
+  {k:"domain",n:"Domain + Repository",sub:"*.Domain",step:"3. Delad sanning och dataåtkomst",col:"--repo",
+   home:["Entiteter (Models), Policies, delade readers","Repository: Where, Include, projektion, paginering"],
+   wrong:["DTO:er och allt HTTP","Repository som avgör om användaren får se något"],ex:["ServiceAOccasionPolicy","ICallbackEntitlementReader"]},
+  {k:"db",n:"Databas",sub:"Postgres via EF Core",step:"4. Lagra och hämta",col:"--db",
+   home:["Constraints som aldrig får brytas: unique, FK, not null"],
+   wrong:["Handskrivna migreringar"],ex:["Migrations/ (genererade)"]},
+];
+const X=[20,215,410,605,800], W=160, Y=40, H=190;
+const lg=document.getElementById("layers"), ag=document.getElementById("arrows");
+lg.innerHTML=LAYERS.map((l,i)=>{
+  const x=X[i], isDb=l.k==="db";
+  const tiles=isDb?`<ellipse cx="${x+W/2}" cy="${Y+70}" rx="34" ry="11" fill="none" stroke="#fff" stroke-opacity=".8" stroke-width="2"/><path d="M${x+W/2-34} ${Y+70}v46a34 11 0 0 0 68 0v-46" fill="none" stroke="#fff" stroke-opacity=".8" stroke-width="2"/>`
+    :i===0?"":[0,1].map(r=>[0,1].map(c=>`<rect x="${x+38+c*46}" y="${Y+46+r*46}" width="38" height="38" rx="4" fill="#fff" fill-opacity=".16"/>`).join("")).join("");
+  return `<g class="layer" tabindex="0" role="button" data-i="${i}" aria-label="${l.n}">
+    <text x="${x+W/2}" y="${Y-14}" text-anchor="middle" font-size="17" font-weight="600" style="fill:var(${l.col})">${l.n}</text>
+    <rect class="box" x="${x}" y="${Y}" width="${W}" height="${H}" rx="8" style="fill:var(${l.col})"/>
+    ${tiles}
+    <text x="${x+W/2}" y="${Y+H-16}" text-anchor="middle" font-size="12" style="fill:#fff" font-family="IBM Plex Mono, monospace">${l.sub}</text>
+    <text x="${x+W/2}" y="${Y+H+26}" text-anchor="middle" font-size="13" style="fill:var(--muted)">${l.step}</text>
+  </g>`}).join("");
+let arr="";
+for(let i=0;i<4;i++){
+  const x1=X[i]+W+4, x2=X[i+1]-4;
+  arr+=`<line x1="${x1}" y1="${Y+70}" x2="${x2}" y2="${Y+70}" stroke="var(--client)" stroke-width="2" marker-end="url(#ar)"/>`;
+  arr+=`<line x1="${x2}" y1="${Y+140}" x2="${x1}" y2="${Y+140}" stroke="var(--db)" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#ar2)"/>`;
+}
+arr+=`<text x="${X[0]+W+18}" y="${Y+60}" font-size="12" style="fill:var(--client)">Request DTO</text>`;
+arr+=`<text x="${X[0]+W+18}" y="${Y+160}" font-size="12" style="fill:var(--db)">Response DTO</text>`;
+arr+=`<text x="${X[2]+W+20}" y="${Y+60}" font-size="12" style="fill:var(--client)">Entitet</text>`;
+arr+=`<rect x="${X[2]+10}" y="292" width="${W-20}" height="30" rx="6" fill="none" stroke="var(--domain)" stroke-width="1.5" stroke-dasharray="5 4"/>`;
+arr+=`<text x="${X[2]+W/2}" y="312" text-anchor="middle" font-size="13" style="fill:var(--domain)">Worker / Rebus-handler</text>`;
+arr+=`<path d="M${X[2]+W/2} 290 V ${Y+H+36}" stroke="var(--domain)" stroke-width="2" stroke-dasharray="5 4" fill="none" marker-end="url(#ar3)"/>`;
+arr+=`<text x="${X[1]+W/2}" y="312" text-anchor="middle" font-size="12" style="fill:var(--muted)">hoppar över controllern →</text>`;
+ag.innerHTML=arr;
+const lp=document.getElementById("lpanel");
+function sel(i){
+  [...lg.children].forEach((g,j)=>{g.classList.toggle("sel",j===i);g.style.opacity=j===i?1:.55});
+  const l=LAYERS[i];
+  lp.innerHTML=`<div><h3>${esc(l.n)} · hör hemma här</h3><ul>${l.home.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>
+  <div><h3>Fel ställe om du ser</h3><ul>${l.wrong.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>
+  <div><h3>I Repo</h3><ul>${l.ex.map(x=>`<li class="mono">${esc(x)}</li>`).join("")}</ul></div>`;
+}
+lg.addEventListener("click",e=>{const g=e.target.closest(".layer");if(g)sel(+g.dataset.i)});
+lg.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){const g=e.target.closest(".layer");if(g){e.preventDefault();sel(+g.dataset.i)}}});
+sel(1);
+
+const ENT=[["Id","k"],["EmployeeId","k"],["StartDate","k"],["EndDate","k"],["Degree","k"],["SocialSecurityNumber","x"],["InternalNote","x"],["CustomerId","x"],["Company (navigation)","x"],["CreatedAt / UpdatedAt","x"]];
+const ds=document.getElementById("dtosvg");
+let d=`<text x="40" y="30" font-size="15" font-weight="600" style="fill:var(--service)">ServiceAResponse (DTO)</text>`;
+d+=`<text x="40" y="48" font-size="12" style="fill:var(--muted)">Kontraktet mot frontend</text>`;
+d+=`<text x="640" y="30" font-size="15" font-weight="600" style="fill:var(--repo)">ServiceA (entitet)</text>`;
+d+=`<text x="640" y="48" font-size="12" style="fill:var(--muted)">Hur databasen lagrar det</text>`;
+d+=`<rect x="380" y="110" width="200" height="56" rx="8" style="fill:var(--controller)"/>`;
+d+=`<text x="480" y="134" text-anchor="middle" font-size="13" style="fill:#fff" font-weight="600">MapFromDomain()</text>`;
+d+=`<text x="480" y="152" text-anchor="middle" font-size="11" style="fill:#fff">vid controllerns gräns</text>`;
+let ky=0;
+ENT.forEach((f,i)=>{
+  const y=66+i*22, keep=f[1]==="k";
+  d+=`<rect x="640" y="${y}" width="300" height="20" rx="3" style="fill:var(--repo)" fill-opacity="${keep?.22:.08}"/>`;
+  d+=`<text x="650" y="${y+14}" font-size="12" font-family="IBM Plex Mono, monospace" ${keep?"":`style="fill:var(--muted)" text-decoration="line-through"`}>${f[0]}</text>`;
+  if(keep){const yy=66+ky*22;d+=`<rect x="40" y="${yy}" width="300" height="20" rx="3" style="fill:var(--service)" fill-opacity=".22"/><text x="50" y="${yy+14}" font-size="12" font-family="IBM Plex Mono, monospace">${f[0]}</text>`;ky++}
+});
+d+=`<path d="M638 120 C 610 120, 600 138, 584 138" fill="none" stroke="var(--muted)" stroke-width="1.5"/>`;
+d+=`<path d="M378 138 C 362 138, 352 110, 342 110" fill="none" stroke="var(--muted)" stroke-width="1.5"/>`;
+d+=`<text x="40" y="200" font-size="13" style="fill:var(--muted)">Personnummer, interna anteckningar och kund-id lämnar aldrig tjänsten.</text>`;
+d+=`<text x="40" y="220" font-size="13" style="fill:var(--muted)">Navigationsproperties följer inte med, så inga cykler eller N+1.</text>`;
+d+=`<text x="640" y="292" font-size="12" style="fill:var(--muted)">Förenklat exempel, inte den riktiga entiteten.</text>`;
+ds.innerHTML=d;
+</script>
