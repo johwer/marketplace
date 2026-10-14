@@ -31,7 +31,7 @@
 #
 # Options:
 #   --hosts h1,h2   Comma-separated $initial_host values to enable for.
-#                   Default: polaris-accept.repo.se,leo-stg.retailer-b.com
+#                   Default: app-accept.repo.se,polaris-accept.repo.se,leo-stg.retailer-b.com
 #                   Repo accept is app-accept.repo.se (polaris-accept is TT accept).
 #   --rollout N     Rollout percentage for the matched group (default 100)
 #   --project ID    PostHog project id (default 247029)
@@ -54,7 +54,7 @@
 #
 set -euo pipefail
 
-KEY="" ; DESC="" ; DESC_EXPLICIT=false ; TICKET="" ; HOSTS="polaris-accept.repo.se,leo-stg.retailer-b.com"
+KEY="" ; DESC="" ; DESC_EXPLICIT=false ; TICKET="" ; HOSTS="app-accept.repo.se,polaris-accept.repo.se,leo-stg.retailer-b.com"
 ROLLOUT=100 ; ACTIVE=true ; DRY_RUN=false
 
 # Project id / API host default from dtf-config.json (posthog section), else built-in.

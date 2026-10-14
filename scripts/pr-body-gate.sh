@@ -8,7 +8,8 @@
 # Usage:  bash ~/.claude/scripts/pr-body-gate.sh <PR_NUMBER>
 #
 # Exit codes:
-#   0  passed, or deliberately out of scope (not the Repo repo)
+#   0  passed, or deliberately out of scope (not the Repo repo; SignedIn gets only the
+#      template-checklist check)
 #   1  REFUSED — the body needs the pr-ready skill run on it
 #
 # Env overrides (rarely needed):
@@ -58,6 +59,44 @@ refuse() {
   exit 1
 }
 
+SIGNEDIN_REPO="RepoAB/Repo.SignedIn.Web"
+
+check_signedin_checklist() {
+  local template body item last_item last_line
+  template=$(gh api "repos/$SIGNEDIN_REPO/contents/.github/pull_request_template.md" \
+    -H 'Accept: application/vnd.github.raw' 2>/dev/null | tr -d '\r')
+  if [ -z "$template" ]; then
+    fail+=("could not read $SIGNEDIN_REPO's PR template — refusing rather than assuming")
+    refuse
+  fi
+  body=$(gh pr view "$PR" --json body --jq .body 2>/dev/null | tr -d '\r')
+  if [ -z "$body" ]; then
+    fail+=("could not fetch PR #$PR body, or it is empty")
+    refuse
+  fi
+
+  while IFS= read -r item; do
+    [ -z "$item" ] && continue
+    grep -qF -- "- [x] $item" <<<"$body" || fail+=("checklist item missing or unticked: $item")
+    last_item="$item"
+  done < <(sed -n 's/^- \[ \] //p' <<<"$template")
+  if [ -z "${last_item:-}" ]; then
+    fail+=("no checklist items found in the PR template — refusing rather than assuming")
+    refuse
+  fi
+
+  grep -q '^[[:space:]]*[-*] \[ \]' <<<"$body" &&
+    fail+=("unticked checkbox in the body — Task Completed Checker will fail: $(grep -m1 '^[[:space:]]*[-*] \[ \]' <<<"$body")")
+
+  last_line=$(grep -v '^[[:space:]]*$' <<<"$body" | tail -n 1)
+  [ "$last_line" = "- [x] $last_item" ] ||
+    fail+=("the template checklist must be the last thing in the body (last line is: $last_line)")
+
+  [ "${#fail[@]}" -gt 0 ] && refuse
+  printf '  \033[32m✓\033[0m PR #%s body ends with the SignedIn template checklist, all ticked\n' "$PR"
+  exit 0
+}
+
 # --- 0. Arguments ----------------------------------------------------------------------
 # A gate that cannot identify its target must refuse, not pass.
 if ! printf '%s' "$PR" | grep -qE '^[0-9]+$'; then
@@ -73,6 +112,13 @@ rc=$?
 if [ "$rc" -ne 0 ] || [ -z "$repo" ]; then
   fail+=("cannot determine the repo (gh not authenticated?) — refusing rather than assuming")
   refuse
+fi
+# SignedIn has its own rule instead: the body must END with the repo's PR template
+# checklist, every box ticked. The "Task Completed Checker" check reads every checkbox in
+# the body and fails on any unticked one. Items are read from the template on the default
+# branch, so a template change does not need a gate change.
+if [ "$repo" = "$SIGNEDIN_REPO" ]; then
+  check_signedin_checklist
 fi
 if [ "$repo" != "$REPO_ALLOW" ]; then
   printf '  \033[33m—\033[0m out of scope: %s is not %s, gate skipped\n' "$repo" "$REPO_ALLOW"
