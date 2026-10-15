@@ -20,7 +20,14 @@ Reference material: `references/layers.md` (Repo layer map, wrong-place symptoms
 
 ## Step 0 — Read before you talk
 
-Read the ticket/plan, then find the real code it touches. Do not reason from layer names alone.
+**Load what the tech leads already decided, before forming any option.** The reviewer patterns live in two commands; this skill reads them and never copies them:
+
+- `~/.claude/commands/ghost-review.md` — the current backend tech lead. Read: "Standing decisions" (dated rules from Slack/Jira, e.g. "the contract is the switch", "use services, not products", migration tooling must keep up), the `[NECESSITY]` check (what already provides this? constraint or convention? config or code? shared rule → prealign), and "Mode 2" Step 2 questions.
+- `~/.claude/commands/owl-review.md` — the former tech lead (left 2026-08; a fixed record). Read its "Standing decisions" and Mode 2 questions for events, concurrency and contracts. A later ghost decision overrides it.
+
+Any option that contradicts a standing decision is dropped before the user sees it, or shown only with the decision quoted and why it might not apply. Cite the decision (date + source) in the option card.
+
+Then read the ticket/plan, the parent epic and sibling tickets (decisions are often recorded there), and find the real code it touches. Do not reason from layer names alone.
 
 - Which service(s)? `services/<Domain>/<X>.API` (Controllers, Services, Models/DTOs, Handlers) and `<X>.Domain` (Models = entities, Repository, Policies, shared Services, Mappers).
 - Who reaches this code? Endpoint only, or also Rebus handlers and `*.Worker.*` projects? A gate on the controller does not cover a worker.
@@ -35,7 +42,7 @@ Walk this ladder top-down and stop at the **highest rung that can carry the deci
 | 0 | Scope | The ticket itself | "Does anyone without access need this at all?" |
 | 1 | Contract / entitlement | `ServiceContract`, `SubContract` (`shared/Repo.Shared.Models/ServiceContracts`), e.g. `ICallbackEntitlementReader` | "Has the customer bought it?" |
 | 2 | Retailer | `RetailerType`, `CanDoActionOnRetailer`, retailer-targeted PostHog flags | "Is this only RetailerB / only one brand?" |
-| 3 | Feature flag | PostHog (frontend; backend only in ServiceD via `IFeatureFlagService`) | "Is this a rollout / experiment?" |
+| 3 | Feature flag | PostHog (frontend; backend only in ServiceD via `IFeatureFlagService`) | "Is this a rollout we may need to roll back?" Not a substitute for a contract: when a service contract exists, the contract is the switch |
 | 4 | ServiceC permission | `ServiceCAuthorizationAdapter.CanDoActionOn*` (BE), `AuthorizedFeatureMap`/`SettingsMap` (FE menu) | "May *this user* do it?" |
 | 5 | Endpoint | `[AcceptTokens]`, `[Authorize]`, controller validation | "Is the request well-formed and allowed?" |
 | 6 | Service / Policy | `*.API/Services`, `*.Domain/Policies` | "What is the business rule?" |
@@ -50,6 +57,9 @@ For the chosen rung, list concretely **what code you no longer need lower down**
 - **A flag is temporary.** When the flag is removed, everyone gets the code. Either the lower code is correct for everyone by then, or the flag must become a contract/permission (a permanent rung). Ask: "What happens the day this flag is deleted?"
 - **Workers and events bypass controllers.** A check on rung 5 does not cover a Rebus handler or a worker. If both paths need the rule, it belongs in `*.Domain` (Policy or shared reader), like `ICallbackEntitlementReader` which the API and the callback engine share.
 - **Data written while gated still exists.** Turning a flag off hides the UI, not the rows. Reads elsewhere (ServiceE, exports, data erasure) still see them.
+- **The migration tooling must keep up.** A new enum value, a new `ServiceContractType`, a schema change or a changed field meaning also needs the SignedIn→Nova migrators (`ServiceContractMigrator`, `HealthCaseTemplateRuleMigrator`, …) updated, or migrated customers get no access / broken data. A high gate built on a contract only works for migrated customers once the migrator grants it (precedent: PROJ-4408).
+
+When the fix is to **data** rather than behaviour, there is a rung above a DB migration: correct it through the existing API or config. A migration is fine, but overkill when an API can do it.
 
 ## Step 2 — Ball the options
 

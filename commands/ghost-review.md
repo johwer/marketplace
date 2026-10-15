@@ -23,6 +23,8 @@ Reviewer One is a senior backend reviewer who:
 His review style: precise, code-specific, not generic. He cites the exact file and line pattern. He doesn't nitpick style (linters handle that) but he does care about naming when it violates REST or DTO conventions.
 
 > **Data backing these patterns** (from `pr-learnings.json`, scraped review history): **1,103 review comments** by reviewer-one across ~590 PRs he reviewed (106 must-fix). Categories: pattern (118), architecture (109), naming (59), api-contract (58), types (51), missing-test (51), error-handling (47), security (40, highest must-fix rate), performance (17), plus many clarifying questions. His must-fix verdicts concentrate in **security, error-handling, architecture, and EF/persistence modeling**. He frequently flags: layering/Unit-of-Work violations, AWS credential/region hardcoding, token-authority & header spoofing, catch-and-log-only, build warnings, commented-out code, and tests that don't assert real logic.
+>
+> **Second mining pass (2026-05-25 → 2026-10-13):** 664 GitHub comments by reviewer-one on 141 PRs (≈29 of them replies to review on his own PRs, kept only where they state a decision), plus dated Slack/Jira decisions through 2026-10-15 (see Mode 2 "Standing decisions"). What moved since the first pass: his weight shifted from per-endpoint security toward **altitude** — products are data not code, the service contract is the switch, one home per rule, rollout-safe schema changes, the SignedIn→Nova migrators — and toward a high bar on AI-generated comment volume and PR scope. New tags from this pass: PRODUCT-IS-DATA, CONTRACT-IS-THE-SWITCH, ONE-HOME-FOR-A-RULE, UNREACHABLE-PERMISSION, EXPAND-CONTRACT, MIGRATOR-PARITY, EVENT-IDEMPOTENCY, DATA-FIX-ROUTE, PRODUCER-OWNS-DERIVATION, PAGE-AUTHZ-CONTEXT, PR-SCOPE, COMMENT-NOISE.
 
 ## Input
 
@@ -185,6 +187,15 @@ answering 501, for a sibling ticket that then shipped its lookup on a different 
 and later reverted it. The seam was removed as unused surface. Specific names age better than
 hopefully-general ones — generalise when the second consumer arrives, with the consumer in hand.
 
+The same goes for **handling a scenario that does not happen in practice**, and for an interface
++ DI registration around something that is a plain helper. On #3369 (PROJ-3522) a source-deletion
+sweep for customers deleted mid-migration got: *"Deletion of a customer we want to migrate in
+signedin mid migration isnt really a thing... we should probably roll back that entire
+complexity."* On #3167 and #2909 (PROJ-2798) he questioned a per-request DI class and an
+interface for a one-off seeder; on #3781 he called an extra layer "unnecessary abstractions".
+Ask "does this case actually occur?" before building for it, and expect AI-proposed robustness to
+be the usual source.
+
 **[DATA-ALREADY-GOVERNED] A new gate designed around a field that already has one**
 Before designing any gate for access to a *field* — identity number, date of birth, salary, a
 medical note — grep how that field is already treated in the code that reads it today, not how the
@@ -228,6 +239,10 @@ person you cannot yet name" — a different capability, so none fit.
 
 Also check the inverse: a class with ONE caller where that caller is a pure pass-through should be
 inlined. And logic that duplicates an existing service's helper should say so and pick a direction.
+
+Reuse applies to **mechanisms and flags, not just classes** (standing decision 2026-10-12: "we
+don't invent a new way"). Before a new flag, toggle, pipeline, link scheme or provisioning path,
+name the existing one and say why it does not fit.
 
 **[JUSTIFICATION-VS-MECHANISM] A comment or commit message that the code does not support**
 His sharpest reviews read the collaborator, not the comment. For any defensive mechanism —
@@ -277,7 +292,7 @@ Look for:
 Look for a user-facing controller/endpoint (or `AuthorizationAdapter` built for user-context auth) being called or reused as a service-to-service (S2S) path. The authorization models differ — user APIs assume a JWT user context; S2S has none. Reusing one for the other violates the Repo bus-driven pattern. Flag if a user-auth endpoint is being consumed internally as if it were an S2S contract.
 
 **[AUTHORIZED-FEATURES-MISUSE] Field added to `authorizedFeatures` for an external/non-FE consumer**
-`customer/{id}/authorizedFeatures` models **Repo's own frontend viewport** (which UI/nav a signed-in user sees). Do NOT add a boolean there for an external system (Seru/Leo, other services) or for a permission the Repo FE doesn't consume — it's noise and doesn't scale. External systems read a user's grants via the existing `authorization/.../action/{action}` endpoints. Flag any new `authorizedFeatures` field whose only consumer is external or non-UI. (PROJ-3183.)
+`customer/{id}/authorizedFeatures` models **Repo's own frontend viewport** (which UI/nav a signed-in user sees). Do NOT add a boolean there for an external system (Seru/Leo, other services) or for a permission the Repo FE doesn't consume — it's noise and doesn't scale. External systems read a user's grants via the existing `authorization/.../action/{action}` endpoints. Flag any new `authorizedFeatures` field whose only consumer is external or non-UI. (PROJ-3183.) Direction since then: he wants `authorizedFeatures` dropped entirely (#3309, PROJ-3452: "can we drop authorizedFeatures entirely now? We need to ping TT before that"), and platform flags there are known to be resolved from a different assignment set than the API gate (#3222, PROJ-3367 → PROJ-3365). So any **new** field there is a MUST-FIX, not a question.
 
 **[PERMISSION-PLACEMENT] Permission modeled at the wrong scope, or filed under a contract its holders do not hold**
 Three checks.
@@ -313,7 +328,7 @@ Look for string interpolation or `Replace()` calls in email template generation 
 Look for DTOs returned from or accepted by controllers that don't carry a `Request`/`Response` suffix, or response models reused as request bodies (which forces awkward field assignments). He treats the suffix convention as must-fix, not a nitpick.
 
 **[MIGRATION-BY-HAND] EF migration files edited manually**
-Look for hand-edits to generated migration files (`*_Migration.cs`, `*Designer.cs`, `*ModelSnapshot.cs`) instead of regenerating via `dotnet ef migrations remove` + re-add. Also flag data-correction needs that should ship as a migration (e.g. "add a migration to lowercase all existing tokens") rather than being assumed. (Note: a migration-guard hook also warns on this.)
+Look for hand-edits to generated migration files (`*_Migration.cs`, `*Designer.cs`, `*ModelSnapshot.cs`) instead of regenerating via `dotnet ef migrations remove` + re-add. Also flag data-correction needs that should ship as a migration (e.g. "add a migration to lowercase all existing tokens") rather than being assumed. (Note: a migration-guard hook also warns on this.) If a migration in this PR drops something an earlier migration *in the same unshipped PR* added, fold them (owl's #2946 finding, same rule).
 
 **[EF-MODELING] Incorrect entity / migration modeling**
 He is strict about the data model. Flag:
@@ -350,6 +365,70 @@ three unrelated failures; read the log before concluding the branch is broadly b
 
 **[NO-COMMENTED-CODE] Commented-out code merged in**
 Flag blocks of commented-out code in the diff. "Never merge commented code." He will not approve with it present.
+
+**[PRODUCT-IS-DATA] Code that branches on, stores, or keys by Product**
+Products are go-to-market packages of services; **services** (`ServiceContractType`) are the typed
+thing code works with, and the product↔service mapping is DB data. The direction is to get
+products out of the code entirely. Flag any new `Product`/`ProductType` check, column, enum use or
+dictionary key in backend logic, and ask what *service* the behaviour actually depends on.
+- #3216 (PROJ-2913): "Products are GTM packages of these services... an attempt to get away products from the code entirely."
+- #3207 (PROJ-3359): a product (and country) column on templates "clashes heavily with our product as data not code migration... strip the product for now".
+- Standing decision 2026-10-14: "Do NOT check product. Use the services."
+
+**[CONTRACT-IS-THE-SWITCH] A flag, reconciler or extra guard where the service contract already gates it**
+If a capability is entitled by a service contract, the contract *is* the on/off switch — checked at
+read time via `ActiveAt(now)`. Do not add a PostHog flag on the backend gate, a reconciler that
+provisions/deprovisions rules when contracts change, or a country/retailer guard layered on top.
+- #3640 (PROJ-3571): "both workers already gate fk on the contract at read time, so the reconciler isnt needed... support activates the service, the customer ticks the box"; and the country guard was dropped because "company country isnt the employees employment country".
+- Standing decisions 2026-10-12 (PROJ-3847): "No PostHog flag on the backend gate. The contract is the switch."
+A rollout flag is still expected where production must stay unaffected until a result is trusted (standing decision 2026-09-28) — the rule is: no flag *duplicating* a contract.
+
+**[ONE-HOME-FOR-A-RULE] A rule, invariant or pipeline implemented twice — especially a customer-level copy of a company-level path**
+The sharpest recurring architecture finding of this period. When a PR adds a customer-level (or
+other scope) twin of an existing company-level service/controller/repository, diff the two: the
+copies drift within the same PR (different status codes, capped vs rejected, transactional vs
+swallowed audit, welcome email sent on one path only). Security-critical invariants (cross-tenant
+guards, scope tables) must live in exactly one place. His fix is specific: **not** an
+`isCustomerLevel` flag that trades duplication for branching, but extract the flag-free shared
+sub-steps and run both routes through one pipeline taking a scope.
+- #3176 (PROJ-3274): "Two parallel implementations of one security-critical rule, in two assemblies. Please fold..."; `RoleScopeRules` said one thing while only three of five assignment methods honoured it.
+- #3251 (PROJ-3410): customer role subscription service "is basically RoleService... rewritten" and had already drifted in four ways; same PR, a ~86-line verbatim repository query.
+Also applies to *derived facts* in CI/infra ("three derivations of the same fact... give phase one source of truth", #3368, PROJ-3464).
+
+**[UNREACHABLE-PERMISSION] A new action no assignable permission can reach for some retailer**
+Adding a `CustomerAction`/`CompanyAction` and mapping it into `DefaultPermissionsMappings` is not
+enough: for each retailer, check that a permission in `ServicePermissionMap.AlwaysOn[<Retailer>]`
+(or a contract entry) that users can actually be assigned maps the action. Blanket grants to
+`ManageCustomer`/`CustomerSupport` do not count for RetailerB, whose assignable customer set is
+tiny. Otherwise the endpoint 403s for every user of that retailer.
+- #3251 (PROJ-3410), marked **Blocker**: `RoleChangeLogRead` reached no TT-assignable permission, so the changelog endpoint 403'd for every TT user in both ServiceC and ServiceD. "better as a decision than something someone finds".
+
+**[EXPAND-CONTRACT] A schema change that old pods cannot run against during rollout**
+Old and new pods run side by side during deploy. A column/table rename, a drop, or a changed
+meaning on a column the old code still reads will 500 until rollout completes. Renames and drops
+need expand/contract: add the new shape, deploy code that reads both/writes new, then drop in a
+later release. Also check multi-database migration jobs: one failed schema must not leave the others
+ahead with no record.
+- Standing decision 2026-10-13: a column rename caused ~25 s of 500s during rollout.
+- #3368 (PROJ-3464): "all six jobs are created before anything is waited on so one failure leaves five schemas ahead".
+
+**[MIGRATOR-PARITY] A schema/enum/field-meaning change the SignedIn→Nova migrators do not follow**
+The migration tooling (`tools/Migration`, e.g. `ServiceContractMigrator`,
+`HealthCaseTemplateRuleMigrator`, `DefaultRoleMigrator`) writes Nova rows directly. Any change to a
+column, an enum, or what a field *means* must be checked against the migrator that writes it, or
+migrated data violates the new invariant in prod. Within the migrators themselves, expect: rerun
+safety, lookups by the table's natural unique key (adopt the existing row instead of a 23505 that
+kills the batch), a content hash that covers every field the write takes, and reuse of the
+provisioning code/constants instead of a restated copy.
+- Standing decision 2026-10-15: a migrator set `Months = null` and every migrated ServiceB template crashed in prod.
+- #3369 (PROJ-3522): tag migrators resolved by minted GUID while the unique key is `(tag_id, value)`; #3452 (PROJ-3610): `DefaultRolePlan` copied `DefaultRoles` instead of reusing it.
+
+**[EVENT-IDEMPOTENCY] Event handler that trusts the event type instead of local replicated state**
+Write handlers for **eventual consistency and idempotency**: decide from what is already
+replicated in the local DB, not from `EventType` (a `Synced` or redelivered message must land the
+same way as `Created`).
+- #2909 (PROJ-2798): "Please write event-related handling with the intention of achieving eventual consistency & idempotency... look at what you have already replicated in your local DB rather than the EventType."
+- See `/owl-review` [REDELIVERY-SAFETY] and [PUBLISH-AFTER-COMMIT] for the messaging half.
 
 
 **Not Reviewer One's patterns — see `/zingo-review`**
@@ -398,7 +477,7 @@ Important nuance he repeats: integration tests should test **round-trips and acc
 He is also strict that tests must **assert real logic, not just pass**: flag mocks/assertions like `It.IsAny<Guid>()`, asserting only that a call happened, or loose matchers that would pass regardless of correctness. "Don't just `IsAny<Guid>`. Please validate your logic in the tests, don't just make the tests pass!" A new endpoint with *no* tests at all is a hard must-fix for him ("makes no sense to not have any tests... please make it a habit").
 
 **[INTEGRATION-TEST-SPARSITY] Too many integration tests where unit tests suffice**
-The flip side of MISSING-TEST: reviewer-one treats integration tests as **expensive (time/CI budget)** and wants them **sparse** — usually a single happy-path is enough. When a PR adds several integration tests covering scenario/branch variations (e.g. granted→true, not-granted→false, leak-guard→false all as integration tests), flag it: keep at most ONE happy-path integration test and **move the rest to unit tests** (mapping tests, scope-resolution tests, helper-level assertions). His verbatim: "Drop these tests please, i dont think it adds a lot of value, and a integration test its quite expensive (time budget-wise)... What you can do is move it to a unit test though. Future consideration is to always be sparse with integrationtests, mostly a single one testing a 'happy' path is enough." So default new-behavior coverage to unit tests, reserving integration for one round-trip/access-matrix happy path. (Source: PROJ-3183 review.)
+The flip side of MISSING-TEST: reviewer-one treats integration tests as **expensive (time/CI budget)** and wants them **sparse** — usually a single happy-path is enough. When a PR adds several integration tests covering scenario/branch variations (e.g. granted→true, not-granted→false, leak-guard→false all as integration tests), flag it: keep at most ONE happy-path integration test and **move the rest to unit tests** (mapping tests, scope-resolution tests, helper-level assertions). His verbatim: "Drop these tests please, i dont think it adds a lot of value, and a integration test its quite expensive (time budget-wise)... What you can do is move it to a unit test though. Future consideration is to always be sparse with integrationtests, mostly a single one testing a 'happy' path is enough." So default new-behavior coverage to unit tests, reserving integration for one round-trip/access-matrix happy path. (Source: PROJ-3183 review.) Repeated since: #3253 (PROJ-3376) "Please do not write a billion integration tests... 1-3 for the happy path, sometimes selective unhappy paths"; #3134 (PROJ-3297) no integration tests for a DB check constraint — "we dont need to write tests to check 'does postgres actually do its job'". The exception he keeps: one real-Postgres test where the thing at risk is SQL/LINQ translation (#3420, PROJ-3657).
 
 **[SEARCH-IS-GET] Search/read endpoint modeled as POST**
 Look for new search/list/read endpoints implemented as `[HttpPost]` with a request body. He pushes for `GET` with query parameters instead — it's the more typical endpoint shape, and RTK Query defaults such endpoints to a `query` (cache) rather than a `mutation`. Ask: should this be a GET with query params?
@@ -458,6 +537,41 @@ were invisible to tsc, eslint, 2000 unit tests, real-browser verification in two
 diff-scoped pre-emptive review — because every one of them lived in code adjacent to the diff
 rather than in it.)
 
+**[DATA-FIX-ROUTE] Data changed through the wrong channel**
+Ask how data gets in or gets corrected. His order of preference: an existing (or a management)
+**API** first; a **migration** for corrective fixes when no API fits ("fine, but also overkill if
+you can do it over APIs"); never direct DB write access for ops. Defaults that only developers
+change belong **in code**, not DB rows — unless non-developers are explicitly meant to edit them.
+- #3828 (PROJ-4054): "No ops should be done through write access, either APIs and for corrective fixes, migrations."
+- #2909 (PROJ-2798): seeding a retailer activity via migration — "we should either create a mgmt API and just insert it there"; #3207 (PROJ-3359): "defaults in code is easier to manage than DB data, UNLESS we explicitly want non-developers to change the defaults".
+
+**[PRODUCER-OWNS-DERIVATION] A consumer re-deriving something the producing service already knew**
+When service B reconstructs a value from parts (a URL, a status, a scope) that service A had in
+finished form, ask whether A should send the finished value so B only renders/stores it. Copies of
+a validation rule on both sides drift silently when one is loosened.
+- #3280 (PROJ-3377): "could ServiceC just always send a finished absolute url here, so ActionValue has one shape and service-d only renders it?... service-d is re-deriving something ServiceC already knew."
+
+**[PAGE-AUTHZ-CONTEXT] A screen that calls an extra endpoint just to learn a fact**
+Each endpoint a page calls adds its permission to what the page needs. A page that fetches another
+resource (products, contracts) only to read one flag breaks for users who hold the page's
+permission but not that one. Ask for the fact on an endpoint the page already uses, or a
+per-company feature read.
+- #3640 (PROJ-3571): "the deviant tab shouldnt need ProductContractsRead just to know if fk is on, it breaks the auth context of the page." (Accepted for now: "Im willing to bet we will regret it later.")
+
+**[PR-SCOPE] Scope beyond the ticket, or unrelated changes riding along**
+Endpoints outside the ticket's technical scope go in a stacked follow-up PR; unrelated file edits
+pollute `git blame`; the PR title becomes the permanent commit message, so it must say everything
+the PR changes. A decided refactor and an undecided design change go in separate PRs.
+- #3806 (PROJ-3925): "This is a monster of a PR. Not just in lines and files changed, but in scope. In the future try to split things."
+- #3251 (PROJ-3410): three role-assignment endpoints "arent in 3410s technical scope... could they go in a stacked follow-up pr?"
+
+**[COMMENT-NOISE] AI-generated comment volume, prompt context in comments, or always-loaded context files**
+He measures it: comments that narrate the line below, restate reasoning, or leak the prompt
+("as the ticket asks...") get cut; rationale belongs in the PR description. Also flag additions to
+`AGENTS.md`/`CLAUDE.md` that are specific to one feature — those load into every context.
+- #3420 (PROJ-3657): "197 of ~790 added prod lines are comments. bar should be higher"; #3598 (PROJ-3790): "28% comment lines vs 4-6% across the rest of the services".
+- #3340 (PROJ-3193): "I would suggest to not commit this in the shared agent file so its loaded into every single context."
+
 ---
 
 ### Step 4 — Format findings
@@ -502,6 +616,19 @@ The PR description says this is MH-only but the endpoint has no tenant guard. Wh
 ## Mode 2: Ticket Pre-Implementation Review
 
 Use this when the user provides a ticket ID instead of a PR number.
+
+### Standing decisions (dated, from Slack/Jira — check the ticket against these first)
+
+Newer decisions override older patterns in this file. Each is reviewer-one' unless noted.
+
+- **2026-09-28 (Slack):** production stays unaffected until the result is trusted; then ship behind a feature flag so it can be rolled back.
+- **2026-10-06/08 (PROJ-3847):** "No ServiceC changes" for subscriptions. Adding a `ServiceContractType` is not an ServiceC change. Contracts need not exist before merge — the migration script inserts them.
+- **2026-10-12 (Slack):** "if we have the contract, we might not need a posthog flag." Same day, tech lead in PROJ-3847: "No PostHog flag on the backend gate. The contract is the switch." → [CONTRACT-IS-THE-SWITCH]
+- **2026-10-12 (Slack):** reuse existing flags and mechanisms ("we don't invent a new way"). No cross-service DB connections. → [REUSE-FIRST]
+- **2026-10-13 (Slack):** a column rename caused ~25 s of 500s during rollout (old pods on the new schema). Renames need expand/contract. → [EXPAND-CONTRACT]
+- **2026-10-14 (Slack):** "Do NOT check product. Use the services. Product<->service mapping is a DB thing." → [PRODUCT-IS-DATA]
+- **2026-10-15 (Slack):** when changing the DB schema or what a field/enum means, check that the SignedIn→Nova migrators (e.g. `ServiceContractMigrator`, `HealthCaseTemplateRuleMigrator`) keep up. A migrator set `Months = null` and every migrated ServiceB template crashed in prod. → [MIGRATOR-PARITY]
+- **2026-10-15 (Slack):** data fixes: "a migration is fine, but also overkill if you can do it over APIs." → [DATA-FIX-ROUTE]
 
 ### Step 1 — Fetch the ticket
 
@@ -554,6 +681,22 @@ Before any implementation starts, surface the questions he would ask in review �
 - New permission? Decide UP FRONT: User vs Company scope; contract-gated vs always-on; and which existing feature it mirrors.
 - Is anything being added to `authorizedFeatures` for a non-FE consumer? It almost certainly belongs on the authorization endpoints instead.
 
+**Altitude — where does the decision live?**
+- Does the design branch on Product (or store it)? Which *service* does the behaviour really depend on?
+- Is the capability entitled by a service contract? If so, is the contract checked at read time as the only switch — no backend PostHog flag, no reconciler, no extra country/retailer guard?
+- Does production need protecting until the result is trusted? If yes, which *existing* flag mechanism carries the rollback?
+- Is there a customer-level twin of a company-level path planned? How will both share one pipeline (scope parameter), so the rule lives in one place?
+- For every new action: which assignable permission reaches it for **each** retailer (check `ServicePermissionMap.AlwaysOn[RetailerB]`)?
+- Does the page that uses this need any new permission just to read one fact?
+- Does a consumer service re-derive something the producer could send finished?
+
+**Rollout and data:**
+- Does any schema change rename/drop/redefine something the running pods read? What is the expand/contract sequence?
+- Which SignedIn→Nova migrator writes the touched table/field, and does it still produce valid rows after this change?
+- How does the data get in or get fixed — API, migration, or (never) direct write access? Are defaults code or data, and who edits them?
+- Do event handlers decide from replicated local state (idempotent on `Synced`/redelivery), not from `EventType`?
+- Is the scope one PR? Anything outside the ticket's technical scope goes in a stacked follow-up.
+
 Output as: *"Before implementation, answer these questions:"* — listed per area. Not as findings, but as design decisions to resolve.
 
 ---
@@ -566,3 +709,5 @@ Output as: *"Before implementation, answer these questions:"* — listed per are
 - Auth-order, multi-tenancy, privilege-scope, S2S-vs-user-API, unit-of-work (SaveChanges in repo), and scope-disposal/N+1 findings are almost always must-fix — fix before requesting review
 - Missing integration test findings: reviewer-one will always ask. Either add the test (round-trip / access scenario — NOT a unit-logic-path test, which he asks to remove), or pre-empt in the PR description with a linked follow-up ticket
 - Cheap pre-empts that recur in his reviews: search endpoints as GET+query, enums/constants instead of raw strings, fail-loud (throw) over silent defaults, Request/Response DTO suffixes, no FQDN in code
+- Since mid-2026 the cheapest pre-empts are altitude ones: no product checks, contract as the switch, one pipeline for company+customer scope, few comments, one-ticket PR scope
+- Check Mode 2's "Standing decisions" before any architecture proposal; they are newer than the PR-mined patterns
