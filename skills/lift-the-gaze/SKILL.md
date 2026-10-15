@@ -77,7 +77,26 @@ Consequence card (pick the rows that actually differ):
 
 Then **recommend one** and say why in one sentence. Ask **one** question at a time — the one whose answer changes the design most. Don't dump every question. Wait for the answer before the next.
 
-When an answer depends on someone else (PO: "is this only ever for one retailer?", tech lead: "is a FE-only gate acceptable here?"), say so and hand off to `stakeholder-questions`.
+When an answer depends on someone else (PO: "is this only ever for one retailer?", tech lead: "is a FE-only gate acceptable here?"), first run Step 2b. Only what survives it goes to `stakeholder-questions`.
+
+## Step 2b — Lift the gaze on the questions too
+
+A question costs someone else's time and blocks us until it is answered. Before sending one, check whether it is already answered higher up:
+
+1. **Collect the principles already given.** Read the ticket's comments and description, the parent epic and sibling tickets (decisions are often recorded there, e.g. "Tech lead answers <date>"), the spec, and earlier turns of the session. Quote them with date and source.
+2. **Test each draft question against them:**
+
+| Verdict | When | Where it goes instead |
+|---------|------|-----------------------|
+| Answered by a principle | A given rule decides it ("use the services", "the contract is the switch", "no change vs SignedIn") | A recorded decision in the spec / `pr-decisions`, quoting the principle |
+| Our own call | Naming, implementation shape, which existing pattern to copy | PR Decisions section |
+| Dependency, not a question | The pattern is set and only the work remains (e.g. a migration step like a previous ticket) | A subtask |
+| Known limitation | Low impact, no data exposure, small parity deviation | One line in the PR |
+| Real question | None of the above, and the answer changes the design | `stakeholder-questions` |
+
+3. **Prefer "decide and inform" to asking.** When everything is covered by the first four rows, send one line in the form "Going with X, because <principle>. Shout if you disagree, otherwise it's in the PR." It costs the reader seconds and doesn't block us.
+
+Show the user this table for their draft questions before writing any question.
 
 ## Step 3 — Layer placement
 
