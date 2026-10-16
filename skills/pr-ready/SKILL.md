@@ -66,7 +66,7 @@ Image captions do not count toward the budget. Neither does anything inside `<de
 | Long enumerations — `## All 40 bumps`, dependency tables, `## Deliberately left behind` | **move** |
 | `## How to Test`, `### Prerequisites`, `### Steps`, `### What to Look For` | **drop** — no pointer replaces it; test guides are never posted (see `tester-handoff`) |
 | `## Progress` checklist | **drop** — 100% checked and worthless by the time a human reads it |
-| `## Architecture` (scope / agents / key files) | **drop** — a session artifact, not reader-facing |
+| `## Architecture` (scope / key files) | **drop** — a session artifact, not reader-facing |
 | `## Questions` (answered, or `_No open questions yet._`) | **drop** |
 | `## Decisions` (still **open** — an unanswered domain-model gate) | **keep in the body** — see below |
 | The ASCII `DREAM TEAM` banner | **drop** |

@@ -462,7 +462,6 @@ Immediately after receiving Amara's analysis, create a **draft PR** so the user 
 
 ## Architecture  <!-- [session-only] stripped at ready by pr-ready -->
 - **Scope:** [backend-only / frontend-only / full-stack]
-- **Agents:** [which agents are working on this]
 - **Key files:** [main files to be modified]
 
 ## How to Test  <!-- [session-only] stripped at ready by pr-ready -->
@@ -484,12 +483,6 @@ _Step-by-step instructions for manually verifying this change._
 
 ## Questions  <!-- [session-only] stripped at ready by pr-ready -->
 _No open questions yet._
-
-## Progress  <!-- [session-only] stripped at ready by pr-ready -->
-- [x] Architecture analysis complete
-- [ ] Implementation in progress
-- [ ] PR review
-- [ ] Final summary
 
 ---
 
@@ -807,7 +800,7 @@ Assign all tasks to the agent with `owner` set immediately. Use `addBlockedBy` t
   5. If a task has been `blockedBy` a dependency for 15+ minutes and the blocking task shows no progress, escalate to the user: "Task X is blocked by Task Y which appears stuck. Should I reassign or unblock?"
 - **Status forwarding**: Agents send you status updates (starting/blocked/done). Forward blocked states and phase completions to the user. Don't forward routine "starting X" updates unless the user asks for verbose progress.
 - **Progress updates**: Proactively update the user at each milestone (e.g., "Amara finished analysis, spawning Kenji and Ingrid", "Kenji completed API endpoints, Ingrid is working on components"). Don't wait for the user to ask.
-- **Update the draft PR description** at each major milestone. **Always read-then-edit** (see Important Rules) — never replace the full body. Update only the `## Progress` section checkboxes and add details about what each agent completed.
+- **Update the draft PR description** at each major milestone. **Always read-then-edit** (see Important Rules) — never replace the full body. Update only the sections whose content changed (e.g. `## What changes`, `## Questions`).
 - **Scope creep guard**: If any agent starts working on changes beyond the ticket scope, message them to stop and stay focused. Only the ticket requirements and directly related fixes should be implemented.
 
 ### Phase 4: PR Review
@@ -916,7 +909,6 @@ After Maya's code review is approved (all MUST FIX items resolved), spawn:
   - **Re-test only the failed items** (don't re-run the full suite)
   - If fixes pass, proceed to Phase 5
   - If the same issue fails twice, escalate to Amara for architectural guidance
-- **Update the draft PR description** `## Progress` section to reflect testing status
 
 ### Phase 4.75: Visual Verification Fallback (UI tickets only)
 
@@ -1299,21 +1291,14 @@ _Step-by-step instructions for manually verifying this change._
 - [ ] [Another item]
 - [ ] [Edge case]
 
-## Progress
-- [x] Architecture analysis complete
-- [x] Implementation complete
-- [x] PR review passed
-- [x] Final summary
-
 ## Notes
 [Any caveats, known limitations, follow-up work needed, or decisions made during implementation]
 ```
   - Include the original ticket text for reference
   - Be thorough but concise — every bullet should add information
   - **IMPORTANT**: The "How to Test" section must include the exact URL path to navigate to, specific user actions, and concrete expected results. Read the router config to determine the correct URL. This section is what the PO and team use to verify the fix — make it clear enough that anyone can follow it.
-  - **IMPORTANT**: The `## Progress` section must always be included and kept up to date with checkboxes reflecting the current state.
 
-After receiving Tane's summary, **update the PR description using the read-then-edit approach** (see Important Rules). Merge Tane's content into the existing PR body — update the `## Why`, `## What changes`, `## How to Test`, etc. sections but **preserve** any user-added images, screenshots, and the `## Progress` checkboxes. If `## Why` / `## What changes` still contain the draft placeholder text, run the `pr-description` skill now — shipping the placeholder is a completion-gate failure.
+After receiving Tane's summary, **update the PR description using the read-then-edit approach** (see Important Rules). Merge Tane's content into the existing PR body — update the `## Why`, `## What changes`, `## How to Test`, etc. sections but **preserve** any user-added images and screenshots. If `## Why` / `## What changes` still contain the draft placeholder text, run the `pr-description` skill now — shipping the placeholder is a completion-gate failure.
 
 ### Phase 6.75: Agent Retrospectives & Self-Improvement
 
@@ -1837,7 +1822,7 @@ If the **team lead itself** is running low on context, use Phase 6.75 (retrospec
 - **Domain model changes require user approval** — never auto-approve schema changes
 - **PR description updates — NEVER overwrite blindly.** The user may have manually added images, screenshots, or comments to the PR body. When updating the PR description:
   1. **Read the current body first**: `gh pr view <PR_NUMBER> --json body --jq '.body' > /tmp/pr-body.md`
-  2. **Edit the file** — update only the sections you need to change (e.g., `## Progress`, `## What changes`). Preserve everything else, especially any images (`![...](...)`), manually added content, and sections you didn't write.
+  2. **Edit the file** — update only the sections you need to change (e.g., `## What changes`, `## Questions`). Preserve everything else, especially any images (`![...](...)`), manually added content, and sections you didn't write.
   3. **Write it back**: `gh pr edit <PR_NUMBER> --body-file /tmp/pr-body.md`
   This prevents wiping user-added screenshots and images.
 
