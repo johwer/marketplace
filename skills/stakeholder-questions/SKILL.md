@@ -31,6 +31,7 @@ unprepared.
 ### Tech lead: English
 
 - Numbered, so the reply can be "1 yes, 2 no, 3 A".
+- One empty line between questions, so each stands apart.
 - One or two sentences each. End with `Yes/no.` or `A or B?`.
 - Name the code: path, enum, ticket key. Give no background, no pros/cons table, no "as we discussed".
 - When we have a proposal, phrase the question as the proposal, so "yes" accepts it.
@@ -45,6 +46,7 @@ unprepared.
 ### PO: Swedish
 
 - Numbered, answerable with ja/nej.
+- One empty line between questions.
 - Plain words. Write "avdelningsadmin", not `DepartmentAdmin`. No endpoints, no class names.
 - When a word can be misread, add one concrete example. "Bevakning" needed one:
   *Anna bevakar Sales = Anna får aviseringar för alla i Sales.*
@@ -95,6 +97,7 @@ When the user pastes answers back:
 - [ ] Every question has an owner, and none is answerable by grep
 - [ ] Tech lead: English, numbered, 1–2 sentences, ends in Yes/no or A/B
 - [ ] PO: Swedish, numbered, ja/nej, plain words, an example where a term can be misread, `Förslag:`
+- [ ] One empty line between numbered questions (every audience)
 - [ ] Parked questions are marked, not asked
 - [ ] Shown in the chat, not posted
 - [ ] Answers mapped by number. Ambiguous ones confirmed with the user before they are recorded
