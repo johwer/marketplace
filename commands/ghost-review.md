@@ -98,6 +98,15 @@ For every capability the diff adds, answer all four:
 Write the finding as: *what the change adds → what already provides it → the cheaper route*. Do not
 soften it into a suggestion; a correct implementation of an unnecessary change still gets closed.
 
+**New mechanism vs existing one (standing decision 2026-10-16).** "Always be careful about building
+a mechanism we dont have." Careful means "something new needs taste, judgment and consensus.
+Something existing is just to go hard." So the order is: use what exists (an API, a config screen,
+a manual step) → a migration only when needed to avoid data loss → a new mechanism (a reconciler,
+a backfill tool, a new endpoint) only with prior consensus. With one live prod customer, "manual
+turning stuff on is reasonable" — a per-company manual switch beats automation nobody asked for.
+(PROJ-4061: Nova-native companies get a new service via the existing `PUT company/{id}/products`,
+not a backfill or a new rollout mechanism.)
+
 > **The incident this came from (PROJ-3952, 2026-09-21).** A narrow ServiceC endpoint was designed,
 > built, unit- and integration-tested against real Postgres, passed 20 CI checks, and was reviewed
 > favourably by the domain lens — then closed by reviewer-one: *"This is a huge architectural
@@ -952,6 +961,7 @@ Newer decisions override older patterns in this file. Each is reviewer-one' unle
 - **2026-10-14 (Slack):** "Do NOT check product. Use the services. Product<->service mapping is a DB thing." → [PRODUCT-IS-DATA]
 - **2026-10-15 (Slack):** when changing the DB schema or what a field/enum means, check that the SignedIn→Nova migrators (e.g. `ServiceContractMigrator`, `HealthCaseTemplateRuleMigrator`) keep up. A migrator set `Months = null` and every migrated ServiceB template crashed in prod. → [MIGRATOR-PARITY]
 - **2026-10-15 (Slack):** data fixes: "a migration is fine, but also overkill if you can do it over APIs." → [DATA-FIX-ROUTE]
+- **2026-10-16 (Slack, PROJ-4061):** "Always be careful about building a mechanism we dont have." "We have one live prod customer, manual turning stuff on is reasonable." "If required to avoid data loss, use a migration before building something new." "Something new needs taste, judgment and consensus. Something existing is just to go hard." → [NECESSITY], [DATA-FIX-ROUTE]
 
 ### Step 1 — Fetch the ticket
 

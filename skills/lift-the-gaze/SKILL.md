@@ -61,6 +61,10 @@ For the chosen rung, list concretely **what code you no longer need lower down**
 
 When the fix is to **data** rather than behaviour, there is a rung above a DB migration: correct it through the existing API or config. A migration is fine, but overkill when an API can do it.
 
+### Existing before new (applies to every option)
+
+Rank options by what they build, not only by altitude: **existing mechanism (API, config screen, manual step) → migration, only when needed to avoid data loss → new mechanism, only with consensus first.** Tech lead 2026-10-16: "Always be careful about building a mechanism we dont have… Something new needs taste, judgment and consensus. Something existing is just to go hard." A manual step is a real option, not a failure: with one live prod customer, "manual turning stuff on is reasonable". In each option card, mark whether it uses something that exists or builds something new; a "new" option without prior agreement goes to the tech lead before it is recommended.
+
 ## Step 2 — Ball the options
 
 Present 2-3 options that differ in **altitude**, not in style. One per rung that is genuinely viable. For each:
