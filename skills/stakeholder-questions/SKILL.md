@@ -34,6 +34,7 @@ unprepared.
 - One empty line between questions, so each stands apart.
 - No hard line breaks inside a sentence: one paragraph per line, so it reflows when pasted into Slack or Jira.
 - The question itself on the first line, its context or detail on the next line.
+- For Slack: each question a top-level bullet, its context or follow-up a nested sub-bullet, A/B options as separate sub-bullets.
 - One or two sentences each. End with `Yes/no.` or `A or B?`.
 - Name the code: path, enum, ticket key. Give no background, no pros/cons table, no "as we discussed".
 - When we have a proposal, phrase the question as the proposal, so "yes" accepts it.
