@@ -800,6 +800,13 @@ cmd_doctor() {
     fi
   done
 
+  if command -v playwright-cli &>/dev/null; then
+    ok "playwright-cli installed (visual verification)"
+  else
+    err "playwright-cli not found — install: npm i -g @playwright/cli@0.1.22 (per nvm Node version)"
+    issues=$((issues + 1))
+  fi
+
   # Check performance tools
   if command -v eslint_d &>/dev/null; then
     ok "eslint_d installed (10x faster ESLint in quality-gate.sh)"

@@ -216,11 +216,12 @@ playwright-cli kill-all
 
 ## Local installation
 
-In some cases user might want to install playwright-cli locally. If running globally available `playwright-cli` binary fails, use `npx playwright-cli` to run the commands. For example:
+The npm package is **`@playwright/cli`**, not `playwright-cli`, so `npx playwright-cli` fails with "could not determine executable". If `playwright-cli` is not on PATH (a global npm install belongs to one nvm Node version, so switching Node loses it), install it or run it through npx with the package name:
 
 ```bash
-npx playwright-cli open https://example.com
-npx playwright-cli click e1
+npm i -g @playwright/cli@0.1.22
+npx @playwright/cli open https://example.com
+npx @playwright/cli click e1
 ```
 
 ## Example: Form submission
