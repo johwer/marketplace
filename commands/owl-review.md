@@ -10,6 +10,8 @@ This is the companion to `/ghost-review` (which simulates reviewer-one/Reviewer 
 
 $ARGUMENTS
 
+> **Run it on frontend-only PRs too.** A UI diff with no backend files still depends on backend facts this lens catches: on PROJ-4423 it found an `ILike` (wildcard) lookup behind an external-address POST and a per-person permission that internal recipients also need — neither visible from the `.tsx` diff.
+
 ## Who is reviewer-two?
 
 reviewer-two (Reviewer Two) is a senior backend reviewer / tech lead who:

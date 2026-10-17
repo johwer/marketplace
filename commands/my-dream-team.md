@@ -117,7 +117,7 @@ Check if the arguments contain `--lite`. If present:
   - **Phase 5.5**: Full GitHub review cycle — poll for AI bot reviews (Copilot is the bot that answers on this repo; Gemini has never responded), poll for AI feedback, fix any issues, poll CI checks, mark PR ready only after user confirms. Human reviewers are auto-assigned by `.github/CODEOWNERS` on ready — do NOT manually assign from `reviewers.json` (use the opt-in `/reviewers` command only if extra reviewers are explicitly wanted)
   - **Phase 6**: User review loop — ask user for feedback, route fixes, iterate until "ship it"
   - **Phase 6.5**: Summary (write it yourself instead of spawning Tane)
-  - **Phase 4.75 (Visual verification)**: **Drive the LIVE app in a real browser via `playwright-cli` and save screenshots to `~/Downloads/<TICKET_ID>/`** — that IS the verification. Navigate the worktree dev app (port 31xx), exercise the changed UI, and check network + console (not just the DOM). Save one screenshot per relevant state to `~/Downloads/<TICKET_ID>/` (user-visible folder; NEVER the repo, NEVER `/tmp`). **Do NOT** write committed Playwright e2e specs, `toHaveScreenshot` baselines, `page.screenshot()` artifacts in the repo, or GIF/video by default — that is the wrong default and contradicts how this team verifies (see memory `feedback_dtf_visual_verification_contradiction`, `feedback_real_browser_verification_mandatory`, `feedback_screenshots_user_visible_paths`). **New component → add a Cosmos fixture** (Vite/Cosmos for component states) instead of an e2e spec, plus a unit test if it has interactive logic. A committed `toHaveScreenshot` regression test is the rare EXCEPTION — only when the user explicitly asks for one. See `~/.claude/skills/playwright-cli/SKILL.md`.
+  - **Phase 4.75 (Visual verification)**: **Drive the LIVE app in a real browser via `playwright-cli` and save screenshots to `~/Downloads/<TICKET_ID>/`** — that IS the verification. Navigate the worktree dev app (port 31xx), exercise the changed UI, and check network + console (not just the DOM). Save one screenshot per relevant state to `~/Downloads/<TICKET_ID>/` (user-visible folder; NEVER the repo, NEVER `/tmp`), each one taken as `bash ~/.claude/scripts/pw-mask-pii.sh <TICKET_ID>-lead && playwright-cli -s=<TICKET_ID>-lead screenshot ...` (HARD RULE, see Phase 5 gate item 3). **Do NOT** write committed Playwright e2e specs, `toHaveScreenshot` baselines, `page.screenshot()` artifacts in the repo, or GIF/video by default — that is the wrong default and contradicts how this team verifies (see memory `feedback_dtf_visual_verification_contradiction`, `feedback_real_browser_verification_mandatory`, `feedback_screenshots_user_visible_paths`). **New component → add a Cosmos fixture** (Vite/Cosmos for component states) instead of an e2e spec, plus a unit test if it has interactive logic. A committed `toHaveScreenshot` regression test is the rare EXCEPTION — only when the user explicitly asks for one. See `~/.claude/skills/playwright-cli/SKILL.md`.
   - **Phase 6.75**: Retrospective — write your own retro learnings using the same 4 categories with destination hints: instruction improvements (`dream-team`/`agent:<name>`/`skill:<name>`), convention discoveries (`project-claude`/`agents-md:<path>`/`repo-docs`), doc gaps (`repo-docs`/`agents-md:<path>`), process improvements (`dream-team`/`memory`). Tag each item with a suggested destination so [`/retro-proposals`](commands.md#team-review) can route it later.
   - **Phase 7**: Completion — runs the **Completion Gate** first (see `dev-workflow-checklist.md` Section 9): all PR comments resolved, visual-verification screenshots present in `~/Downloads/<TICKET_ID>/`, retro done, CI green, PR description complete. Then posts a **Jira completion comment** with PR link + summary, @mentioning the ticket creator if different from assignee. Then transitions ticket to Klart. **Stops there** — no worktree, branch or session teardown (that is `/workspace-cleanup` from the orchestrator; a session cannot remove the worktree it is running in).
 - **Visual verification applies in lite mode too.** The same Phase 4.75 gate (real-browser `playwright-cli` check + `~/Downloads/<TICKET_ID>/` screenshots) applies whether you're in full Dream Team or lite mode. Don't skip it just because you're working solo.
@@ -238,6 +238,12 @@ This phase runs instead of the normal Phase 1-7 workflow when `--resume` is dete
      This is NOT a pass. Say "backend unverified" explicitly; `quality-gate.sh` reports it through
      the same ".NET build failed" path as a real regression, which reads as an environment nit.
 
+4.6. **Spot-check the evidence the notes claim, not just the build.** A green gate proves the branch
+   compiles; it does not prove the previous session's screenshots or measurements show what the
+   notes say. Open each `~/Downloads/<TICKET_ID>/` capture the notes call verified and confirm it
+   shows the claimed role, state and data (PROJ-3890: the "verified" shots proved the wrong role).
+   Then run `bash ~/.claude/scripts/dtf-preflight.sh <worktree>` (Phase 1 step 1b).
+
 5. **Assess what phase the previous session was in** based on the gathered context:
    - **No code changes, no PR** → Previous session barely started. Start fresh from Phase 1.
    - **Code changes exist, no PR** → Implementation was in progress. Skip to Phase 2 with context.
@@ -294,6 +300,18 @@ bash ~/.claude/scripts/phase-cost-tracker.sh log "<TICKET_ID>" "<phase-name>" "<
 ### Phase 1: Team Creation & Architecture Analysis
 
 1. **Determine ticket ID** from the input or current directory (e.g., `PROJ-1234`). This is used for the team name.
+
+1b. **Preflight the environment NOW, not at the phase that needs it** (lite and full, and on `--resume`):
+   ```bash
+   bash ~/.claude/scripts/dtf-preflight.sh <worktree>        # add --no-login for backend-only tickets
+   ```
+   Checks `playwright-cli`, `git-lfs`, a route to GitHub (SSH :22 → :443 → HTTPS fallback, printing the
+   push command to use) and that the seed login returns a token. **Paste the output.** Any FAIL goes
+   to the user before planning: in PROJ-4294 all four failed mid-session, each found only after
+   implementation, and a 401 seed login means the shared stack is unseeded — ask before planning a
+   post-login check. When the ticket's base is newer than the main-stack images (a dependency merged
+   today), also start the worktree service(s) and apply that PR's seed rows up front; the stale main
+   stack answers new reads with the default 404 "Resource not found" = missing route (PROJ-4389).
 
 2. **Load the Jira ticket from disk**: Check for `.dream-team/jira-ticket.md` in the worktree. If it exists (written by `/workspace-launch` or `/create-stories`), read it — this is the **single source of truth** for the ticket.
    ```bash
@@ -355,7 +373,7 @@ bash ~/.claude/scripts/phase-cost-tracker.sh log "<TICKET_ID>" "<phase-name>" "<
      - **Design intent check**: For new features, verify the implementation approach matches the ticket's stated purpose — not just code quality. Flag when the proposed solution solves a different problem than what was described.
      - **If `.dream-team/interview.md` exists** (from `--interview` flag), read it first — the user's answers take priority over assumptions from the ticket text
      - Analyze the ticket/story provided
-     - **Check for Jira attachments**: If the ticket mentions attached images, screenshots, or design references, use **Playwright CLI** to browse `https://your-company.atlassian.net/browse/<TICKET_ID>` and view attachments: `playwright-cli -s=amara open https://your-company.atlassian.net/browse/<TICKET_ID> --headed`. Use `playwright-cli snapshot` to get element refs and `playwright-cli screenshot --filename=jira-attachment.png` to capture images. Images are the source of truth over text descriptions if they conflict. Include key visual details (colors, layout, shapes) in your architecture report so dev agents have the specs. If authentication is needed, ask the user to log in via the headed browser.
+     - **Check for Jira attachments**: If the ticket mentions attached images, screenshots, or design references, use **Playwright CLI** to browse `https://your-company.atlassian.net/browse/<TICKET_ID>` and view attachments: `playwright-cli -s=<TICKET_ID>-amara open https://your-company.atlassian.net/browse/<TICKET_ID> --headed`. Use `playwright-cli snapshot` to get element refs and `playwright-cli screenshot --filename=jira-attachment.png` to capture images. Images are the source of truth over text descriptions if they conflict. Include key visual details (colors, layout, shapes) in your architecture report so dev agents have the specs. If authentication is needed, ask the user to log in via the headed browser.
      - Explore the codebase to determine what files/services are affected. **Start with Glob patterns for file/folder names** before grepping file contents — folder naming often differs from code naming conventions (e.g., `medicalcertificate` vs `MedicalCertificate`).
      - **Independent candidate discovery**: Do NOT limit your exploration to files mentioned in the ticket or pre-hydrated context. Independently grep the codebase for the pattern/anti-pattern being addressed — there may be additional instances the ticket author missed. Report any extra candidates you find so the team lead can decide whether to include them in scope.
      - Determine if the ticket needs: backend-only, frontend-only, or both
@@ -378,7 +396,7 @@ bash ~/.claude/scripts/phase-cost-tracker.sh log "<TICKET_ID>" "<phase-name>" "<
      - **Handoff TL;DR block**: End your report (and the top of your notes file) with a 5-line block for downstream agents: scope counts by category/technique, intentional behavior changes (if any), and known verification blockers (missing seed data, feature flags off). The summary writer and reviewer read this first. In classification tables, use row types `convert / keep / delete / partial-convert (keep-fragment)` — flag split items (part converted, part kept) explicitly so the reviewer verifies BOTH halves.
      - **Blast-radius map (refactor tickets)**: For refactor tickets, annotate each target file with (a) has unit tests? (glob for the test file) and (b) consumer count (grep imports). Files that are **untested AND have ≥1 consumer** must be flagged for mandatory real-browser verification by the dev, and called out in the reviewer checklist as requiring browser/trace evidence — green builds prove nothing there. (Retro PROJ-3041: all 3 MUST FIX were in untested files; 11 of 18 targets had no direct test.)
      - **Verified route paths**: For each affected page, include the full URL path as it appears in `AppRoutes.tsx` (e.g., `/<customerId>/administration/access-management/organization`). These are passed directly to Ingrid (visual verification), Suki (functional testing), and Tane (How to Test section). Wrong paths cause testers to hit "Not yet implemented" pages.
-     - **Stacked-PR assessment**: If the ticket has internal ordering a reviewer needs — a deletion and its replacement, groundwork the rest depends on, backend contract → generated client → UI, or one change with a much larger blast radius than the rest — invoke the **`stacked-prs`** skill (repo skill, `.claude/skills/stacked-prs/SKILL.md`) and use its **Entry A** to plan the layers now, before any code is written. Planning the cut up front is cheap; cutting a finished 37-commit branch apart later is not (PROJ-3717). Report the proposed layers in your architecture report as an ordered list, bottom first, with one line each on what it changes and whether the app still works with only that layer applied. Do **not** stack merely because the diff will be large — each layer costs its own approval and Copilot review. The skill owns the decision criteria and the hard limits; do not restate them here.
+     - **Stacked-PR assessment**: If the ticket has internal ordering a reviewer needs — a deletion and its replacement, groundwork the rest depends on, backend contract → generated client → UI, or one change with a much larger blast radius than the rest — plan the layers now, before any code is written. (**There is no `stacked-prs` skill on main** — it exists only on the unmerged PROJ-3825 branch, and `gh stack` is not installed. Do not invoke either; use plain git as described in Phase 1.5.) Planning the cut up front is cheap; cutting a finished 37-commit branch apart later is not (PROJ-3717). Report the proposed layers in your architecture report as an ordered list, bottom first, with one line each on what it changes and whether the app still works with only that layer applied. Do **not** stack merely because the diff will be large — each layer costs its own approval and Copilot review. Layers that must ship in **different releases** (expand/contract: the enum first, the data migration that writes it one release later) are separate PRs against `main`, never a stack, because merging a stack merges every layer at once.
      - **Team sizing decision**: Decide how many devs to spawn per discipline:
        - **Default**: 1 backend dev (Kenji), 1 frontend dev (Ingrid)
        - **Spawn a second backend dev (Ravi)** only if: there are 2+ independent backend workstreams (e.g., two separate services), OR the backend scope is large enough that one agent's context window would be exhausted
@@ -400,6 +418,30 @@ bash ~/.claude/scripts/phase-cost-tracker.sh log "<TICKET_ID>" "<phase-name>" "<
      - Stay available to help troubleshoot issues other agents encounter
      - **Jira ticket on disk**: Tell Amara to read `.dream-team/jira-ticket.md` as the first thing she does. This file contains the complete, unedited Jira output and is the source of truth for scope and acceptance criteria. Do NOT paste a summary of the ticket into Amara's prompt — she reads it from disk.
 
+**Investigation rules — apply to Amara AND to the lead in `--lite`** (each one cost a reopened
+decision or a late finding in more than one session):
+- **Measure and trace BEFORE asking the user a scope question.** A scope question asked before the
+  adjacency is traced is asked on incomplete information. When the ticket says "choose X from a
+  measured value", measure it first (PROJ-4444: a token assumed to live hours lived 60 s and reopened
+  a made decision). When a change narrows or widens a rule, trace what else the rule reaches first
+  (PROJ-3977). For pair tickets (A sends, B reads), trace the real producer's URL end to end before
+  verifying with hand-typed URLs (PROJ-4179).
+- **Search Jira before proposing a fix for an adjacent defect.** A seed or code comment saying "has
+  its own ticket" is a lead, not a claim to flatten: `acli jira workitem search --jql 'text ~ "<symbol>"'`
+  (PROJ-3978, PROJ-3890 — the ticket existed, was assigned and was more precise).
+- **Negative claims cite their grep.** "Nothing does X", "the flag covers it", "never used" carries the
+  command and hit count, run over the whole `services/<Svc>` tree (and every service the claim
+  crosses), targeting the readers (queries that filter), not just the field name. Otherwise tag it
+  `[unverified]` in notes; the reviewer clears or confirms each tag before ready (PROJ-4231).
+- **You may question the ticket's MECHANISM, not only its design.** Name the concrete click path for
+  every claimed cause; a "confirm the route" phrasing repeats a false premise into the PR (PROJ-4036).
+- **Design-link-only acceptance criteria** (Figma / Claude Design, no screenshots): ask for
+  screenshots, and present the codebase precedent for each design element before planning (PROJ-4423).
+- **Before documenting a propagation gap as permanent, grep `replay|sync|backfill`.** ServiceC SQL writes reach the other services through Administration > Platform > Sync; the "ServiceC only" gap needed no code (PROJ-4135).
+- **Removal tickets:** sweep the originating PR's file list (`git show --stat <feature-commit>`) for
+  helpers that become orphaned, and ask whether data created through the removed UI keeps acting
+  (PROJ-4049).
+
 5a. **Wait for Amara's analysis** before proceeding (normal path — when no pre-hydrated context exists).
 
 5b. **Pre-hydrated fast path** (when `.dream-team/context.md` exists from Step 2):
@@ -414,7 +456,7 @@ bash ~/.claude/scripts/phase-cost-tracker.sh log "<TICKET_ID>" "<phase-name>" "<
 
 Immediately after receiving Amara's analysis, create a **draft PR** so the user and colleagues can follow progress on GitHub:
 
-> **If Amara's report proposes a stack** (see her Stacked-PR assessment in Phase 1), follow the **`stacked-prs`** skill instead of this phase's single-PR flow: create the layer branches with `gh stack init`, and open the draft PR for the **bottom layer only**. Upper layers get their PRs from `gh stack submit` as they become reviewable. Note that `validate-title` does not run on drafts, so a malformed title only fails when the PR goes ready.
+> **If Amara's report proposes a stack** (see her Stacked-PR assessment in Phase 1), build it with **plain git**: create each layer branch off the one below it (`git switch -c <ticket>-layer2 <ticket>-layer1`), open the draft PR for the bottom layer against `main`, and each upper layer's PR with `gh pr create --draft --base <lower-layer-branch>`. When a lower layer merges, rebase the next one onto `main` and retarget it with `gh pr edit <n> --base main`. There is no `stacked-prs` skill or `gh stack` here (the skill lives only on unmerged PROJ-3825). Note that `validate-title` does not run on drafts, so a malformed title only fails when the PR goes ready.
 
 0. **HARD GATE — the ticket must be Pågående before a PR exists.** Opening a PR while the
    board still says "Att göra" is how a skipped Step 3 goes unnoticed; it was caught by hand on
@@ -515,17 +557,19 @@ Immediately after creating the draft PR, spawn Lena to capture a "before" screen
   - You are **Lena**, the Visual Verifier for Repo. Your teammates know you by name.
   - Your job is to capture a "BEFORE" screenshot showing the current bug state. You do NOT edit any files.
   - **Use Playwright CLI** for browser automation — no Chrome queue needed, you get your own isolated session.
-  - **Dev server**: Check if Vite is running with `lsof -i -P | grep node | grep LISTEN`. If not running, start it: `cd apps/web && npx vite --config vite.config.worktree.mts --host &` and wait for it to be ready. **Always use vite.config.worktree.mts in worktrees** — `npm start` uses port 3000 which conflicts with other worktrees.
-  - **Login**: Open the browser with `playwright-cli -s=lena open http://localhost:<port> --headed`. If you see a login page, use `playwright-cli snapshot` to get element refs, then `playwright-cli click <ref>` to click "More login options" → "Username and password" → `playwright-cli fill <ref> "gunner"` for username. If you cannot enter a password, message the team lead to ask the user to log in, then continue.
+  - **Dev server**: Check if Vite is running with `lsof -i -P | grep node | grep LISTEN`. If not running, start it: `bash ~/.claude/scripts/worktree-dev.sh --no-cosmos` (never a backgrounded `npx vite &` — it dies silently) and wait for it to be ready. **Always use vite.config.worktree.mts in worktrees** — `npm start` uses port 3000 which conflicts with other worktrees.
+  - **Login**: Open the browser with `playwright-cli -s=<TICKET_ID>-lena open http://localhost:<port> --headed`. If you see a login page, use `playwright-cli snapshot` to get element refs, then `playwright-cli click <ref>` to click "More login options" → "Username and password" → `playwright-cli fill <ref> "gunner"` for username. If you cannot enter a password, message the team lead to ask the user to log in, then continue.
   - **Page path**: [Include the specific page path from the architect's analysis]
   - **Reproduction steps**: [Include the ticket's reproduction steps]
   - **Capture "BEFORE" screenshot**:
-    1. Navigate to the affected page: `playwright-cli -s=lena goto http://localhost:<port>/<path>`
+    1. Navigate to the affected page: `playwright-cli -s=<TICKET_ID>-lena goto http://localhost:<port>/<path>`
     2. Walk through the reproduction steps using `playwright-cli` commands (click, fill, etc.)
-    3. Take a screenshot: `mkdir -p ~/Downloads/<TICKET_ID> && playwright-cli -s=lena screenshot --filename=~/Downloads/<TICKET_ID>/<ComponentName>-before.png` (user-visible folder — NEVER the repo, NEVER `/tmp`)
-  - **Close session**: Run `playwright-cli -s=lena close`
+    3. Take a screenshot: `mkdir -p ~/Downloads/<TICKET_ID> && bash ~/.claude/scripts/pw-mask-pii.sh <TICKET_ID>-lena && playwright-cli -s=<TICKET_ID>-lena screenshot --filename=~/Downloads/<TICKET_ID>/<ComponentName>-before.png` (user-visible folder — NEVER the repo, NEVER `/tmp`)
+  - **Close session**: Run `playwright-cli -s=<TICKET_ID>-lena close`
   - **Report to team lead**: Send a message with screenshot path and a brief description of what the bug looks like visually.
   - **IMPORTANT**: Do NOT edit any files. Do NOT run git commit. You are read-only.
+
+**Login-page tickets:** capture the BEFORE shots right after disabling auto-login and before any code changes, with one script that is reused unchanged for the AFTER shots, so the pair is directly comparable (PROJ-4148).
 
 **Don't wait for Lena to finish** — proceed to Phase 2 immediately. Lena runs in parallel with dev agent spawning. When Lena reports back, include the visual reference in a message to Ingrid so she knows what the bug looks like.
 
@@ -632,16 +676,16 @@ Based on the tech-architect's scope assessment, spawn the needed agents. **Use t
     Fix any issues — these will fail the GitHub build if left unfixed.
   - **Visual verification = drive the LIVE app in a real browser (MANDATORY for UI changes)**: If the ticket involves UI changes, verify by driving the real running app with **Playwright CLI** and saving screenshots to `~/Downloads/<TICKET_ID>/` before reporting completion. **Do NOT write committed Playwright e2e specs, `toHaveScreenshot` baselines, `page.screenshot()` artifacts in the repo, or GIF/video** — that contradicts how this team verifies (memory `feedback_dtf_visual_verification_contradiction`, `feedback_real_browser_verification_mandatory`, `feedback_screenshots_user_visible_paths`). A committed visual-regression test is the rare EXCEPTION, only when the user explicitly asks for one.
     0. **Pre-check**: Check if the target page has permission gates and verify seed data supports the test user. Missing permissions = blank page and wasted time.
-    1. **Start the Vite dev server**: Check if one is already running for this worktree with `lsof -i -P | grep node | grep LISTEN`. If not, start it: `cd apps/web && npx vite --config vite.config.worktree.mts --host &`. Worktree port (31xx), APIs proxy to the main stack (500x) by default.
+    1. **Start the Vite dev server**: Check if one is already running for this worktree with `lsof -i -P | grep node | grep LISTEN`. If not, start it: `bash ~/.claude/scripts/worktree-dev.sh --no-cosmos` (never a backgrounded `npx vite &` — it dies silently). Worktree port (31xx), APIs proxy to the main stack (500x) by default.
     1b. **Verify you're on the right dev server**: Run `lsof -i :<port> | grep node` and confirm the process path contains your worktree directory, not another open worktree — testing the wrong server means testing old code silently.
     2. **Figure out the path**: Use the verified route paths from Amara's architecture report, or the router config (`apps/web/src/routes/`).
-    3. **Drive the real app** with `playwright-cli -s=ingrid`: open headed, log in, navigate to the page (use seed data IDs from `scripts/database-init/` for deterministic navigation), and exercise the actual interaction (click, select, type). Scroll the changed element into view before capturing.
-    4. **Check what headless can't catch** — `playwright-cli -s=ingrid console error` (no JS/React errors). ⚠️ **There is NO `playwright-cli network` subcommand** — it errors with "Unknown command". To check requests, either (a) assert statically that no caller of the old endpoint/hook remains (`grep` the src), which is stronger than a sampled request log, or (b) use `playwright-cli -s=ingrid eval "() => performance.getEntriesByType('resource').map(e=>e.name).filter(n=>n.includes('/api/'))"` — but note the resource-timing buffer caps at **250 entries** and Vite dev module requests evict your API calls, so `performance.clearResourceTimings()` + `setResourceTimingBufferSize(2000)` first, and beware that Vite serves `/src/**` module paths that match your endpoint names and look like API calls. The browser is still the step that catches stale companyId, failed requests, and ErrorBoundary crashes.
-    5. **Capture screenshots to `~/Downloads/<TICKET_ID>/`** (one per relevant state): `mkdir -p ~/Downloads/<TICKET_ID> && playwright-cli -s=ingrid screenshot --filename=~/Downloads/<TICKET_ID>/<state>.png`. NEVER the repo, NEVER `/tmp`. Confirm the rendered text/labels are correct (translations live in S3), not raw i18n keys.
+    3. **Drive the real app** with `playwright-cli -s=<TICKET_ID>-ingrid`: open headed, log in, navigate to the page (use seed data IDs from `scripts/database-init/` for deterministic navigation), and exercise the actual interaction (click, select, type). Scroll the changed element into view before capturing.
+    4. **Check what headless can't catch** — `playwright-cli -s=<TICKET_ID>-ingrid console error` (no JS/React errors). ⚠️ **There is NO `playwright-cli network` subcommand** — it errors with "Unknown command". To check requests, either (a) assert statically that no caller of the old endpoint/hook remains (`grep` the src), which is stronger than a sampled request log, or (b) use `playwright-cli -s=<TICKET_ID>-ingrid eval "() => performance.getEntriesByType('resource').map(e=>e.name).filter(n=>n.includes('/api/'))"` — but note the resource-timing buffer caps at **250 entries** and Vite dev module requests evict your API calls, so `performance.clearResourceTimings()` + `setResourceTimingBufferSize(2000)` first, and beware that Vite serves `/src/**` module paths that match your endpoint names and look like API calls. The browser is still the step that catches stale companyId, failed requests, and ErrorBoundary crashes.
+    5. **Capture screenshots to `~/Downloads/<TICKET_ID>/`** (one per relevant state): `mkdir -p ~/Downloads/<TICKET_ID> && bash ~/.claude/scripts/pw-mask-pii.sh <TICKET_ID>-ingrid && playwright-cli -s=<TICKET_ID>-ingrid screenshot --filename=~/Downloads/<TICKET_ID>/<state>.png`. NEVER the repo, NEVER `/tmp`. Confirm the rendered text/labels are correct (translations live in S3), not raw i18n keys.
     6. **New component? Add a Cosmos fixture** (`*.fixture.tsx`) showing its states, run via `npx cosmos --config cosmos.worktree.config.json` — preferred over an e2e spec for component states. If it has interactive/conditional logic, also add a unit test in the same PR.
     7. **Compare against the design**: If the ticket has a Figma link or Jira image attachment, compare layout, colors, spacing, typography.
     8. **Check acceptance criteria** against the ticket; if the result doesn't match, fix and re-verify.
-    9. **Close session**: `playwright-cli -s=ingrid close`.
+    9. **Close session**: `playwright-cli -s=<TICKET_ID>-ingrid close`.
     10. **Report visual status**: reference the `~/Downloads/<TICKET_ID>/` screenshot paths (and any Cosmos fixture), confirm network/console were clean, and note any deviations from the design.
   - **Context management**: Follow the Context Management Protocol (see below). Create your notes file at `.dream-team/notes/ingrid.md`.
   - **Communication**: Follow the Communication Protocol (see below). Your contacts: `kenji` (backend), `diego` (infra), `amara` (architect). Be proactive — if you find API contract issues, message `kenji` immediately.
@@ -926,17 +970,17 @@ After Maya's code review is approved (all MUST FIX items resolved), spawn:
   - You are **Lena**, the Visual Verifier for Repo. Your teammates know you by name.
   - Your job is to **drive the LIVE app in a real browser via `playwright-cli` and save screenshots to `~/Downloads/<TICKET_ID>/`**. Do NOT write committed Playwright e2e specs, `toHaveScreenshot` baselines, repo `page.screenshot()` artifacts, or GIF/video — that contradicts how this team verifies (memory `feedback_dtf_visual_verification_contradiction`).
   - **Dev server**: should already be running. Check with `lsof -i -P | grep node | grep LISTEN` to find the worktree port. If not running, message the team lead.
-  - **Login**: `playwright-cli -s=lena open http://localhost:<port> --headed`. If you see a login page, use `playwright-cli snapshot` for refs, then `click`/`fill`. If you can't enter a password, message the team lead to ask the user to log in.
+  - **Login**: `playwright-cli -s=<TICKET_ID>-lena open http://localhost:<port> --headed`. If you see a login page, use `playwright-cli snapshot` for refs, then `click`/`fill`. If you can't enter a password, message the team lead to ask the user to log in.
   - **Page path**: [Include the specific page path from the ticket]. Get the customerId from the URL after login (or seed data IDs in `scripts/database-init/`).
   - **Reproduction / verification steps**: [Include the ticket's steps]
   - **Verify in the real browser**:
     1. Navigate to the page and exercise the actual interaction (click, select, type). Scroll the changed element into view.
     2. Confirm requests route correctly — **but note there is NO `playwright-cli network` subcommand.** Prefer a static check (`grep` that no caller of the old endpoint remains) plus `console error`; see the note in Ingrid's prompt for the `performance.getEntriesByType('resource')` approach and its 250-entry buffer trap.
-    3. `playwright-cli -s=lena console error` — confirm no JS/React errors.
+    3. `playwright-cli -s=<TICKET_ID>-lena console error` — confirm no JS/React errors.
     4. Confirm rendered text/labels are correct (translations live in S3), not raw i18n keys; check both positive and negative cases where relevant.
     4b. **Locale-display tickets: verify in a non-`sv` locale.** For any ticket whose change is about how locale-sensitive content renders (dates, numbers, translated copy, formatting), switch the app to a non-Swedish locale before capturing — `sv` is the default and hides bugs that only surface in other locales (PROJ-3200).
-    5. Capture screenshots: `mkdir -p ~/Downloads/<TICKET_ID> && playwright-cli -s=lena screenshot --filename=~/Downloads/<TICKET_ID>/<state>.png` (one per state). NEVER the repo, NEVER `/tmp`.
-  - **Close session**: `playwright-cli -s=lena close`
+    5. Capture screenshots: `mkdir -p ~/Downloads/<TICKET_ID> && bash ~/.claude/scripts/pw-mask-pii.sh <TICKET_ID>-lena && playwright-cli -s=<TICKET_ID>-lena screenshot --filename=~/Downloads/<TICKET_ID>/<state>.png` (one per state). NEVER the repo, NEVER `/tmp`.
+  - **Close session**: `playwright-cli -s=<TICKET_ID>-lena close`
   - **Report to team lead**: the `~/Downloads/<TICKET_ID>/` screenshot paths, network/console status, and any issues. Do NOT commit anything — these screenshots are evidence, not repo files.
 
 **Note for team lead**: For a "before/after" comparison, capture the "before" in Phase 1.75 (against `main`/the bug state) and the "after" here — both as `~/Downloads/<TICKET_ID>/` screenshots. The user drag-drops them into the PR description; nothing is committed to the repo.
@@ -990,6 +1034,11 @@ In this codebase **feature-flagging is frontend-only** (the backend does not eva
 
 4. The feature ships **flag-off in prod by default** — safe. The user enables/rolls out via PostHog after merge.
 
+5. **Verifying flag-gated UI locally:** read memory `reference_nova_posthog_feature_flags` BEFORE the
+   first browser run. Flags are host-targeted, so localhost renders without the feature even with a
+   real UA, and headless Chromium gets no flags at all. Rewrite PostHog's `/flags` response with a
+   route in the first script instead of discovering this on the third run (PROJ-3847, PROJ-4421).
+
 ### Phase 5: Commit, Push & Initial Summary
 
 **HARD GATE — Visual verification (UI tickets only):**
@@ -1009,6 +1058,17 @@ Before proceeding with ANY push, confirm visual verification was done **in the r
    ```bash
    git diff --name-only origin/main | grep -E 'src/.*__screenshots__/.*\.png|tests/e2e/.*-snapshots/.*\.png' && echo "REMOVE these — screenshots go to ~/Downloads, not the repo" || echo "ok: no screenshots committed"
    ```
+3. **Every capture was masked (HARD RULE, PROJ-4061).** Each screenshot in `~/Downloads/<TICKET_ID>/`
+   was taken as `bash ~/.claude/scripts/pw-mask-pii.sh <session> && playwright-cli -s=<session> screenshot ...`,
+   after the last navigation or re-render. Before the user uploads anything, the lead opens every
+   shot that shows a person and confirms no national ID, full name of a real person, or email
+   is readable. An unmasked personnummer reached a PR on 2026-10-15; a PR image cannot be recalled
+   once a reviewer has loaded it. Any doubt → re-capture, never crop.
+4. **A rendered derived value matches the raw API row (PROJ-4061).** For any column, badge or flag
+   the UI derives from data, compare the screenshot with the raw response row by row for at least
+   one row of each kind. Every column marked "subscribed" looked right and passed visual
+   verification; the API padded company-offered channels with `reasons: []`, and only a channel
+   with a reason is a subscription. A screenshot proves rendering, not derivation.
 
 Once PR review is approved (or all MUST FIX items are resolved), **run drift detection before pushing**:
 
@@ -1050,7 +1110,7 @@ If there are conflicts, resolve them (keep both additions for routes/tabs — th
 **Run the deterministic quality gate** before committing. This script handles formatting, linting, type checks, and builds — no LLM reasoning needed:
 
 ```bash
-bash ~/.claude/scripts/quality-gate.sh <worktree-path>
+bash ~/.claude/scripts/quality-gate.sh <worktree-path> && git commit ... && git push   # && — never ;
 ```
 
 The script auto-detects which checks to run (backend/frontend) based on changed files. It auto-fixes formatting (CSharpier, Prettier) and reports any remaining failures. **Quality gate failures BLOCK the commit** — if the script exits non-zero, you MUST fix the reported issues before committing. Do not treat failures as advisory.
@@ -1063,7 +1123,7 @@ Then **commit, push, and generate the initial PR summary**:
    - If both backend and frontend were changed, create separate commits (e.g., `TICKET-ID: Add API endpoints for feature X` and `TICKET-ID: Add frontend components for feature X`)
    - If infra/migrations were involved, commit those first (e.g., `TICKET-ID: Add database migration for feature X`)
    - Each commit message should follow the `TICKET-ID: Description` pattern
-2. **Push the branch** with `git push`. If HTTPS push is rejected for workflow files (`.github/workflows/`), use SSH instead: `git push git@github.com:<OWNER>/<REPO>.git HEAD:<branch-name>`
+2. **Push the branch** with `git push` — only after `quality-gate.sh` passed, chained with `&&`. If HTTPS push is rejected for workflow files (`.github/workflows/`), use SSH instead: `git push git@github.com:<OWNER>/<REPO>.git HEAD:<branch-name>`. If SSH :22 hangs, use the fallback push command the Phase 1 preflight printed (`ssh://git@ssh.github.com:443/...` or HTTPS via `gh auth git-credential`) instead of waiting (PROJ-4049, PROJ-4294). After pushing to an explicit URL, `git update-ref refs/remotes/origin/<branch> HEAD` once `git ls-remote` confirms, so ahead/behind stays truthful. Fetching over an explicit HTTPS URL needs the leading `+` (`git fetch <url> +main:refs/remotes/origin/main`); without it a non-fast-forward update is silently refused and the tracking ref goes stale after a force-push (PROJ-4148).
 3. **Spawn Tane for initial summary** (see Tane's prompt below) — this summary helps GitHub AI reviewers and human reviewers understand the changes
 3b. **Invoke the `code-walkthrough` skill** to add a `## Walkthrough of the changes` section. It explains the diff file by file for a reviewer who has not read it, and — the part that matters — splits hand-written production code from tests and generated output, because a 1,890-line diff that is 75% tests is a small change wearing a big number and a reviewer who doesn't know that budgets their attention wrongly. It also forces the scope statement: anything in the diff that is NOT what the ticket asked for (an opportunistic fix, a pre-existing bug fixed in passing, endpoints that rode along in a regeneration) gets named with a line count. Unannounced extras read as scope creep; labelled ones read as diligence.
 
@@ -1101,7 +1161,10 @@ Poll for whatever responds:
 ```bash
 bash ~/.claude/scripts/poll-ai-reviews.sh <OWNER>/<REPO> <PR_NUMBER> 6 45
 ```
-If it times out, say **which** bots did and did not answer, then proceed.
+If it times out, say **which** bots did and did not answer, then proceed. **Exit 3 = Copilot posted
+"wasn't able to review any files"** — that is no review (it was counted as one three times). Re-request
+with `gh pr edit <PR_NUMBER> --add-reviewer @copilot` and poll again; Copilot never appears in
+`requested_reviewers`, only in `.reviews`.
 
 **Step B: Handle AI bot feedback**
 
@@ -1157,6 +1220,9 @@ Only after both AI review and CI are clean:
    ```bash
    bash ~/.claude/scripts/jira-status-gate.sh "<TICKET_ID>" "Under granskning" --fix   # paste the output
    ```
+   **Ticket split across sessions or repos** (e.g. a Nova half and a SignedIn half): this transition,
+   and Phase 7's "Klart", wait for the LAST half. Moving the shared ticket when the first PR is
+   clean tells the board the whole ticket is in review (PROJ-4244).
 4. **Notify the user** that AI review and CI are clean, and the PR is ready for their review. The PR is still a draft — it will be marked ready (and CODEOWNERS will auto-assign reviewers) once they confirm.
 5. See `~/.claude/docs/dev-workflow-checklist.md` Section 4 for the full PR lifecycle.
 
@@ -1385,6 +1451,14 @@ Before shutting down the team, run a retrospective to capture learnings that imp
      - [issue] → suggested `destination`
      ```
      Destination values use the registry format: `dream-team`, `agent:<name>`, `skill:<name>`, `project-claude`, `agents-md:<path>`, `repo-docs`, `memory`.
+
+     **Increment, never duplicate (recurrence check — before writing any Deferred line).** For each
+     item, grep the file for its key term (script name, symbol, tool, error code):
+     `grep -n -i "<key term>" <memory-dir>/dream-team-learnings.md | grep -v '~~'`. If an unresolved
+     entry already covers it, do NOT add a new line — append ` (recurred: N)` to the existing one
+     (first repeat = 1). `(recurred: 2)` auto-promotes it in `/retro-proposals`. Between 2026-09-14 and
+     2026-10-16 this was skipped almost every time: one item carried a counter, while eleven clusters
+     recurred 3-9 times as fresh lines and never reached the threshold.
 
 9. **Collect session metrics** before recording history:
    - **firstPassCompile**: Did `dotnet build` and `npx tsc --noEmit` pass on the first try before any fixes? (true/false)
@@ -1776,10 +1850,14 @@ For the shared services (`service-c`, `service-a`) one invocation writes **both*
 Each worktree has its own Vite port baked into `vite.config.worktree.mts` (generated by `allocate-ports.sh`):
 
 ```bash
-cd apps/web && npx vite --config vite.config.worktree.mts --host
+bash ~/.claude/scripts/worktree-dev.sh --worktree <worktree> --no-cosmos
 # Runs on http://localhost:<unique-port> (e.g., 3103)
 # API proxies → main stack (500x) unless worktree-service.sh switched one
 ```
+
+**Start it only through `worktree-dev.sh`, and per verification burst.** A `npx vite ... &` from a
+tool shell dies silently at the background-task limit or during user think-time, and the next check
+then hits a dead port (PROJ-4179, PROJ-3847). Re-run the script right before each browser pass.
 
 **Do NOT use `npm start` in worktrees** — it uses `vite.config.mts` which hardcodes port 3000 and would conflict with other worktrees.
 
@@ -1820,6 +1898,11 @@ If the **team lead itself** is running low on context, use Phase 6.75 (retrospec
 - If any agent encounters a critical error, pause and consult the user
 - Keep the user informed of progress at each phase transition
 - **Domain model changes require user approval** — never auto-approve schema changes
+- **`// Arrange` / `// Act` / `// Assert` are function-body comments too.** The comment gate flags
+  them even when every sibling test in the file uses them; matching local style is not a defence when
+  the local style is what the rule was written against (PROJ-3890). Separate the phases with blank lines.
+- **A reviewer verifying a count prints the raw list first**, then checks the arithmetic reconciles
+  before writing "matches" (PROJ-4036: 6+1 was reported as matching 7).
 - **PR description updates — NEVER overwrite blindly.** The user may have manually added images, screenshots, or comments to the PR body. When updating the PR description:
   1. **Read the current body first**: `gh pr view <PR_NUMBER> --json body --jq '.body' > /tmp/pr-body.md`
   2. **Edit the file** — update only the sections you need to change (e.g., `## What changes`, `## Questions`). Preserve everything else, especially any images (`![...](...)`), manually added content, and sections you didn't write.
@@ -1867,6 +1950,25 @@ trivia item; it is the mechanism by which a green result reaches the user with r
   PASS results (PROJ-3763). Echo the value **the system under test itself reports** — the page's
   own `innerHeight`, the serving process's own PID — from inside the measurement, so a stuck
   harness is visible rather than unanimously green.
+- **zsh never word-splits a scalar — so never keep a command or a file list in one** (five
+  sessions: PROJ-4148, 4219, 4389, 4373, 4444). `PW="npx @playwright/cli"; $PW open` runs a command
+  named `npx @playwright/cli` and `>/dev/null` swallows the "command not found", so an empty result
+  reads as a pass. `prettier $FILES` / `git add -- $FILES` pass ONE argument (ENAMETOOLONG or a
+  silent no-op). Use arrays (`PW=(npx @playwright/cli); "${PW[@]}" open`), `xargs -0`
+  (`git diff --name-only -z | xargs -0 git add --`), or write the script in bash. Two more zsh
+  traps: `"$B:src/x"` applies the `:s` history modifier (write `"${B}:src/x"`), and an argument
+  starting with `=` is =-expanded (`echo ====` fails with "= not found").
+- **Gate, then act: chain with `&&`, never `;`.** `quality-gate.sh <wt>; git commit ...; git push`
+  commits and pushes after a FAILED gate (PROJ-4327, PROJ-4423 — a freshness failure was pushed and
+  had to be rebased and force-pushed back).
+- **A removal or negative check must restore the whole old surface and still compile.** Revert to
+  `origin/main`'s sources for every layer the guard spans, make the reverted code build
+  (`currentData → data` everywhere), then read the failure REASON, not the count — a ReferenceError
+  is not the behaviour failing (PROJ-4158, PROJ-4061). Same rule for test-only tickets: break the
+  guard in `src`, rebuild, expect the spec to fail, revert (PROJ-4005).
+- **Rebuilding a branch: never `git checkout -B NAME origin/main`.** It sets the upstream to main and
+  the next plain push is refused or lands wrong. Drop commits with `git rebase --onto`, or use
+  `git switch -C NAME --no-track` (PROJ-4061).
 - **A suite result is a count and a duration, never a bare "passed".** `7 passed` from a parity
   script counted users it could never log in at all; real coverage was 6/7 (PROJ-3452). Read
   per-item results before reporting an aggregate, and say how many of what ran for how long.
@@ -1916,7 +2018,15 @@ All agents MUST follow these rules to stay within context limits:
    [Leave empty until you're done. Fill with a 5-line distilled summary when complete:
    what you built, key decisions, deviations from plan, risks, and what the next agent needs to know.
    This is what Maya, Suki, or other agents will read instead of parsing your full notes.]
+
+   ## Status
+   [in-progress | COMPLETE — write COMPLETE only when every section above is final]
    ```
+
+   **Read a teammate's section only after `## Status` says COMPLETE.** The lead asked twice for
+   sections already on disk, and a dev started implementing from a relay while the architect was
+   still writing (PROJ-4036). **Waiting on a teammate's file: use Monitor with an until-loop on that
+   marker, never bare `sleep`** — foreground sleep is blocked and costs a round trip.
 
    Write decisions and findings to the relevant section as you work. If you need to recall something later, read the file instead of keeping it all in context.
 
@@ -2083,6 +2193,11 @@ had no shape. Minimum viable version:
 
 - Name the shared resource and the owning session in each side's notes file on day one.
 - The non-owner asks before any destructive operation on it (drop, reseed, rebuild, migrate).
+- **A shared cross-repo contract (event names, stage unions, payload shapes) is written BEFORE the
+  sibling sessions plan**, and each sibling lists its emit sites against it first. A contract that
+  arrives mid-implementation cannot express the failure paths a sibling already built (PROJ-4327).
+- **Before adopting a peer session's library fix, compare dependency versions.** The same
+  `posthog-js` call behaved differently at 1.372 and 1.434 (PROJ-4327).
 - Both sides re-read the shared artefact **after writing it** — concurrent worktree sessions have
   clobbered `dream-team-learnings.md` wholesale before, losing an entire session's history.
 
@@ -2101,32 +2216,38 @@ All browser verification and testing uses **Playwright CLI** (`playwright-cli`).
 ### Quick reference
 ```bash
 # Open browser with named session (for manual exploration)
-playwright-cli -s=ingrid open http://localhost:3001/some/path --headed
+playwright-cli -s=<TICKET_ID>-ingrid open http://localhost:3001/some/path --headed
 
 # Get element refs via snapshot
-playwright-cli -s=ingrid snapshot
+playwright-cli -s=<TICKET_ID>-ingrid snapshot
 
 # Interact using refs
-playwright-cli -s=ingrid click e5
-playwright-cli -s=ingrid fill e3 "test@example.com"
+playwright-cli -s=<TICKET_ID>-ingrid click e5
+playwright-cli -s=<TICKET_ID>-ingrid fill e3 "test@example.com"
 
 # Ad-hoc screenshot (prefer screenshots from e2e tests instead)
-playwright-cli -s=ingrid screenshot --filename=~/Downloads/<TICKET_ID>/<state>.png  # user-visible folder, NEVER the repo
+bash ~/.claude/scripts/pw-mask-pii.sh <TICKET_ID>-ingrid && playwright-cli -s=<TICKET_ID>-ingrid screenshot --filename=~/Downloads/<TICKET_ID>/<state>.png  # mask first (HARD RULE), user-visible folder, NEVER the repo
 
 # Close session when done
-playwright-cli -s=ingrid close
+playwright-cli -s=<TICKET_ID>-ingrid close
 
 # Monitor all active sessions
 playwright-cli list
 ```
 
 ### Agent session naming
-Each agent uses their own named session to avoid conflicts:
-- Amara: `-s=amara` (Jira browsing)
-- Ingrid: `-s=ingrid` (manual exploration during visual verification)
-- Elsa: `-s=elsa` (manual exploration during visual verification)
-- Lena: `-s=lena` (before screenshots, e2e test writing)
-- Suki: `-s=suki` (functional testing)
+Session names are **global across worktrees**: two DTF sessions both using `-s=lena` drive the same
+browser (PROJ-4148). Always prefix with the ticket, and never run `close-all` / `kill-all`:
+- Amara: `-s=<TICKET_ID>-amara` (Jira browsing)
+- Ingrid: `-s=<TICKET_ID>-ingrid` (manual exploration during visual verification)
+- Elsa: `-s=<TICKET_ID>-elsa` (manual exploration during visual verification)
+- Lena: `-s=<TICKET_ID>-lena` (before screenshots, e2e test writing)
+- Suki: `-s=<TICKET_ID>-suki` (functional testing)
+- Lead (lite mode): `-s=<TICKET_ID>-lead`
+
+### Screenshots — mask first (HARD RULE)
+Every `screenshot` is preceded by `bash ~/.claude/scripts/pw-mask-pii.sh <session> &&`, run after the
+last navigation or re-render. See the HARD RULE section in `~/.claude/skills/playwright-cli/SKILL.md`.
 
 ### Full documentation
 See `~/.claude/skills/playwright-cli/SKILL.md` for the complete command reference, including storage management, network mocking, tracing, and multi-tab workflows.

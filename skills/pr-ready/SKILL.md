@@ -49,7 +49,10 @@ ticket if there is one.>
 Not covered: <one line>. Follow-up: PROJ-XXXX.
 ```
 
-Image captions do not count toward the budget. Neither does anything inside `<details>`.
+**Image captions DO count toward the budget** — `pr-body-gate.sh` strips image markup, not the
+prose a human reads (four recurrences: PROJ-4179, PROJ-4013, PROJ-4421, PROJ-4423, each a refused
+gate round). Budget ~10 words per caption, one line each, and count them before the first gate run.
+Anything inside `<details>` does not count.
 
 ## Keep, move, drop
 
@@ -223,6 +226,13 @@ does — the reader cannot tell which mode wrote it, so neither can the gate.
    whether it is answered first.
 6. **Running it on a draft mid-session.** The working sections are load-bearing while agents are
    still writing. This runs once, at ready.
+7. **A stale browser tab saves the old body back.** If the user will drag screenshots in after
+   this runs, tell them to reload the PR page first; an edit from a tab opened before the rewrite
+   overwrites the shrunk body with the long one (PROJ-4351, #3941).
+8. **`gh` from a non-git directory returns an empty body.** Run from the scratchpad and `gh pr view`
+   prints an error to stderr and nothing to stdout, so a rewrite pipeline builds the new body from
+   "". Always pass `-R <owner>/<repo>` when not inside the repo, and refuse to write a body that
+   lost its images (PROJ-4421).
 
 ## Related
 

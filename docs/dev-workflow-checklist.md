@@ -63,7 +63,7 @@ playwright-cli -s=<agent-name> screenshot --filename=~/Downloads/<TICKET_ID>/<st
 playwright-cli -s=<agent-name> close
 ```
 
-Each agent uses their own named session (`-s=ingrid`, `-s=lena`, etc.) — no queue needed.
+Each agent uses its own named session, prefixed with the ticket (`-s=<TICKET_ID>-ingrid`, `-s=<TICKET_ID>-lena`) because session names are global across worktrees — no queue needed. Every screenshot is preceded by `bash ~/.claude/scripts/pw-mask-pii.sh <session> &&` (HARD RULE: no national IDs in captures).
 
 **Multi-worktree parallel testing**: S3 translations work on all 3xxx ports (CORS: `http://localhost:3*`). Each worktree's Vite port (3100-3199 from `allocate-ports.sh`) gets full translation support — multiple worktrees can run Playwright simultaneously without port conflicts or missing translations.
 

@@ -295,8 +295,32 @@ Analyze the codebase to determine:
 12. **Recommended mode**: Dream Team / Lite / Just worktree — with one-line justification
 13. **Recommended team**: Which agents at what model tier
 
+VERIFIED vs UNVERIFIED — the one rule that matters more than coverage:
+- Every claim about what code DOES (a component hides X, nothing keys Y, an env var is read only by Z, a
+  route wraps all of /login/*) is either VERIFIED — you opened the file and paste the line, and for an
+  service-a/effect claim you paste the full `git grep -n <symbol>` over the WHOLE tree with every hit — or
+  it is written as `[unverified] <claim>`. Reading where a value is DEFINED cannot establish what it DOES;
+  only its readers can. A route/path claim greps EVERY `<Route` for that path, not the first match.
+- Never cite a spec section, file or helper you did not open; never call a file 'verified against real
+  files' unless you opened it this run.
+- A 'remove X' / 'reuse X' instruction needs `git grep X origin/main` plus an ancestry check — reviews of
+  unmerged commits name symbols that do not exist on main.
+- Proposing an env var or flag: grep every reader of it, not the one you found first.
+Half a report with honest [unverified] tags is worth more than a full one stated with equal confidence.
+
 Return your analysis as a structured report. If you haven't finished all 13 points by tool use 25, wrap up with what you have — partial is fine, Amara will fill gaps."
 ```
+
+> **Why the VERIFIED/UNVERIFIED rule is in the prompt (A6, nine sessions):** pre-hydration asserted
+> unopened facts in PROJ-3978, 4019, 4036, 4055, 4158, 4179, 4005, 4231, 4361 — each stated with the
+> same confidence as the true claims beside it, each fixed in one worktree's copy while the generator
+> kept producing them. The 30-tool budget is why the agent may not verify everything; it is not
+> permission to assert what it did not verify.
+
+**Sibling tickets that share a cross-repo contract** (event names, stage unions, payload shapes —
+e.g. a Nova half and a SignedIn half): write the contract into each sibling's `context.md` NOW, during
+pre-hydration, and have each sibling list its emit sites against it before planning. A contract that
+arrives mid-implementation cannot express failure paths a sibling already built (PROJ-4327).
 
 #### Step 4: Present Recommendations Table
 
@@ -471,25 +495,25 @@ Use the `playwright-cli` skill for ALL browser verification. Do NOT use Puppetee
 
 \```bash
 # Open browser with named session (use the worktree's port from .env.local)
-playwright-cli -s=lena open http://localhost:<VITE_DEV_PORT>/<path> --headed
+playwright-cli -s=<TICKET_ID>-lena open http://localhost:<VITE_DEV_PORT>/<path> --headed
 
 # Take snapshot to get element refs
-playwright-cli -s=lena snapshot
+playwright-cli -s=<TICKET_ID>-lena snapshot
 
 # Interact
-playwright-cli -s=lena click <ref>
-playwright-cli -s=lena fill <ref> "value"
+playwright-cli -s=<TICKET_ID>-lena click <ref>
+playwright-cli -s=<TICKET_ID>-lena fill <ref> "value"
 
 # Screenshot
-playwright-cli -s=lena screenshot --filename=<TICKET_ID>-after.png
+bash ~/.claude/scripts/pw-mask-pii.sh <TICKET_ID>-lena && playwright-cli -s=<TICKET_ID>-lena screenshot --filename="$HOME/Downloads/<TICKET_ID>/after.png"   # mask first — HARD RULE
 
 # Video recording
-playwright-cli -s=lena video-start
+playwright-cli -s=<TICKET_ID>-lena video-start
 # ... do interactions ...
-playwright-cli -s=lena video-stop <TICKET_ID>-after.webm
+playwright-cli -s=<TICKET_ID>-lena video-stop <TICKET_ID>-after.webm
 
 # Close when done
-playwright-cli -s=lena close
+playwright-cli -s=<TICKET_ID>-lena close
 \```
 
 Login sequence: click "More login options" → "Username and password" → fill username (gunner/anna) → fill password (tolvan) → submit.
@@ -627,8 +651,21 @@ When the user indicates a story is done or merged (e.g., "PROJ-1234 is merged", 
 
 2. **Docker pass (part of every cleanup — do NOT skip).** After removing the worktree(s):
    - **Health check + CPU-load fix (DO THIS — the dev machine runs hot):** `bash ~/.claude/scripts/docker-health-check.sh`. If it flags a **single `repo-*` worker pegged at ~100% CPU** (known cause **R1** = concurrent EF migrations racing on `docker compose up --build` → a zombied worker), **restart that one container to clear it**: `docker restart <container>`, then confirm CPU dropped (`docker stats --no-stream <container>`). Restarting a stateless worker is safe (volumes persist). What you must NOT do: rebuild or restart the **whole stack** / `docker compose up --build` (that can trigger the R1 race again and another worktree may depend on running state), and never touch volumes. For anything other than a clear single-worker CPU zombie (unhealthy DB, restart-loop, etc.), report to the user rather than restarting. If R1 keeps recurring, offer to file a Jira ticket for the structural fix.
+   - **Remove THIS ticket's worktree containers, images and volumes** — the same `$TICKET_LOWER`
+     block as `/workspace-cleanup` Step 3.5, scoped to the ticket being torn down. Leftover
+     containers are not just disk: compose registers the service name as a network alias that is
+     identical for every worktree, so stale sibling ServiceC containers answer a live worktree's calls
+     round-robin and a route that exists 404s intermittently (PROJ-3890). The "never touch
+     `repo-*`" rule below protects OTHER tickets and the main stack, not the one being removed:
+     ```bash
+     bash ~/.claude/scripts/worktree-service.sh --worktree ~/Documents/<TICKET_ID> down 2>&1 || true   # before the worktree is removed, if still present
+     TICKET_LOWER=$(echo "<TICKET_ID>" | tr '[:upper:]' '[:lower:]')
+     docker ps -a --format '{{.Names}}' | grep -- "$TICKET_LOWER" | xargs -r docker rm -f
+     docker images --format '{{.Repository}}:{{.Tag}}' | grep -- "$TICKET_LOWER" | xargs -r docker rmi
+     docker volume ls -q | grep "^repo-$TICKET_LOWER""_" | xargs -r docker volume rm
+     ```
    - **Leak check (port-scoped, NOT broad):** for each removed worktree's `VITE_DEV_PORT`, `lsof -ti tcp:<PORT> -sTCP:LISTEN` and kill only that PID. Never `pgrep`-match by ticket name.
-   - **Remove unused (conservative):** `docker image prune -f` (dangling only) + `docker builder prune -f` (build cache). **NEVER** `docker volume prune` / `--volumes` (DB & seed state) and never remove running or stopped `repo-*` containers (e.g. the `localstack-init` one-shot exits 0 by design). Inspect `docker system df` / `docker ps -a` before pruning.
+   - **Remove unused (conservative):** `docker image prune -f` (dangling only) + `docker builder prune -f` (build cache). **NEVER** `docker volume prune` / `--volumes` (DB & seed state) and never remove running or stopped `repo-*` containers of the main stack or of OTHER tickets (e.g. the `localstack-init` one-shot exits 0 by design). Inspect `docker system df` / `docker ps -a` before pruning.
    - **Log recurring issues:** the health-check script logs to `~/.claude/data/docker-health-log.jsonl`; if a symptom recurs (same container, last 7d), append a curated entry to `~/.claude/data/docker-health-findings.md` and suggest a Jira ticket if it keeps recurring.
 
 3. **If PR is NOT merged**, warn the user before proceeding — code may only exist on the remote branch.

@@ -119,6 +119,14 @@ Each worktree's Docker containers use a unique `COMPOSE_PROJECT_NAME` (e.g., `re
 - Volumes are namespaced per project
 - All connect to the shared `repo_repo-network` for infrastructure (postgres, redis, rabbitmq)
 
+**Unique container names are not network isolation (PROJ-3890).** Compose also registers each
+*service* name as a network alias, and that alias is identical in every project. `worktree-service.sh`
+writes the shared alias `service-c-api-wt` into `ServiceC_SERVICE_HOST`, so with N worktrees' ServiceC up on the shared
+network, Docker round-robins and a call lands on a sibling's ServiceC about (N-1)/N of the time. Symptom: a
+route that exists 404s intermittently, which reads as a missing endpoint or a broken frontend. Stale
+containers from removed worktrees cause it, so tear them down on cleanup (see `/workspace-cleanup`
+Step 3.5 and `/create-stories` cleanup).
+
 ```bash
 # Worktree A: starts service-b-api on port 10705
 cd ~/Documents/PROJ-2580

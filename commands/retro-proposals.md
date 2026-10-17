@@ -14,6 +14,21 @@ Analyze accumulated Dream Team session data (retro learnings, history, journals)
 
 **Before reading history or producing a health report**, scan `dream-team-learnings.md` for all unresolved deferred items (not struck through) and output the routing table immediately. This is the first thing the user sees.
 
+**Do not trust the counters — recount them.** Sessions write repeats as fresh lines (2026-10-16 pass:
+one counter in the file, eleven clusters that had recurred 3-9 times). Before routing, cluster the
+unresolved items by key term (script name, symbol, tool, error code, rule) and count sessions per
+cluster, e.g.:
+
+```bash
+F=<memory-dir>/dream-team-learnings.md
+for k in quality-gate pr-body-gate poll-ai-reviews playwright-cli zsh pre-hydration NETSDK; do
+  printf '%-16s %s\n' "$k" "$(grep -i -- "$k" "$F" | grep -vc '~~')"
+done
+```
+
+Extend the term list with the key terms of the current batch. A cluster seen in 3+ sessions counts as
+`(recurred: 2+)` whatever its lines say.
+
 While scanning, check each deferred item for a `(recurred: N)` annotation. Items with `(recurred: 2+)` are **auto-promoted** — they bypass the normal deferral path and go straight to Ticket+PR regardless of any previous rationale for deferring them. Flag these prominently.
 
 Classify each item using the Repo File Decision Tree (see Learning Router section below). Then output:
@@ -222,7 +237,7 @@ Learnings split into two tracks based on who they affect:
    - Third time: `- Deferred: [description] (recurred: 2)` ← auto-promotion threshold
    - And so on.
 
-   **Auto-promotion rule:** Any item with `(recurred: 2+)` is automatically placed in the Ticket+PR track. No rationale overrides this — not "the service is about to be rewritten", not "it's a small thing", not "we'll do it next sprint". If it keeps reappearing, the team hasn't acted on it and a Jira ticket is the only way to make it real.
+   **Auto-promotion rule:** Any item with `(recurred: 2+)` is automatically placed in the Ticket+PR track. No rationale overrides this — not "the service is about to be rewritten", not "it's a small thing", not "we'll do it next sprint". If it keeps reappearing, the team hasn't acted on it and a Jira ticket is the only way to make it real. **Exception — personal-config homes:** when the right destination is a file under `~/.claude/` (`dream-team`, `skill:*`, `agent:*`, a script), a repo PR cannot carry it; auto-promotion then means *direct apply this pass, no deferral*, not Ticket+PR.
 
 2. **Classify** each using the Repo File Decision Tree above. Auto-promoted items (`recurred: 2+`) skip classification debate — they go to whichever destination was previously tagged or the most appropriate one from the decision tree. If the retro already tagged a destination hint, use it as a **starting point only** — verify it's correct using the decision tree. Retro destination hints are often wrong (e.g., coding conventions tagged as `agents-md:apps/web/AGENTS.md` when they belong in `docs/CODING_STYLE_FRONTEND.md`).
 

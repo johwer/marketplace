@@ -218,10 +218,19 @@ if [[ "$RUN_BACKEND" == "true" ]]; then
     echo "  → .NET build..."
     BUILD_OUTPUT=""
     BUILD_PASS=true
+    # Restore every solution first: a fresh or rebased worktree has never restored the services it
+    # did not touch, and `--no-restore` alone then fails with NETSDK1004 / a missing
+    # project.assets.json that reads as a code error (PROJ-3952, 3977, 4231, 4351).
     while IFS= read -r sln; do
+      [[ -z "$sln" ]] && continue
+      if ! (cd "$WORKTREE" && dotnet restore "$sln" 2>&1) > /tmp/qg-restore.log 2>&1; then
+        BUILD_PASS=false
+        BUILD_OUTPUT="restore failed for $sln (not a code error — network/feed?): $(tail -3 /tmp/qg-restore.log)"
+        continue
+      fi
       if ! (cd "$WORKTREE" && dotnet build "$sln" --no-restore 2>&1) > /tmp/qg-build.log 2>&1; then
         BUILD_PASS=false
-        BUILD_OUTPUT=$(tail -5 /tmp/qg-build.log)
+        BUILD_OUTPUT="$sln: $(tail -5 /tmp/qg-build.log)"
       fi
     done <<< "$SLN_FILES"
 

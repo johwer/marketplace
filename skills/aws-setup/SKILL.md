@@ -251,4 +251,6 @@ print(f'{key}: \"{d.get(key, \"NOT FOUND\")}\"')
 
 ## Key Details
 
+- **The S3 translation sync script needs `boto3`.** Run it from a throwaway venv in the scratchpad (`python3 -m venv <scratch>/venv && <scratch>/venv/bin/pip install boto3`), never a global install (PROJ-4423).
+
 Values come from `~/.claude/company-config.json` under the `aws` key. If not present, ask the user or check `~/.aws/config` for existing profiles.

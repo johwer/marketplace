@@ -77,12 +77,24 @@ for raw in sys.stdin.read().splitlines():
         added.append((path, lineno, raw[1:]))
         lineno += 1
 
-restating, review = [], []
+TICKET = re.compile(r"\b(?:NOVA|PLRS)-\d+\b")
+COMMENTISH = re.compile(r"^\s*(//|/\*|\*)")
+
+restating, review, ticketed = [], [], []
 for i, (p, n, text) in enumerate(added):
+    # A ticket number is banned in ANY comment, TSDoc and XML docs included
+    # (CODING_STYLE_FRONTEND "Never put a ticket number in a code comment"; PROJ-4179).
+    if COMMENTISH.match(text) and TICKET.search(text) and not ALLOW.search(text):
+        ticketed.append((p, n, text.strip()[:78], 1.0))
+        continue
     if DOC.match(text) or ALLOW.search(text):
         continue
     m = LINE_COMMENT.match(text) or BLOCK_ONELINE.match(text)
     if not m:
+        continue
+    # The rule covers function bodies. A column-0 comment is module-level (file header,
+    # section divider above a top-level declaration), not body narration (PROJ-4185).
+    if not text[:1].isspace():
         continue
     if i > 0:
         pp, pn, ptext = added[i-1]
@@ -105,6 +117,10 @@ def show(rows, mark, colour):
     for p, n, body, s in rows:
         sys.stdout.write("  \033[%sm%s\033[0m %s:%d  // %s\n" % (colour, mark, p, n, body))
 
+if ticketed:
+    sys.stdout.write("\n  \033[31mREFUSED\033[0m — %d added comment(s) carry a ticket number"
+                     " (put it in the PR or commit message)\n\n" % len(ticketed))
+    show(ticketed, "x", "31")
 if restating:
     sys.stdout.write("\n  \033[31mREFUSED\033[0m — %d added comment(s) restate the code below them\n"
                      "  (docs/CODING_STYLE_FRONTEND.md:256 — a comment must say what the code cannot)\n\n" % len(restating))
@@ -113,7 +129,7 @@ if review:
     sys.stdout.write("\n  \033[33m!\033[0m %d other added comment(s) — keep only the non-obvious WHY:\n\n" % len(review))
     show(review, "?", "33")
 
-if restating or (STRICT and review):
+if ticketed or restating or (STRICT and review):
     sys.stdout.write("\n  Delete every line listed above in ONE pass, then re-run this gate.\n\n")
     sys.exit(1)
 

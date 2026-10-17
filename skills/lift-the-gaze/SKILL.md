@@ -25,6 +25,22 @@ Reference material: `references/layers.md` (Repo layer map, wrong-place symptoms
 - `~/.claude/commands/ghost-review.md` — the current backend tech lead. Read: "Standing decisions" (dated rules from Slack/Jira, e.g. "the contract is the switch", "use services, not products", migration tooling must keep up), the `[NECESSITY]` check (what already provides this? constraint or convention? config or code? shared rule → prealign), and "Mode 2" Step 2 questions.
 - `~/.claude/commands/owl-review.md` — the former tech lead (left 2026-08; a fixed record). Read its "Standing decisions" and Mode 2 questions for events, concurrency and contracts. A later ghost decision overrides it.
 
+**Know which skill answers what.** Route instead of improvising:
+
+| Need | Skill |
+|------|-------|
+| What the tech leads already decided; what they'd flag | `ghost-review`, `owl-review` (Standing decisions, Mode 2 questions) |
+| How this is usually done in .NET / the textbook view (layers, clean architecture, DDD, events, outbox, gateway, resilience) | `dotnet-architecture-reference`. Generic; never overrides a standing decision |
+| Repo conventions (naming, ApiResponse, DTO mapping, EF) | `backend-conventions` |
+| Two or more radically different interface shapes | `design-an-interface` |
+| A whole module that's hard to work in | `improve-codebase-architecture` |
+| API contract leaks (entities in signatures, missing DTOs) | `ln-643-api-contract-auditor` |
+| Query/latency cost of an option | `backend-performance` |
+| Domain terms or an ADR need writing down | `grill-with-docs` |
+| A question that belongs to PO or tech lead | `stakeholder-questions` (after Step 2b) |
+| Recording the decision in the PR | `pr-decisions` |
+| A diagram | `mermaid-diagram` |
+
 Any option that contradicts a standing decision is dropped before the user sees it, or shown only with the decision quoted and why it might not apply. Cite the decision (date + source) in the option card.
 
 Then read the ticket/plan, the parent epic and sibling tickets (decisions are often recorded there), and find the real code it touches. Do not reason from layer names alone.

@@ -179,6 +179,8 @@ public class ServiceNameTests
 
 ## What NOT to Do
 
+- Don't flip an e2e expectation from a guessed URL — probe the real landing URL first, pin it, and do one mutation run against the old code (PROJ-4244)
+
 - Don't write all tests first, then all implementation — one test at a time
 - Don't write implementation "to get ahead" before a test fails
 - Don't skip the refactor step — accumulating unrefactored green tests is tech debt

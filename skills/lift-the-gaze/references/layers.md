@@ -20,7 +20,7 @@ Domain              *.Domain                 policies, shared readers, entities
 Database            Postgres (EF Core)       4. store / retrieve
 ```
 
-Rule: each layer only calls the one below it. A controller never calls a repository directly.
+Rule: each layer calls downward, never upward. A controller normally calls a service. It may call a repository directly when a service would only pass the call through (team agreement 2025-10-08: "no law that you have to add an abstraction layer that makes no point"). Add the service as soon as there is a rule, orchestration or an event to publish. A domain object never leaves the controller; map it to a DTO. Note: `docs/CODING_STYLE_BACKEND.md` still says "Do not skip layers" and lags this agreement.
 
 Side doors that skip the controller: Rebus handlers (`*.API/Handlers`, `Messaging`) and workers (`*.Worker.*`). They call services/domain directly. Anything that must hold for **every** path belongs at Domain level or below, not in the controller.
 

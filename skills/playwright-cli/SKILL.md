@@ -278,6 +278,24 @@ playwright-cli close
 * **Tracing** [references/tracing.md](references/tracing.md)
 * **Video recording** [references/video-recording.md](references/video-recording.md)
 
+## HARD RULE — mask national IDs before EVERY screenshot (Repo)
+
+Every capture that can leave this machine (PR body, Jira, Slack) must be masked first. A shot with an
+unmasked personnummer reached a PR on 2026-10-15 because masking was a habit, not a step.
+
+```bash
+bash ~/.claude/scripts/pw-mask-pii.sh <session> && \
+  playwright-cli -s=<session> screenshot --filename="$HOME/Downloads/<TICKET_ID>/<state>.png"
+```
+
+- The script rewrites SE/FI/NO national-ID-shaped text in text nodes, inputs and same-origin
+  iframes to `X`, prints `masked: N`, and exits 1 if the eval did not run. Chain with `&&` so a
+  failed mask blocks the capture.
+- Run it **immediately before each capture**, after the last navigation, click or re-render. React
+  restores the real text on its next render, so one mask per page is not enough.
+- `masked: 0` on a page that shows people is a reason to look at the screenshot before uploading it,
+  not proof it is clean (an ID can be split across nodes or drawn on a canvas).
+
 ## Gotchas found the hard way (Repo sessions)
 
 These are behaviours of this CLI that cost real time to rediscover. Each one produced a false
@@ -310,6 +328,43 @@ date bugs invisible, so the test passes on broken code.
   the threshold instead of faking data up to it — fewer moving parts and it exercises the real code
   path. Revert afterwards and confirm with `git show HEAD:<file>`. Three attempts at faking a
   16383-char blob through route interception all fell through to a fallback path and proved nothing.
+
+- **End every `route` glob with `*`.** `**/api/x` does not match `/api/x?y=1`; the query string
+  defeats the mock and the real backend answers (PROJ-4158). For `ctx.route` in `run-code`, use a
+  regex — the `**/path` glob missed ServiceC calls (PROJ-4373).
+- **`run-code` routes are untracked and unremovable.** A `page.route(...)` installed via `run-code`
+  is not in `route-list`, and `unroute` reports success having removed a *different* CLI route. A
+  throwing handler never settles the request, i18n never initialises, and **every page renders
+  blank** with no console error. Only `close` + `open` clears it. `require` is undefined there (ESM).
+- **`route --body` cannot carry a fixture larger than `ARG_MAX`** (1 MB on macOS); there is no
+  `--body-file`. Serve the file from a local CORS-enabled `http.server` instead.
+- **A 302 from an https URL to `http://127.0.0.1` is silently not followed** (scheme downgrade).
+  `requests` shows `=> [302] Found` and nothing after; i18n falls back to `en`, which reads as a
+  locale setting. Assert on the rendered outcome, never on "the route was installed" (PROJ-3890).
+
+### Login without risking a seed-user lockout (Repo)
+
+- **Never live-test a login flow with a real seed user "to see an event".** One failed attempt can
+  423-lock a user every worktree shares. Mock the ServiceC login/exchange endpoints instead (PROJ-4373).
+- **Local login is OTP-only in the UI.** What works for a real session: in the browser context,
+  `POST /api/service-c/v1/usernamepassword/login` through the Vite proxy, then
+  `localStorage.loggedIn = "true"` and reload — the refresh-token cookie does the rest (PROJ-4389).
+- **External-IdP paths (BankID/GrandID) can still be driven end to end** by routing the ServiceC endpoints
+  that wrap the IdP in a Playwright context (PROJ-4420).
+
+### Analytics (PostHog) verification
+
+The recipe — wrap `posthog.capture` through Vite's module graph, headed browser, route PostHog to a
+local fulfill — lives in memory `reference_posthog_verify_with_ph_debug`. Two additions: report events
+through `ctx.exposeBinding` rather than `window.__events` so they survive the hard reload that
+FORCE_LOGOUT does, and loop anything racing a navigation 10x before calling it stable
+(PROJ-4327, PROJ-4373).
+
+### Detecting error pages
+
+Match the app's own boundary text ("An unexpected error occurred"), not only React Router's default
+error page — a detector with the wrong regex reported `errorPage=false` on the bug itself. Check every
+detector against one known-bad screenshot before trusting it (PROJ-4294).
 
 ### Toasts and other self-dismissing UI
 

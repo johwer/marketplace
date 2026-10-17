@@ -60,11 +60,15 @@ If any unresolved threads are found, **STOP** and tell the user which comments a
 
 ### Step 3: Stop Worktree Docker Services (if running)
 
-If the worktree has a `docker-compose.worktree.yml`, stop any running worktree containers:
+Stop any running worktree containers through the script that started them (the compose template
+lives in `~/.claude/templates/`, so the old `docker compose -f docker-compose.worktree.yml down` from
+inside the worktree never found a file and silently no-op'd on every run — PROJ-3890):
 
 ```bash
-cd ~/Documents/<TICKET_ID> && docker compose -f docker-compose.worktree.yml down 2>/dev/null || true
+bash ~/.claude/scripts/worktree-service.sh --worktree ~/Documents/<TICKET_ID> down
 ```
+
+Paste the output. A failure here is not fatal — Step 3.5 removes the containers by name — but say so.
 
 ### Step 3.5: Remove Worktree Docker Containers & Images
 

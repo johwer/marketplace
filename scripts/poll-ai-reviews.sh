@@ -5,7 +5,9 @@
 #
 # Polls a GitHub PR for AI bot review comments (Gemini, Copilot, etc.)
 # Logs timing data to ~/.claude/logs/ai-review-times.csv for optimization.
-# Exits with 0 when comments are found, 1 on timeout, 2 on error.
+# Exits with 0 when comments are found, 1 on timeout, 2 on error, 3 when the only bot review is a
+# "wasn't able to review any files" decline (PROJ-4148, PROJ-4049, PROJ-4179 — that body used to
+# count as a review, so a PR nobody reviewed read as reviewed).
 
 set -euo pipefail
 
@@ -27,6 +29,8 @@ fi
 
 # Known AI bot patterns (case-insensitive match on login)
 BOT_PATTERNS="gemini-code-assist|copilot|github-actions|coderabbit|sourcery|sweep"
+# A review whose body says the bot reviewed nothing is not a review.
+DECLINE_PATTERN="(wasn.t|was not|were not|weren.t) able to review any files|unable to review any files"
 
 echo "Polling PR #${PR_NUMBER} on ${OWNER_REPO} for AI bot reviews..."
 echo "Max wait: ${MAX_MINUTES} minutes, checking every ${INTERVAL} seconds"
@@ -44,10 +48,21 @@ while [ "$ELAPSED" -lt "$MAX_SECONDS" ]; do
     '[.[] | select(.user.login | test($pat; "i"))] | length' 2>/dev/null || echo "0")
 
   # Filter for bot authors in reviews
-  BOT_REVIEWS=$(echo "$REVIEWS" | jq -r --arg pat "$BOT_PATTERNS" \
-    '[.[] | select(.user.login | test($pat; "i"))] | length' 2>/dev/null || echo "0")
+  BOT_REVIEWS=$(echo "$REVIEWS" | jq -r --arg pat "$BOT_PATTERNS" --arg dec "$DECLINE_PATTERN" \
+    '[.[] | select(.user.login | test($pat; "i")) | select((.body // "") | test($dec; "i") | not)] | length' 2>/dev/null || echo "0")
+
+  BOT_DECLINES=$(echo "$REVIEWS" | jq -r --arg pat "$BOT_PATTERNS" --arg dec "$DECLINE_PATTERN" \
+    '[.[] | select(.user.login | test($pat; "i")) | select((.body // "") | test($dec; "i"))] | length' 2>/dev/null || echo "0")
 
   TOTAL=$((BOT_COMMENTS + BOT_REVIEWS))
+
+  if [ "$TOTAL" -eq 0 ] && [ "$BOT_DECLINES" -gt 0 ]; then
+    ACTUAL=$(($(date +%s) - START_TIME))
+    echo "$(date +%Y-%m-%d_%H:%M),${OWNER_REPO},${PR_NUMBER},${ACTUAL},declined,0" >> "$LOG_FILE"
+    echo "DECLINED: the bot posted a review saying it was not able to review any files. This is NOT a review."
+    echo "Re-request: gh pr edit ${PR_NUMBER} -R ${OWNER_REPO} --add-reviewer @copilot  (then poll .reviews again)"
+    exit 3
+  fi
 
   if [ "$TOTAL" -gt 0 ]; then
     ACTUAL=$(($(date +%s) - START_TIME))

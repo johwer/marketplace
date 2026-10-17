@@ -40,7 +40,8 @@ Visual verification (MANDATORY for UI changes):
   changed element:
   ```bash
   mkdir -p ~/Downloads/<TICKET_ID>
-  playwright-cli -s=<your-name> screenshot --filename=~/Downloads/<TICKET_ID>/<state>.png
+  bash ~/.claude/scripts/pw-mask-pii.sh <TICKET_ID>-<your-name> && \
+    playwright-cli -s=<TICKET_ID>-<your-name> screenshot --filename="$HOME/Downloads/<TICKET_ID>/<state>.png"   # mask first — HARD RULE
   ```
   **Never `/tmp`, and never commit a screenshot to the repo** — no `__screenshots__` captures and
   no `toHaveScreenshot` baselines unless the user explicitly asked for a regression test. The
@@ -53,6 +54,13 @@ Visual verification (MANDATORY for UI changes):
 - **New component → add a Cosmos fixture** (`*.fixture.tsx`) for its states rather than an e2e
   spec, plus a unit test if it has interactive or conditional logic.
 - Compare with design mockups or Jira attachments if available (download with `bash ~/.claude/scripts/jira-download-attachments.sh <TICKET_ID>`)
+
+Business rules from backend values:
+- **Before using a backend enum value as a business rule, read its producer.** ServiceD's
+  `CalculateStatus` returns `Inactive` for ended AND not-yet-started rows, so "Inactive = left the
+  company" was wrong (PROJ-4389).
+- **A disabled option is not a gate when the form's default value IS that option.** Gate the
+  dependent control and the proceed condition too (PROJ-4389).
 
 Context management:
 - Create notes at `.dream-team/notes/<your-name>.md` when working in a team

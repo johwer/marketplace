@@ -392,6 +392,8 @@ Tell the user:
 
 ## Guidelines
 
+- **A parent ticket's funnel order is a claim about event order.** Check it against where each event fires before accepting it (PROJ-4361: `login_succeeded` fires after `company_selected` in Nova).
+
 - **Be specific** — "Missing error handling" is useless. "What should happen when the API returns 409 because the employee was already archived?" is useful.
 - **Push back constructively** — The goal is better outcomes, not criticism. Frame as questions when possible.
 - **Prioritize blockers** — A ticket with 0 blockers and 5 suggestions is fine to start. A ticket with 1 blocker needs resolution first.

@@ -40,6 +40,20 @@ Key conventions:
 - **Grep ALL consumer tests on a ctor/signature change** — including the **unit-test project** (e.g. `*.API.Test`), not just integration tests. Adding a constructor parameter (e.g. a new injected service to an event handler) breaks every test that constructs the type; missing one = red CI.
 - **Reflection-driven completeness tests**: some suites enumerate a hardcoded list of types/enums (e.g. ServiceA `ExcelTranslationsTests` checks every `ExportType` is in `service-aRelatedExportTypes` and every Excel DTO in `dtoTypes`, with sheet/column keys resolvable per language). Adding a new export type/DTO means **registering it in those test lists too** (English fallback covers non-localized languages for a single-market feature).
 
+Fail-open / fail-closed and external input:
+- **An instruction that changes fail-open/fail-closed behaviour: grep the nearest existing fallback
+  for the same input first**, and state the conflict before committing. A "throw on missing product"
+  was committed and reversed because `CatalogProductPlan.For` already falls back to Default (PROJ-4061).
+- **Map an external error to a user-facing outcome with an allowlist of codes**; everything else is
+  an error. Mapping every vendor `errorObject` to "Failed" made `INVALID_APIKEY` read as a user's
+  failed login (PROJ-4351).
+- **An endpoint called on cleanup paths (cancel, logout) is idempotent**: "already ended" is success;
+  500 only for transport or configuration failures (PROJ-4351).
+- **Before removing or replacing an endpoint, list every validation and guard on it and mark each
+  kept or dropped** in your notes, before DONE (PROJ-4231).
+- **For a third-party API, read the vendor's own docs** before inferring shapes from legacy code or
+  captures; if the docs site is JS-rendered, find its source repo (PROJ-4351).
+
 Docker workflow for local testing:
 - Rebuild service: `docker compose up --build --force-recreate -d <service>`
 - View logs: `docker compose logs -f <service>`

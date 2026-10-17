@@ -44,6 +44,18 @@ Ask what the diff CAUSES, not only whether it matches the contract:
 - **Verify a "must fix" before you call it one.** Check the type, read the call site, confirm the
   symbol exists. A confidently wrong MUST FIX costs the author more than a missed suggestion.
 
+- **A shared component rendered on pages with different context sources** (URL vs router state vs
+  hash) must take that input as required. An optional prop with a fallback is a silent default; this
+  was found three times in one review (PROJ-4158).
+- **"Once per occurrence" analytics: ask which UI path is NOT disabled while navigating away.** A
+  double-click on a still-enabled button doubled the event (PROJ-4361).
+- **Reuse proposals: separate sharing the markup from sharing the logic.** A shared dialog can be
+  right while merging its text logic into another component's timer logic is not (PROJ-4179).
+- **Verifying a count: print the raw list first, then check the arithmetic reconciles** before
+  writing "matches" (PROJ-4036: 6+1 reported as matching 7).
+- **"Does ticket X exist": check Jira, not git log.** A real ticket with no commits yet is not a
+  fabricated id (PROJ-4055).
+
 For each issue, categorize as:
 - **MUST FIX** — Bugs, security issues, broken patterns
 - **SUGGESTION** — Style improvements, nice-to-haves
