@@ -596,7 +596,7 @@ existing invalidation.
 
 **Not the tech lead's patterns — see `/zingo-review`**
 Findings about per-retailer seed matrices, an unconstrained *grantee*, derived-helper shape gaps,
-`Validate`/`Can` duplication and making a request unrepresentable came from reviewer-three's review
+`Validate`/`Can` duplication and making a request unrepresentable came from a senior backend dev's review (see `/zingo-review`)
 lens, not this one. They live in `/zingo-review` so this file keeps simulating one reviewer.
 
 ---

@@ -51,7 +51,7 @@ Then guide them to populate author profiles by running the scrape — it auto-di
   },
   "tech_leads": ["<tech lead name>"],
   "author_profiles": {
-    "Andreas Höjevik": {
+    "<tester name>": {
       "role": "tester",
       "pushback_level": "high",
       "known_patterns": ["thin descriptions", "title/description mismatch", "no ACs"],
@@ -74,8 +74,8 @@ Then guide them to populate author profiles by running the scrape — it auto-di
     }
   },
   "ticket_flow": [
-    { "from": "Monika Åkvist-Johansson", "to": "Andreas Höjevik", "label": "UAT findings" },
-    { "from": "Andreas Höjevik", "to": "<ticket author name>", "label": "product context" },
+    { "from": "<upstream tester name>", "to": "<tester name>", "label": "UAT findings" },
+    { "from": "<tester name>", "to": "<ticket author name>", "label": "product context" },
     { "from": "<ticket author name>", "to": "<tech lead name>", "label": "tech review" },
     { "from": "<tech lead name>", "to": "AI/Dev Team", "label": "approved for dev" }
   ]
