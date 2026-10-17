@@ -3,7 +3,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-/* Layout: one reading column, three numbered sections (a real sequence: altitude → layers → DTO), diagrams in scrollable frames */
+/* Layout: one reading column, four numbered sections (a real sequence: problem → altitude → layers → DTO), diagrams in scrollable frames */
 :root{
   --bg:#f5f6f3; --surface:#ffffff; --fg:#1d2320; --muted:#5d6762; --line:#d6dbd7; --accent:#2f5d50;
   --client:#3b82c4; --controller:#34465e; --service:#2f9e5b; --domain:#7a5bb5; --repo:#d9822b; --db:#c0392b; --gate:#e0a526;
@@ -78,6 +78,18 @@ th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute
   <h1>Lyft blicken</h1>
   <p class="lede">Innan vi frågar <em>vilken controller eller service</em> som ska ändras: kan beslutet tas högre upp, så att lagren under aldrig behöver hantera det? Och för koden som blir kvar: vilket lager hör den hemma i?</p>
 </header>
+
+<section id="problem">
+  <h2><span class="n">0</span>Vilken sorts problem är det?</h2>
+  <p>Stäng av kodhjärnan en stund. Innan vi väljer nivå: vad är det egentligen för problem? Fyra linser, var och en med Repos standardsvar.</p>
+  <div class="frame panel">
+    <div><h3>Data eller logik</h3><p>Sitter det i koden, eller i datan (index, lås, frågans form)?</p><p><span class="tag ok">Mät först</span> Telemetri i Elastic och <code>backend-performance</code> innan någon omdesign.</p></div>
+    <div><h3>Synkront eller asynkront</h3><p>Måste det ske medan användaren väntar?</p><p><span class="tag ok">Event efter commit</span> för sidoeffekter. <span class="tag warn">Aldrig</span> request/reply över bussen eller "200 = köad".</p></div>
+    <div><h3>Läsningar eller skrivningar</h3><p>Är lasten skev åt ena hållet?</p><p><span class="tag ok">Repliker + Dapper</span> för tunga läsningar, cache bara med invalidering. <span class="tag warn">Inte</span> skrivningar via en worker.</p></div>
+    <div><h3>Enkel drift</h3><p>Löser vi ett problem vi inte har?</p><p><span class="tag ok">Befintligt först</span> Något nytt kräver omdöme och konsensus. Färre, större tjänster är riktningen.</p></div>
+  </div>
+  <p class="scenario">Fråga bara det som inte redan är känt: vad är problemet (ett mått, inte "det är långsamt")? Vilken deadline? Arkitekturen och att vi har en kund live i prod vet vi redan. Skriv svaret på en rad, till exempel: "Logikproblem, synkront, läsintensivt, ingen ny mekanism."</p>
+</section>
 
 <section id="hojd">
   <h2><span class="n">1</span>Var ska beslutet ligga?</h2>

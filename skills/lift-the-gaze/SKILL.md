@@ -53,6 +53,31 @@ Then read the ticket/plan, the parent epic and sibling tickets (decisions are of
 - Who reaches this code? Endpoint only, or also Rebus handlers and `*.Worker.*` projects? A gate on the controller does not cover a worker.
 - Who actually has access to the feature today? (retailer, contract, permission, PostHog flag). Grep, don't assume.
 
+## Step 0.5 — What kind of problem is this?
+
+Before choosing *where* a decision lives, name *what kind* of problem it is. Turn off the code brain for one turn. Two to four short questions, only the ones whose answer isn't already known.
+
+**Context, ask only what is unknown:**
+
+| Question | Known Repo default (don't ask again) |
+|---|---|
+| What is the actual problem or bottleneck? A symptom, a ticket, a number? | Always ask if the ticket doesn't say. "It's slow" is not a problem statement |
+| Current architecture | Known: .NET microservices, Rebus events, replicas per service, ServiceC over HTTP. Don't ask |
+| Constraints: scale, time, team, budget | One live prod customer, so a manual switch-on is reasonable (2026-10-16). The SignedIn migration is in flight. Ask only about deadlines the ticket doesn't state |
+
+**Four lenses, each with the Repo default:**
+
+| Lens | Question | Repo default |
+|---|---|---|
+| Data or logic | Is the pain in the code, or in the data (index, lock, query shape)? | **Measure first.** A performance question goes to telemetry (Elastic) and `backend-performance` before any redesign. Without numbers it's a guess |
+| Sync or async | Must this happen while the user waits? | An event published after commit is fine for side effects. **Never** a request emulated over the bus, and no "200 = queued" for a write the caller relies on ([BUS-IS-NOT-RPC]) |
+| Reads or writes | Is the load lopsided? | Replicas via events (the owning service enriches), Dapper for heavy reads, cache only with invalidation ([CACHE-INVALIDATION]). Writes through a worker were rejected (2025-08-18) |
+| Operational simplicity | Are we solving a problem we don't have? | Existing mechanism first; something new needs taste, judgment and consensus (2026-10-16, [NECESSITY]). Fewer, bigger services is the direction (ServiceC merged 2025-01) |
+
+**Generic advice that does not apply here, so don't offer it:** an API gateway or BFF to absorb orchestration (ruled out 2025-12-03); CQRS through workers; switching to another architecture style as the fix for one ticket. "Invert dependencies" applies at the API edge only: the DTO protects the contract, while entities deliberately match the tables.
+
+Write the answer as one line before Step 1, e.g. "Logic problem, synchronous, read-heavy, no new mechanism needed."
+
 ## Step 1 — The altitude ladder
 
 Walk this ladder top-down and stop at the **highest rung that can carry the decision**. Every rung you can stop at higher up deletes branches in every rung below.
