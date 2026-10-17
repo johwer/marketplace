@@ -73,7 +73,7 @@ Details and examples: `references/ef-core.md`.
 ## 3. Async and cancellation
 
 - **Async all the way.** No `.Result`, `.Wait()` or `GetAwaiter().GetResult()` (none on `main` today, keep it that way). No `async void`.
-- **Pass the `CancellationToken`** from the controller action down to EF and `HttpClient` (`CODING_STYLE_BACKEND.md:517`). A long query on an aborted request keeps a connection busy.
+- **Pass the `CancellationToken` on long-running and worker paths** (`CODING_STYLE_BACKEND.md:517` scopes it to long-running operations). Few controllers take one today (4 of 138), so don't flag its service-a on an ordinary request path or retrofit it in an unrelated PR ([PR-SCOPE]). Do flag a worker, job or long export that drops the token it was given.
 - **Don't `Task.WhenAll` over one `DbContext`.** A context is not thread-safe, and two queries in parallel on it throw. Parallel is fine for independent HTTP calls. The generic "use WhenAll" advice is a trap here.
 - **No `Task.Run` around code that is already async.**
 - **Background work that outlives the request** creates its own scope. Never capture a scoped service in a continuation or a field ([SCOPE-DISPOSAL], must-fix).
