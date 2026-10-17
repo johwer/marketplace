@@ -43,6 +43,8 @@ Reference material: `references/layers.md` (Repo layer map, wrong-place symptoms
 | Recording the decision in the PR | `pr-decisions` |
 | A diagram | `mermaid-diagram` |
 
+Naming a skill in this table loads nothing. Invoke it, or read its `SKILL.md`, before using what it says, and never report a skill as consulted because it was named.
+
 Any option that contradicts a standing decision is dropped before the user sees it, or shown only with the decision quoted and why it might not apply. Cite the decision (date + source) in the option card.
 
 Then read the ticket/plan, the parent epic and sibling tickets (decisions are often recorded there), and find the real code it touches. Do not reason from layer names alone.

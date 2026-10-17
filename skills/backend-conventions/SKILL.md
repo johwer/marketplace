@@ -5,9 +5,7 @@ description: Backend coding conventions for the Repo monorepo
 
 ## Loading Conventions
 
-Project-level conventions are loaded automatically via `.claude/skills/backend-conventions.md` when editing `services/**/*.cs` or `shared/**/*.cs` files.
-
-If project-level skills are not available (e.g., older branch), read these files directly:
+Nothing loads these conventions automatically: the repo has no `.claude/skills/backend-conventions.md` (checked 2026-10-18). The `backend-skill-reminder.sh` hook nudges once per session when C# under `services/` or `shared/` is edited. Read these files directly:
 - `docs/CODING_STYLE_BACKEND.md`
 - `docs/API_CONVENTIONS.md`
 - `docs/TESTING_GUIDELINES_BACKEND.md`

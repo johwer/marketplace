@@ -1,6 +1,6 @@
 ---
 name: dotnet-backend-review
-description: Repo-aligned .NET review checklist for the gap other skills don't cover — EF Core query and write hygiene (tracking, projections, N+1, split queries, ExecuteUpdate, transactions, concurrency tokens), async and CancellationToken, typed configuration (IOptions, ValidateOnStart), DI lifetimes, Quartz scheduled jobs, soft-delete filtering, and a few architecture boundary checks. Every item is checked against Repo's standing decisions, and textbook advice Repo has declined (Result<T>, MediatR, AutoMapper, Dapper-first, stored procedures, aggressive caching, the 4-project layout) is listed so it is never recommended. Use when reviewing or writing C# in services/ or shared/, when someone asks "is this EF query OK", "should this be AsNoTracking / ExecuteUpdate / a transaction", "IOptions or IOptionsSnapshot", "is this lifetime right", or from lift-the-gaze once the layer is chosen.
+description: Repo-aligned .NET review checklist for the gap other skills don't cover — EF Core query and write hygiene (tracking, projections, N+1, split queries, ExecuteUpdate, transactions, concurrency tokens), async and CancellationToken, typed configuration (IOptions, ValidateOnStart), DI lifetimes, logging, Quartz jobs and BackgroundServices, soft-delete filtering, and a few architecture boundary checks. Every item is checked against Repo's standing decisions, and textbook advice Repo has declined (Result<T>, MediatR, AutoMapper, Dapper-first, stored procedures, aggressive caching, the 4-project layout) is listed so it is never recommended. Use when reviewing or writing C# in services/ or shared/, when someone asks "is this EF query OK", "should this be AsNoTracking / ExecuteUpdate / a transaction", "IOptions or IOptionsSnapshot", "is this lifetime right", or from lift-the-gaze once the layer is chosen.
 user_invocable: true
 ---
 
@@ -76,6 +76,7 @@ Details and examples: `references/ef-core.md`.
 - **Pass the `CancellationToken` on long-running and worker paths** (`CODING_STYLE_BACKEND.md:517` scopes it to long-running operations). Few controllers take one today (4 of 138), so don't flag its service-a on an ordinary request path or retrofit it in an unrelated PR ([PR-SCOPE]). Do flag a worker, job or long export that drops the token it was given.
 - **Don't `Task.WhenAll` over one `DbContext`.** A context is not thread-safe, and two queries in parallel on it throw. Parallel is fine for independent HTTP calls. The generic "use WhenAll" advice is a trap here.
 - **No `Task.Run` around code that is already async.**
+- **New time logic takes `TimeProvider`,** not `DateTime.UtcNow`, so tests can fix the clock. It is registered in ServiceC.API, ServiceD.API, ServiceB.Worker and Billing.API (`Program.cs`); a service elsewhere registers `TimeProvider.System` first. Tests share one fake per test project (there are two hand-rolled `FixedTimeProvider`s today). Don't convert the ~377 existing `DateTime.UtcNow` call sites in an unrelated PR ([PR-SCOPE]).
 - **Background work that outlives the request** creates its own scope. Never capture a scoped service in a continuation or a field ([SCOPE-DISPOSAL], must-fix).
 
 ## 4. Configuration
@@ -92,8 +93,16 @@ Details and examples: `references/ef-core.md`.
 - **`IHttpClientFactory` / `AddHttpClient`,** never `new HttpClient()` (none on `main`).
 - **Resilience:** Repo has no Polly or `Http.Resilience` today, and there is no decision either way (`repo-vs-textbook.md` "HTTP resilience"). Don't add it inside a feature PR. Raise it as a question if the diff adds a new hot cross-service call ([NECESSITY]).
 - **Timeouts:** a new outbound client sets one. The default of 100 s holds a request thread far too long.
+- **Base URLs:** `new Uri(baseUrl)` plus a relative path drops the base's last path segment when the base has no trailing `/` (`https://x/api` + `v1/y` → `https://x/v1/y`). Normalise the trailing slash where the client is built (as in `PuzzelHttpClient.cs:21`) or validate it at startup with `ValidateOnStart` (as in `Billing.API/Program.cs:42`). Five call sites build the `Uri` raw today.
 
-## 6. Scheduled jobs (Quartz)
+## 5b. Logging and exceptions
+
+- **Message templates, never interpolation:** `logger.LogWarning("Send failed for {MessageId}", id)`, not `$"Send failed for {id}"`. A template keeps the field searchable in Elastic and skips formatting when the level is off. 7 lines in 4 files interpolate today (`ServiceD.API/Services/MessageService.cs`, `ServiceAReportService.cs`, `RoleEventHandler.cs`, `GenericMobileProvider.cs`), against 267 files that use templates.
+- **What goes in the log:** ids yes, personal data and tokens no ([LOG-PII-BOUNDARY]).
+- **Rethrow with `throw;`,** never `throw ex;`, which resets the stack trace (`GenericMobileProvider.cs:136` does it).
+- **No silent catch.** Log and rethrow, or handle with a reason; a Rebus handler rethrows so the retry and error queue work ([FAIL-LOUD]).
+
+## 6. Scheduled and hosted workers (Quartz, BackgroundService)
 
 Quartz runs 19 `IJob`s in five ServiceA and ServiceC workers, with the in-memory store (no `UsePersistentStore`, no clustering). Every pod schedules every job. Today the worker deployments checked (deviant engine, callback engine, export, quarantine) run `replicas: 1`, and the engines take `PostgresDistributedLockService` locks in their services rather than in the job.
 
@@ -104,6 +113,14 @@ Quartz runs 19 `IJob`s in five ServiceA and ServiceC workers, with the in-memory
 - **Cancellation:** pass `context.CancellationToken` down, so a shutdown stops the run instead of being killed mid-write.
 - **Batches, not everything:** load work in pages and commit per batch, so one bad row does not roll back the run, and log the row that failed ([FAIL-LOUD]).
 - **Time:** cron in UTC or an explicit time zone, and "today" from `TimeProvider`, not `DateTime.Now`.
+
+
+**`BackgroundService` loops** (15 today, e.g. `CallbackDispatchWorker`, `MessageSentOutboxDispatcher`). They already share one shape; keep it:
+
+- A new scope per iteration (`scopeFactory.CreateAsyncScope()`), never a `DbContext` held across iterations.
+- A `try/catch` per iteration that logs and continues. Since .NET 6 an unhandled exception in `ExecuteAsync` stops the whole host by default, so one bad row would take the worker down.
+- `await Task.Delay(interval, stoppingToken)` between iterations, and the loop condition on `stoppingToken`.
+- Multi-pod: the same replica question as Quartz above. A loop that claims work must lock or claim per item.
 
 ## 7. Architecture boundaries (adapted from clean architecture)
 

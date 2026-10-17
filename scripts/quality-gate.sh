@@ -171,6 +171,23 @@ echo ""
 if [[ "$RUN_BACKEND" == "true" ]]; then
   echo "▸ Backend checks..."
 
+  # Hidden-problem gate: things that make a failure invisible instead of fixing it. main has
+  # none of the hard ones (0 skipped tests, 0 empty catches), so any new one is this branch's.
+  # Skipped tests and empty catches FAIL; suppressions WARN, because a justified pragma or
+  # NoWarn exists and the reviewer must see it, not because it is fine.
+  echo "▸ Hidden problems (skips, empty catches, suppressions)..."
+  HP_ADDED=$(cd "$WORKTREE" && { [[ -n "$BASE_REF" ]] && git diff -U0 "$BASE_REF"...HEAD -- '*.cs' '*.csproj' '*.props' '.editorconfig'; git diff -U0 HEAD -- '*.cs' '*.csproj' '*.props' '.editorconfig'; } 2>/dev/null \
+    | awk '/^\+\+\+ /{f=substr($2,3);next} /^@@/{split($3,a,",");l=substr(a[1],2)+0;next} /^\+/{print f":"l": "substr($0,2);l++}' | sort -u)
+  HP_FAIL=$(echo "$HP_ADDED" | grep -E '\[(Fact|Theory)\([^]]*Skip *=|catch *(\([^)]*\))? *\{ *\}' | head -5 | tr '\n' ';' || true)
+  HP_WARN=$(echo "$HP_ADDED" | grep -E '#pragma warning disable|<NoWarn>|SuppressMessage\(' | head -5 | tr '\n' ';' || true)
+  if [[ -n "$HP_FAIL" ]]; then
+    add_result "Hidden problems" "FAIL" "skipped test or empty catch added — fix the cause instead of hiding it: $HP_FAIL"
+  elif [[ -n "$HP_WARN" ]]; then
+    add_result "Hidden problems" "WARN" "warning suppression added — say why in the PR body, or fix the warning: $HP_WARN"
+  else
+    add_result "Hidden problems" "PASS" ""
+  fi
+
   # Find .sln files in services/
   SLN_FILES=$(find "$WORKTREE/services" -maxdepth 3 -name "*.sln" 2>/dev/null || echo "")
 

@@ -364,6 +364,15 @@ Checked against `main` @ `6d94fcd7b` on 2026-10-17. Book refs: **web-apps** = *A
   - The worker deployments checked (deviant engine, callback engine, export, quarantine) run `replicas: 1` (e.g. `infra/k8s/service-a-deviant-engine-worker/03-deployment.yaml`).
   - The engines lock inside their services (`PostgresDistributedLockService`), so some work is already guarded.
 
+- Should liveness stop checking the database? (A) liveness = "the process is alive" only, readiness keeps the Npgsql check; (B) keep both on `/health` as today.
+  - `/health` includes the Npgsql check (`shared/Repo.Shared.Common/Extensions/EntityFrameworkExtensions.cs:84`, mapped in `WebApplicationExtensions.cs:113`).
+  - All 16 k8s deployments point both probes at `/health` (e.g. `infra/k8s/service-a/03-deployment.yaml:104`), so a database outage restarts every pod instead of taking them out of rotation.
+  - Note the 2025-04-07 rule that a worker whose RabbitMQ connection dies must crash: that is about a dead consumer, not a dependency outage.
+
+- Should we raise three analyzers to warnings repo-wide (CA2254 log templates, CA2200 `throw ex`, CA2016 forward the token)? Yes/no.
+  - There is no `.editorconfig` or `AnalysisLevel` today, and CI already builds with `/warnaserror`, so they would fail CI at once.
+  - Today: 7 interpolated log lines in 4 files and one `throw ex;`. CA2016 would flag many calls, so it may need to wait or be `suggestion`.
+
 ## New decisions found in #backend
 
 Sorted 2026-10-17: tech-lead items go to ghost-review / owl-review, the rest are in `~/.claude/skills/backend-decisions/SKILL.md` (with era and Nova relevance). The list below is the raw intake.
