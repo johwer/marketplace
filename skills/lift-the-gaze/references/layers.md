@@ -30,14 +30,14 @@ Side doors that skip the controller: Rebus handlers (`*.API/Handlers`, `Messagin
 - Inherits `RepoController`; `[ApiController]`, `[Authorize]`, `[AcceptTokens]`.
 - Validates **shape**: required fields, `StartDate <= EndDate`, GUID not empty → `ApiResponse.ValidationError("…")`.
 - Asks ServiceC: `authorizationAdapter.CanDoActionOnCompany(token, action, companyId)` → `Forbidden` if false.
-- Calls one service method, wraps the result in `ApiResponse<T>`.
+- Calls one service method and returns its `ApiResponse<T>`. In Repo the service builds the envelope (`CODING_STYLE_BACKEND.md:521`, ~200 services); the textbook would put a result type in the service and the HTTP mapping in the controller (see `dotnet-architecture-reference/repo-vs-textbook.md`).
 - **Wrong here:** business rules (`if (company.HasContract…)`), EF queries, loops that compute things, mapping repeated in several actions.
 - **Symptom:** the controller is long and its tests need a database.
 
 ### Service — the brain (for this API)
 - The business rule: "an service-a cannot start before employment", "notify the manager when…".
 - Orchestrates: repository calls, other services over HTTP, publishing Rebus events.
-- **Wrong here:** `ApiResponse`, HTTP status codes, `HttpContext`; raw SQL; a rule that a worker also needs (then it is duplicated or skipped).
+- **Wrong here:** `HttpContext` and request plumbing; raw SQL; a rule that a worker also needs (then it is duplicated or skipped). Returning `ApiResponse<T>` is the Repo convention, not a smell.
 - **Symptom:** the same `if` exists in the service and in a worker.
 
 ### Domain — shared truth
