@@ -83,7 +83,7 @@ th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute
   <h2><span class="n">0</span>Vilken sorts problem är det?</h2>
   <p>Stäng av kodhjärnan en stund. Innan vi väljer nivå: vad är det egentligen för problem? Fyra linser, var och en med Repos standardsvar.</p>
   <div class="frame panel">
-    <div><h3>Data eller logik</h3><p>Sitter det i koden, eller i datan (index, lås, frågans form)?</p><p><span class="tag ok">Mät först</span> Telemetri i Elastic och <code>backend-performance</code> innan någon omdesign.</p></div>
+    <div><h3>Data eller logik</h3><p>Sitter det i koden, eller i datan (index, lås, frågans form)?</p><p><span class="tag ok">Mät först</span> Elastic (accept): vilket endpoint är långsamt (p95), och var går tiden i en request (SQL, ServiceC-anrop, N+1)? Accept säger <em>var</em> tiden går, inte hur långsam prod är.</p></div>
     <div><h3>Synkront eller asynkront</h3><p>Måste det ske medan användaren väntar?</p><p><span class="tag ok">Event efter commit</span> för sidoeffekter. <span class="tag warn">Aldrig</span> request/reply över bussen eller "200 = köad".</p></div>
     <div><h3>Läsningar eller skrivningar</h3><p>Är lasten skev åt ena hållet?</p><p><span class="tag ok">Repliker + Dapper</span> för tunga läsningar, cache bara med invalidering. <span class="tag warn">Inte</span> skrivningar via en worker.</p></div>
     <div><h3>Enkel drift</h3><p>Löser vi ett problem vi inte har?</p><p><span class="tag ok">Befintligt först</span> Något nytt kräver omdöme och konsensus. Färre, större tjänster är riktningen.</p></div>

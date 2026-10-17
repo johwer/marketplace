@@ -74,6 +74,15 @@ Before choosing *where* a decision lives, name *what kind* of problem it is. Tur
 | Reads or writes | Is the load lopsided? | Replicas via events (the owning service enriches), Dapper for heavy reads, cache only with invalidation ([CACHE-INVALIDATION]). Writes through a worker were rejected (2025-08-18) |
 | Operational simplicity | Are we solving a problem we don't have? | Existing mechanism first; something new needs taste, judgment and consensus (2026-10-16, [NECESSITY]). Fewer, bigger services is the direction (ServiceC merged 2025-01) |
 
+**Measure, don't guess (data or logic lens).** For a performance or "it's slow / it fails" question, fetch numbers before proposing anything. The Elastic MCP tools (`mcp__claude_ai_Elastic_mh-accept__*`, load them via ToolSearch) read the **accept** environment:
+
+1. `observability_get_services` (start `now-24h`): find the service. Only the APIs and `service-c-sync-worker` have APM traces (service-a-api, service-c-api, service-d-api, service-b-api); service-e-api, billing-api and the workers show up in logs only.
+2. `observability_get_trace_metrics` with `kqlFilter: 'service.name: "service-a-api"'`, `groupBy: "transaction.name"`, `latencyType: "p95"`: which endpoint is slow or failing.
+3. `observability_get_traces` for that transaction: the spans show where the time goes (SQL, an ServiceC call, a loop of calls = N+1).
+4. `observability_get_logs` / `observability_run_log_rate_analysis`: errors and spikes, for workers and services without traces.
+
+What the numbers can and cannot say: accept has little traffic and test data. Use it for **where the time goes inside one request** (span breakdown, number of SQL or ServiceC calls) and for error patterns, not for **how slow production is**. There is no prod connection here; ask the user for prod figures when the decision depends on scale. Put the numbers in the one-line answer, e.g. "p95 600 ms on GET /service-as, 40 ServiceC calls per request → a data/N+1 problem, not an architecture problem."
+
 **Generic advice that does not apply here, so don't offer it:** an API gateway or BFF to absorb orchestration (ruled out 2025-12-03); CQRS through workers; switching to another architecture style as the fix for one ticket. "Invert dependencies" applies at the API edge only: the DTO protects the contract, while entities deliberately match the tables.
 
 Write the answer as one line before Step 1, e.g. "Logic problem, synchronous, read-heavy, no new mechanism needed."
