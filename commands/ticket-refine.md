@@ -121,7 +121,7 @@ Read `~/.claude/team-profiles.json` to look up the reporter. This file contains 
 - **light**: Trust the intent. Push back only on missing specifics, not missing intent. If this author commented on someone else's ticket, treat it as partially validated.
 - **unknown/not in config**: Default to medium pushback.
 
-**Tech lead weight** — if a tech lead has commented with specific direction, treat their input as higher-weight than AI reviewer (Solomon) analysis. Tech lead one-liners often contain more actionable context than full AI reviews. (Learned: Reviewer Two's single-line comment on PROJ-1745 was more valuable than Solomon's entire review.)
+**Tech lead weight** — if a tech lead has commented with specific direction, treat their input as higher-weight than AI reviewer (Solomon) analysis. Tech lead one-liners often contain more actionable context than full AI reviews. (Learned: the tech lead's single-line comment on PROJ-1745 was more valuable than Solomon's entire review.)
 
 **High-risk flag** — if the reporter has `pushback_level: "high"` AND no tech lead from the config has commented:
 ```

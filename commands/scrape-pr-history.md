@@ -156,7 +156,7 @@ Then ask the user:
     "ticket": "PROJ-1577",
     "title": "PROJ-1577: Password reset initialization endpoint",
     "merged_at": "2026-02-27T15:15:28Z",
-    "author": "reviewer-one",
+    "author": "<github-login>",
     "findings": [
       {
         "reviewer": "gemini-code-assist[bot]",

@@ -49,7 +49,7 @@ Then guide them to populate author profiles by running the scrape — it auto-di
     "display_name": "Solomon",
     "comment_marker": "Solomon — Planning"
   },
-  "tech_leads": ["Reviewer Two"],
+  "tech_leads": ["<tech lead name>"],
   "author_profiles": {
     "Andreas Höjevik": {
       "role": "tester",
@@ -58,14 +58,14 @@ Then guide them to populate author profiles by running the scrape — it auto-di
       "strengths": ["finds real bugs from UAT"],
       "gaps": ["no technical context", "no expected behavior", "no edge cases"]
     },
-    "Ludvig Övergaard": {
+    "<ticket author name>": {
       "role": "product",
       "pushback_level": "medium",
       "known_patterns": ["detailed ACs", "table formats", "user flows"],
       "strengths": ["good at describing WHAT", "improving structure"],
       "gaps": ["no API contracts", "no migration needs", "no cross-service impacts"]
     },
-    "Reviewer Two": {
+    "<tech lead name>": {
       "role": "tech_lead",
       "pushback_level": "light",
       "known_patterns": ["varies — sometimes detailed, sometimes minimal"],
@@ -75,9 +75,9 @@ Then guide them to populate author profiles by running the scrape — it auto-di
   },
   "ticket_flow": [
     { "from": "Monika Åkvist-Johansson", "to": "Andreas Höjevik", "label": "UAT findings" },
-    { "from": "Andreas Höjevik", "to": "Ludvig Övergaard", "label": "product context" },
-    { "from": "Ludvig Övergaard", "to": "Reviewer Two", "label": "tech review" },
-    { "from": "Reviewer Two", "to": "AI/Dev Team", "label": "approved for dev" }
+    { "from": "Andreas Höjevik", "to": "<ticket author name>", "label": "product context" },
+    { "from": "<ticket author name>", "to": "<tech lead name>", "label": "tech review" },
+    { "from": "<tech lead name>", "to": "AI/Dev Team", "label": "approved for dev" }
   ]
 }
 ```

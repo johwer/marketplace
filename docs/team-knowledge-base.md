@@ -42,10 +42,10 @@ Living document for knowledge gaps, recurring issues, communication improvements
 
 | Author | Role | Pushback | Key pattern |
 |--------|------|----------|-------------|
-| Monika Åkvist-Johansson | tester (upstream) | n/a | Finds UAT issues, flows through others |
-| Andreas Höjevik | tester | **HIGH** | Thin 1-2 sentence tickets, title/desc mismatch |
-| Ludvig Övergaard | product | **MEDIUM** | Good product specs, lacks technical context |
-| Reviewer Two | tech_lead | **LIGHT** | Validates others' tickets, trust his intent |
+| Upstream tester | tester (upstream) | n/a | Finds UAT issues, flows through others |
+| Tester | tester | **HIGH** | Thin 1-2 sentence tickets, title/desc mismatch |
+| PO | product | **MEDIUM** | Good product specs, lacks technical context |
+| Former tech lead | tech_lead | **LIGHT** | Validates others' tickets, trust his intent |
 
 **Key rules:**
 - High-pushback author + no tech lead comment = **HIGH RISK** flag
@@ -122,11 +122,11 @@ Living document for knowledge gaps, recurring issues, communication improvements
 ## Testing & UAT
 
 ### Old system vs new system alignment
-- **Problem:** UAT/bug testing (Monika, Ludvig, Andreas) — unclear if current behavior matches or intentionally deviates from the old system
+- **Problem:** UAT/bug testing (testers and the PO) — unclear if current behavior matches or intentionally deviates from the old system
 - **Impact:** Bugs get reported that are actually intentional changes, and real regressions get missed
 - **Key questions:**
   - How does the new system work compared to the old one? Where does it intentionally differ?
-  - Is the current behavior aligned with what Reviewer Two has designed/approved?
+  - Is the current behavior aligned with what the tech lead has designed/approved?
   - Do UAT testers have a reference for "expected behavior" or are they comparing from memory?
 - **Fix:** Create a comparison document for areas that changed. Mark each difference as: Intentional / Bug / Needs Decision
 

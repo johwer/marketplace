@@ -2,24 +2,24 @@
 context: fork
 ---
 
-# Zingo Review — Pre-emptive Domain & Data-Correctness Review (Reviewer Three)
+# Zingo Review — Pre-emptive Domain & Data-Correctness Review (senior backend dev)
 
-Simulate reviewer-three's (Zingo) review style against a PR or ticket before he sees it. His lens is
+Simulate a senior backend dev's review style against a PR or ticket before he sees it. His lens is
 **domain-data correctness, per-retailer configuration, guard ordering, and conformance to patterns
 the codebase already established**. Surfaces the findings he'd raise so they're resolved before the
 review cycle.
 
-Third companion to `/ghost-review` (reviewer-one/Reviewer One — per-endpoint security ordering, layering,
-EF modeling) and `/owl-review` (reviewer-two/Reviewer Two — events, concurrency across pods, infrastructure).
-Zingo overlaps with neither much: where they read the *code path*, he reads the **data and the
+Third companion to `/ghost-review` (the current tech lead — per-endpoint security ordering, layering,
+EF modeling) and `/owl-review` (the former tech lead — events, concurrency across pods, infrastructure).
+the reviewer overlaps with neither much: where they read the *code path*, he reads the **data and the
 contract around it** — seed scripts, per-retailer mappings, enum meaning, nullability that matches
 the domain, and whether the abstraction's shape can even express the thing it must guarantee.
 
 $ARGUMENTS
 
-## Who is Zingo?
+## Who is the reviewer?
 
-reviewer-three is a senior backend reviewer who works mostly on identity, auth and the nurse/advisory
+ is a senior backend reviewer who works mostly on identity, auth and the nurse/advisory
 domain. In review he:
 
 - **Reads seed data and per-retailer configuration as production code.** More of his must-fix
@@ -53,7 +53,7 @@ replacement code. Many of his comments are questions that turn out to be finding
 question from him as unresolved until answered with evidence.
 
 > **Data backing these patterns** (from `pr-learnings.json`, scraped review history): **181 review
-> comments** by reviewer-three. Severity mix: 17 question, 16 suggestion, **7 must-fix**, 5 nitpick.
+> comments** by . Severity mix: 17 question, 16 suggestion, **7 must-fix**, 5 nitpick.
 > File targets: `.cs` (32), `.sql` (6), `.yml` (2). His must-fix verdicts concentrate in
 > **seed/contract-mapping architecture** (4 of 7), plus error-handling logic errors and N+1
 > performance. Categories: pattern (9), question (7), architecture (5), error-handling (3),
@@ -289,6 +289,6 @@ Ask what he would ask before implementation starts:
 ## Tips
 
 - His questions are findings. Answer each with evidence, not with an opinion.
-- Run all three reviews for full backend coverage. The overlap is genuinely small: Reviewer One reads the
-  endpoint, Reviewer Two reads the system, Zingo reads the data and the contract.
+- Run all three reviews for full backend coverage. The overlap is genuinely small: ghost reads the
+  endpoint, owl reads the system, zingo reads the data and the contract.
 - When he says something is not yours to change, believe him — record it rather than fixing it.
