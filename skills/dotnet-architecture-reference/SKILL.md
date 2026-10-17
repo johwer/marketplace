@@ -22,6 +22,8 @@ When the textbook disagrees with 1 or 2, show both. Quote the decision with its 
 |---|---|---|
 | `sources/ms-architecting-modern-web-apps.md` | *Architecting Modern Web Applications with ASP.NET Core and Azure* (Microsoft, 2023). One app: principles, layers, clean architecture, MVC, EF Core, testing. | **PDF** pages (printed ≈ PDF − 9) |
 | `sources/ms-dotnet-microservices.md` | *.NET Microservices: Architecture for Containerized .NET Applications* (Microsoft, 2023). Boundaries, data sovereignty, communication, integration events, outbox, DDD, CQRS, resilience. | **Printed** pages (PDF = printed + 15) |
+| `sources/cognitive-load.md` | *Cognitive load is what matters* (github.com/zakirullin/cognitive-load, commit `d2d60d2`, June 2026). Shallow vs deep modules, layers that add only indirection, nesting, inheritance, DRY abuse, shallow microservices, self-describing result codes. **CC BY 4.0**: credit and link the licence when reusing. Shared in #knowledge-sharing 2024-06-20. | README section headings |
+| `sources/knowledge-sharing.md` | Five articles from Slack #knowledge-sharing (code review guide, twelve-factor, outbox/inbox, DB replication, OTel baggage), each with takeaways and Repo relevance. | Article URL per section |
 
 Both books are "all rights reserved". The digests are in our own words with page refs. Don't paste book passages into anything that gets published.
 
@@ -41,6 +43,14 @@ Both books are "all rights reserved". The digests are in our own words with page
 | Value objects, enumeration classes vs enums? | microservices "Value objects", "Enumeration classes vs enums" |
 | Retries, circuit breakers, health checks? | microservices Ch. 7. Repo has **no Polly/resilience handler** on HttpClients (verified 2026-10-17); ServiceC calls matter most |
 | How to test at which level? | web-apps Ch. 8 + ghost [MISSING-TEST] / integration-test sparsity |
+| Does this service/layer/interface earn its place, or is it just indirection? | cognitive-load "Layered architecture", "Too many small modules" + mapping rows on [REPO-PATTERN] and one-implementation interfaces. **Conflict:** `CODING_STYLE_BACKEND.md:85` mandates an interface per service |
+| Base class with override hooks, or compose? | cognitive-load "Inheritance nightmare" + Billing/ServiceE mapping row |
+| Merge two similar code paths? | cognitive-load "Abusing DRY" + [ONE-HOME-FOR-A-RULE]: merge rules, not look-alike code, never via a mode flag |
+| Is this code too nested / too clever to review? | cognitive-load "Nested ifs", "Complex conditionals", "Familiar projects" + ghost 2026-05-13 nested-if quote |
+| New microservice or extend an existing one? | cognitive-load "Too many shallow microservices" + 2025-01-02 ServiceC merge; microservices "Bounded contexts and boundaries" |
+| What should a reviewer approve, and how to mark non-blocking comments? | knowledge-sharing "Google engineering practices" |
+| Outbox vs inbox, and how to survive redelivery? | knowledge-sharing "Microservices 101" + microservices "Publishing atomically: outbox" |
+| Pass context (retailer, flag) across services without drilling parameters? | knowledge-sharing "OpenTelemetry baggage". Never PII, never authorization |
 
 ## Repo vs textbook, with evidence
 
