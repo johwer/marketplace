@@ -2,19 +2,19 @@
 context: fork
 ---
 
-# Owl Review — Pre-emptive Tech-Lead Review (Reviewer Two)
+# Owl Review — Pre-emptive Tech-Lead Review (former tech lead)
 
-Simulate reviewer-two's (Reviewer Two) review style against a PR or ticket before he sees it. He's a backend tech lead whose lens is **event-driven architecture, distributed concurrency, authorization correctness, and infrastructure**. Surfaces the questions and must-fix issues he'd raise so they're resolved before the review cycle.
+Simulate the former backend tech lead's review style against a PR or ticket before he sees it. He's a backend tech lead whose lens is **event-driven architecture, distributed concurrency, authorization correctness, and infrastructure**. Surfaces the questions and must-fix issues he'd raise so they're resolved before the review cycle.
 
-This is the companion to `/ghost-review` (which simulates reviewer-one/Reviewer One). Where Reviewer One concentrates on per-endpoint security ordering, layering, and EF modeling, Reviewer Two zooms out to **how services talk to each other** (events/messaging), **how the system behaves under concurrency** (multiple pods), and **how infrastructure is declared**. Zingo (`/zingo-review`) is the third lens: domain data, per-retailer seed configuration and contract shape. Run all three for full backend coverage; the overlap is small.
+This is the companion to `/ghost-review` (which simulates the current tech lead). Where the current tech lead concentrates on per-endpoint security ordering, layering, and EF modeling, the former tech lead zooms out to **how services talk to each other** (events/messaging), **how the system behaves under concurrency** (multiple pods), and **how infrastructure is declared**. Zingo (`/zingo-review`) is the third lens: domain data, per-retailer seed configuration and contract shape. Run all three for full backend coverage; the overlap is small.
 
 $ARGUMENTS
 
 > **Run it on frontend-only PRs too.** A UI diff with no backend files still depends on backend facts this lens catches: on PROJ-4423 it found an `ILike` (wildcard) lookup behind an external-address POST and a per-person permission that internal recipients also need — neither visible from the `.tsx` diff.
 
-## Who is reviewer-two?
+## Who is the former tech lead?
 
-reviewer-two (Reviewer Two) is a senior backend reviewer / tech lead who:
+The former tech lead is a senior backend reviewer / tech lead who:
 - Thinks in **events and messaging first** — routing keys, event types, what data belongs in an event payload, and whether a new event type is even warranted
 - Asks **distributed-systems questions**: "how does this behave with multiple pods running concurrently?", is the lock scoped correctly, is the publisher awaited
 - Treats **authorization logic** as something to be reasoned about for correctness, not just presence (permission leaks, timing-based enumeration)
@@ -26,7 +26,7 @@ reviewer-two (Reviewer Two) is a senior backend reviewer / tech lead who:
 
 His review style: zoom-out and systemic. He often defers small stuff ("these are details") and concentrates fire on the messaging contract, concurrency behavior, and infra. He frequently endorses the bot comments ("Good comments from gemini") and adds the systemic concern on top.
 
-> **Data backing these patterns** (from `pr-learnings.json`, scraped review history): **300 review comments** by reviewer-two across ~245 PRs he reviewed (25 must-fix). File targets: `.cs` (189), `.ts/.tsx` (54), `.tf/.yml` (11). His must-fix verdicts concentrate in architecture, API contract, error-handling, and authorization.
+> **Data backing these patterns** (from `pr-learnings.json`, scraped review history): **300 review comments** by the former tech lead across ~245 PRs he reviewed (25 must-fix). File targets: `.cs` (189), `.ts/.tsx` (54), `.tf/.yml` (11). His must-fix verdicts concentrate in architecture, API contract, error-handling, and authorization.
 >
 > **Final mining pass (2026-05-26 → 2026-08-06, complete history):** 314 GitHub comments on 57 PRs, plus dated Slack decisions (see Mode 2 "Standing decisions"). In this last period his weight moved from naming events to **what happens when a message is redelivered or a commit half-lands**: publish-after-commit, redelivery safety, validate-before-side-effects, backfill correctness, a second pipeline next to an existing one, and a fact proxied in two places. New tags: PUBLISH-AFTER-COMMIT, REDELIVERY-SAFETY, VALIDATE-BEFORE-COMMIT, SECOND-PIPELINE, BACKFILL-CORRECTNESS, PROXY-FACT, INMEMORY-BLINDSPOT, LEGACY-GHOST, CLIENT-CONTRACT; AUTHZ-CORRECTNESS and EVENT-PAYLOAD sharpened.
 >
@@ -53,7 +53,7 @@ gh pr view <PR> --repo <REPO> --json number,title,headRefName,body,files,author
 gh api repos/<REPO>/pulls/<PR>/files   # full file list with patches
 ```
 
-Focus on (in priority order for Reviewer Two):
+Focus on (in priority order for the former tech lead):
 - Event/messaging code: `*Event*.cs`, `*Consumer.cs`, `*Publisher.cs`, `*Handler.cs`, `RoutingKeys*.cs`, anything touching Rebus/RabbitMQ
 - Worker/job code: `*Worker.cs`, `*Job.cs`, `*Worker/Program.cs` (concurrency, locking)
 - Infra: `*.tf`, `docker-compose.yml`, `*-deployment.yaml`, configmaps, `appsettings*.json`
@@ -84,7 +84,7 @@ Run each check against the actual diff. Only flag a check if the code *actually 
 
 ---
 
-#### MUST-FIX patterns (reviewer-two blocks approval on these)
+#### MUST-FIX patterns (the former tech lead blocks approval on these)
 
 **[EVENT-MODELING] New event type where an existing event suffices**
 Look for a new `EventType` enum value / new event class created for something that is really a state change on an existing entity. "UserAnonymized should not be a separate event type — use the normal update event instead." Ask whether the change can ride an existing update event rather than introducing a new type/routing key.
@@ -196,7 +196,7 @@ are Terraform resources, never created by the app (2024-03-11).
 
 ---
 
-#### CLARIFYING QUESTIONS (reviewer-two asks before approving)
+#### CLARIFYING QUESTIONS (the former tech lead asks before approving)
 
 **[SHARED-DTO] Duplicated request/response shapes**
 When a new paginated search / list request or response repeats a shape that exists elsewhere, ask: "should we make a shared DTO for paginated searches?" He pushes for shared base DTOs (`...RequestBase`, pagination wrappers) over copy-paste.
@@ -271,7 +271,7 @@ out of the logs (2025-03-20). Alert on any non-empty error queue (2025-09-03).
 
 ### Step 4 — Format findings
 
-Output in reviewer-two's style: systemic, pragmatic, grouped by severity. Lead with the messaging/concurrency/infra concerns; defer small stuff explicitly.
+Output in the former tech lead's style: systemic, pragmatic, grouped by severity. Lead with the messaging/concurrency/infra concerns; defer small stuff explicitly.
 
 ```
 ## Owl Review — PR #<N>: <title>
@@ -381,6 +381,7 @@ From the full Slack pass (2023-10 → 2026-08), in date order. Format: `YYYY-MM-
 - 2026-02-24 #dream-team: heavy SQL is done with Dapper.
 - 2026-03-03 #repo-retailer-b: records from external systems name the system that created them, not just "External". → [ENUM-OVER-STRING]
 - 2026-03-04 #repo-retailer-b: `insertedBy` and timestamps are settable only through the migration endpoint; normal endpoints take the sender from the JWT. → [AUTHZ-CORRECTNESS]
+- 2026-03-04 #project-nova: OTP/MFA codes are hashed like passwords ("MFA is a password"); the current tech lead conceded. → [SECRETS-CONFIG]
 - 2026-03-09 #project-nova: CODEOWNERS requires approval from someone with the right competency (backend dev under `services/`). → [CONFIG-OWNERSHIP]
 - 2026-03-11 #knowledge-sharing: inbox/outbox for eventual consistency when events cascade across services. → [PUBLISH-AFTER-COMMIT]
 - 2026-03-20 #ask-data: keep the system the same across markets; every customisation adds complexity exponentially. → [PROXY-FACT]
@@ -405,7 +406,7 @@ From the full Slack pass (2023-10 → 2026-08), in date order. Format: `YYYY-MM-
 acli jira workitem get <TICKET_ID>
 ```
 
-### Step 2 — Ask the architecture questions reviewer-two would ask
+### Step 2 — Ask the architecture questions the former tech lead would ask
 
 **Messaging / events:**
 - Does this introduce a new event type, or can it ride an existing update event?
@@ -457,7 +458,7 @@ Output as: *"Before implementation, answer these questions:"* — listed per are
 
 ## Tips
 
-- Run before requesting review: `/owl-review` (auto-detects current branch). Pair with `/ghost-review` for full backend coverage — Reviewer Two and Reviewer One flag mostly different things.
+- Run before requesting review: `/owl-review` (auto-detects current branch). Pair with `/ghost-review` for full backend coverage — the former tech lead and the current tech lead flag mostly different things.
 - Event-modeling, concurrency-scope, and authz-correctness findings are almost always must-fix — resolve before review.
 - He defers small stuff; don't pad the output. Lead with the systemic concern.
 - Cheap pre-empts that recur in his reviews: enums for routing keys/event types, shared paginated-search DTOs, Terraform variables instead of hardcoded names, per-entity (not global) locks in workers, awaited publishers.

@@ -4,13 +4,13 @@ context: fork
 
 # Ghost Review — Pre-emptive Backend Code Review
 
-Simulate reviewer-one' review style against a PR or ticket before he sees it. Flags must-fix issues and surfaces the clarifying questions he would ask, so they're resolved before the review cycle.
+Simulate the current backend tech lead's review style against a PR or ticket before he sees it. Flags must-fix issues and surfaces the clarifying questions he would ask, so they're resolved before the review cycle.
 
 $ARGUMENTS
 
-## Who is reviewer-one?
+## Who is the tech lead?
 
-Reviewer One is a senior backend reviewer who:
+The current tech lead is a senior backend reviewer who:
 - Asks architecture-first questions before accepting a design
 - Expects developers to apply architectural judgment to the ticket itself: a mechanism relayed from product/customer (even "TT wants X") is a *suggestion, not a spec* — push back and model it the way the system actually works ("my expectation is that we apply judgment about that before implementation")
 - Flags security issues (auth ordering, multi-tenancy, privilege escalation) as must-fix
@@ -22,9 +22,11 @@ Reviewer One is a senior backend reviewer who:
 
 His review style: precise, code-specific, not generic. He cites the exact file and line pattern. He doesn't nitpick style (linters handle that) but he does care about naming when it violates REST or DTO conventions.
 
-> **Data backing these patterns** (from `pr-learnings.json`, scraped review history): **1,103 review comments** by reviewer-one across ~590 PRs he reviewed (106 must-fix). Categories: pattern (118), architecture (109), naming (59), api-contract (58), types (51), missing-test (51), error-handling (47), security (40, highest must-fix rate), performance (17), plus many clarifying questions. His must-fix verdicts concentrate in **security, error-handling, architecture, and EF/persistence modeling**. He frequently flags: layering/Unit-of-Work violations, AWS credential/region hardcoding, token-authority & header spoofing, catch-and-log-only, build warnings, commented-out code, and tests that don't assert real logic.
+> **Data backing these patterns** (from `pr-learnings.json`, scraped review history): **1,103 review comments** by the tech lead across ~590 PRs he reviewed (106 must-fix). Categories: pattern (118), architecture (109), naming (59), api-contract (58), types (51), missing-test (51), error-handling (47), security (40, highest must-fix rate), performance (17), plus many clarifying questions. His must-fix verdicts concentrate in **security, error-handling, architecture, and EF/persistence modeling**. He frequently flags: layering/Unit-of-Work violations, AWS credential/region hardcoding, token-authority & header spoofing, catch-and-log-only, build warnings, commented-out code, and tests that don't assert real logic.
 >
-> **Second mining pass (2026-05-25 → 2026-10-13):** 664 GitHub comments by reviewer-one on 141 PRs (≈29 of them replies to review on his own PRs, kept only where they state a decision), plus dated Slack/Jira decisions through 2026-10-15 (see Mode 2 "Standing decisions"). What moved since the first pass: his weight shifted from per-endpoint security toward **altitude** — products are data not code, the service contract is the switch, one home per rule, rollout-safe schema changes, the SignedIn→Nova migrators — and toward a high bar on AI-generated comment volume and PR scope. New tags from this pass: PRODUCT-IS-DATA, CONTRACT-IS-THE-SWITCH, ONE-HOME-FOR-A-RULE, UNREACHABLE-PERMISSION, EXPAND-CONTRACT, MIGRATOR-PARITY, EVENT-IDEMPOTENCY, DATA-FIX-ROUTE, PRODUCER-OWNS-DERIVATION, PAGE-AUTHZ-CONTEXT, PR-SCOPE, COMMENT-NOISE.
+> **Second mining pass (2026-05-25 → 2026-10-13):** 664 GitHub comments by the tech lead on 141 PRs (≈29 of them replies to review on his own PRs, kept only where they state a decision), plus dated Slack/Jira decisions through 2026-10-15 (see Mode 2 "Standing decisions"). What moved since the first pass: his weight shifted from per-endpoint security toward **altitude** — products are data not code, the service contract is the switch, one home per rule, rollout-safe schema changes, the SignedIn→Nova migrators — and toward a high bar on AI-generated comment volume and PR scope. New tags from this pass: PRODUCT-IS-DATA, CONTRACT-IS-THE-SWITCH, ONE-HOME-FOR-A-RULE, UNREACHABLE-PERMISSION, EXPAND-CONTRACT, MIGRATOR-PARITY, EVENT-IDEMPOTENCY, DATA-FIX-ROUTE, PRODUCER-OWNS-DERIVATION, PAGE-AUTHZ-CONTEXT, PR-SCOPE, COMMENT-NOISE.
+>
+> **Identity:** people are named by role only, never by name or handle. To mine again, ask the user for the GitHub login and Slack user; they are not stored here. A spot check on 2026-10-17 covered PRs from 2026-10-13 to 2026-10-17: 5 PRs, one decision kept (#3985).
 >
 > **Slack pass (full walk of his messages, 2025-05-06 → 2026-10-15):** Slack: ~5,060 messages scanned, ~220 kept, date range 2025-05-06 → 2026-10-15. There are no messages before 2025-05. About 85% was noise: changelogs, standups, incidents, social posts, one-liners. Kept items became dated Mode 2 "Standing decisions" and "Slack sharpening" notes under existing tags. New tags from this pass: BUS-IS-NOT-RPC, BAD-INPUT-IS-4XX, CONTRACT-ENCODES-RULES, IDENTIFIER-SEMANTICS, LOG-PII-BOUNDARY, NO-STORED-PROC, CACHE-INVALIDATION, CAPABILITY-IS-NOT-ELIGIBILITY. Three items revise earlier patterns:
 > - the 2026-03-05 [PRIVILEGE-SCOPE] carve-out;
@@ -58,7 +60,7 @@ Focus on: `*Controller.cs`, `*Repository.cs`, `*Service.cs`, `*Handler.cs`, `*Wo
 
 ### Step 2 — PR description pre-emption scan
 
-Extract what the PR description explicitly acknowledges. These are already "on the table" — reviewer-one may still comment but the team has a prepared answer. List them:
+Extract what the PR description explicitly acknowledges. These are already "on the table" — the tech lead may still comment but the team has a prepared answer. List them:
 
 ```
 ### Already pre-empted in description:
@@ -77,7 +79,7 @@ Every other check below asks whether the code is built correctly. This one asks 
 be built. Run it before reading a single line of implementation, because if it fires, the rest of
 the review is wasted effort on both sides.
 
-reviewer-one raises this as a **blocking** finding, and his characterisation above already says why:
+The tech lead raises this as a **blocking** finding, and his characterisation above already says why:
 a mechanism relayed from product, from a customer, or **from the ticket itself** is a *suggestion,
 not a spec*. A ticket that names its own mechanism has not thereby justified it.
 
@@ -109,7 +111,7 @@ not a backfill or a new rollout mechanism.)
 
 > **The incident this came from (PROJ-3952, 2026-09-21).** A narrow ServiceC endpoint was designed,
 > built, unit- and integration-tested against real Postgres, passed 20 CI checks, and was reviewed
-> favourably by the domain lens — then closed by reviewer-one: *"This is a huge architectural
+> favourably by the domain lens — then closed by the tech lead: *"This is a huge architectural
 > intrusion into the role and permission system without any prealignment or discussion afaik.
 > Please do not do that again."* The capability already existed: `RoleScopeRules` forbids only
 > **customer-level** roles at Retailer scope, and the nurse roles were customer-owned because a
@@ -122,7 +124,7 @@ not a backfill or a new rollout mechanism.)
 
 ---
 
-#### MUST-FIX patterns (reviewer-one blocks approval on these)
+#### MUST-FIX patterns (the tech lead blocks approval on these)
 
 **[AUTH-ORDER] Permission check after data fetch**
 Look for controller methods that:
@@ -592,14 +594,14 @@ authorization data with no invalidation on the write path, or a new write path t
 existing invalidation.
 
 
-**Not Reviewer One's patterns — see `/zingo-review`**
+**Not the tech lead's patterns — see `/zingo-review`**
 Findings about per-retailer seed matrices, an unconstrained *grantee*, derived-helper shape gaps,
 `Validate`/`Can` duplication and making a request unrepresentable came from reviewer-three's review
 lens, not this one. They live in `/zingo-review` so this file keeps simulating one reviewer.
 
 ---
 
-#### CLARIFYING QUESTIONS (reviewer-one asks before approving)
+#### CLARIFYING QUESTIONS (the tech lead asks before approving)
 
 **[ROUTES] Action-based URL paths**
 Look for `[HttpGet("getX")]`, `[HttpPost("createX")]`, `[HttpDelete("deleteX")]`, `[HttpGet("searchX")]` — any route attribute where the path segment is a verb + noun.
@@ -685,7 +687,7 @@ timeouts should be about 1 s, not 10 s (2026-02-11).
 He is also strict that tests must **assert real logic, not just pass**: flag mocks/assertions like `It.IsAny<Guid>()`, asserting only that a call happened, or loose matchers that would pass regardless of correctness. "Don't just `IsAny<Guid>`. Please validate your logic in the tests, don't just make the tests pass!" A new endpoint with *no* tests at all is a hard must-fix for him ("makes no sense to not have any tests... please make it a habit").
 
 **[INTEGRATION-TEST-SPARSITY] Too many integration tests where unit tests suffice**
-The flip side of MISSING-TEST: reviewer-one treats integration tests as **expensive (time/CI budget)** and wants them **sparse** — usually a single happy-path is enough. When a PR adds several integration tests covering scenario/branch variations (e.g. granted→true, not-granted→false, leak-guard→false all as integration tests), flag it: keep at most ONE happy-path integration test and **move the rest to unit tests** (mapping tests, scope-resolution tests, helper-level assertions). His verbatim: "Drop these tests please, i dont think it adds a lot of value, and a integration test its quite expensive (time budget-wise)... What you can do is move it to a unit test though. Future consideration is to always be sparse with integrationtests, mostly a single one testing a 'happy' path is enough." So default new-behavior coverage to unit tests, reserving integration for one round-trip/access-matrix happy path. (Source: PROJ-3183 review.) Repeated since: #3253 (PROJ-3376) "Please do not write a billion integration tests... 1-3 for the happy path, sometimes selective unhappy paths"; #3134 (PROJ-3297) no integration tests for a DB check constraint — "we dont need to write tests to check 'does postgres actually do its job'". The exception he keeps: one real-Postgres test where the thing at risk is SQL/LINQ translation (#3420, PROJ-3657).
+The flip side of MISSING-TEST: the tech lead treats integration tests as **expensive (time/CI budget)** and wants them **sparse** — usually a single happy-path is enough. When a PR adds several integration tests covering scenario/branch variations (e.g. granted→true, not-granted→false, leak-guard→false all as integration tests), flag it: keep at most ONE happy-path integration test and **move the rest to unit tests** (mapping tests, scope-resolution tests, helper-level assertions). His verbatim: "Drop these tests please, i dont think it adds a lot of value, and a integration test its quite expensive (time budget-wise)... What you can do is move it to a unit test though. Future consideration is to always be sparse with integrationtests, mostly a single one testing a 'happy' path is enough." So default new-behavior coverage to unit tests, reserving integration for one round-trip/access-matrix happy path. (Source: PROJ-3183 review.) Repeated since: #3253 (PROJ-3376) "Please do not write a billion integration tests... 1-3 for the happy path, sometimes selective unhappy paths"; #3134 (PROJ-3297) no integration tests for a DB check constraint — "we dont need to write tests to check 'does postgres actually do its job'". The exception he keeps: one real-Postgres test where the thing at risk is SQL/LINQ translation (#3420, PROJ-3657).
 
 **[SEARCH-IS-GET] Search/read endpoint modeled as POST**
 Look for new search/list/read endpoints implemented as `[HttpPost]` with a request body. He pushes for `GET` with query parameters instead — it's the more typical endpoint shape, and RTK Query defaults such endpoints to a `query` (cache) rather than a `mutation`. Ask: should this be a GET with query params?
@@ -806,7 +808,7 @@ He measures it: comments that narrate the line below, restate reasoning, or leak
 
 ### Step 4 — Format findings
 
-Output in reviewer-one' style: code-specific, no preamble, grouped by severity.
+Output in the tech lead's style: code-specific, no preamble, grouped by severity.
 
 ```
 ## Ghost Review — PR #<N>: <title>
@@ -849,7 +851,7 @@ Use this when the user provides a ticket ID instead of a PR number.
 
 ### Standing decisions (dated, from Slack/Jira — check the ticket against these first)
 
-Newer decisions override older patterns in this file. Each is reviewer-one' unless noted.
+Newer decisions override older patterns in this file. Each is the tech lead's unless noted.
 
 **From the full Slack walk (2025-05 → 2026-10), oldest first. Where two entries disagree, the later one wins.**
 
@@ -869,6 +871,7 @@ Newer decisions override older patterns in this file. Each is reviewer-one' unle
 - 2025-09-19 #project-new-service-e: "Silent errors are worse than 500." → [FAIL-LOUD]
 - 2025-09-24 #backend-pull-requests: no stored procedures. "Better to just inject the sql from the backend directly so they are coupled". An SP/backend bucket mismatch broke prod. → [NO-STORED-PROC]
 - 2025-10-08 #project-nova (team agreement): a controller may call a repository directly "when it makes sense". Add a service only when it adds something: "no law that you have to add a abstraction layer that makes no point". "Never return a domain object from a controller." → [REPO-PATTERN]
+- 2025-10-21 #project-nova: enums in the DB are stored as strings, "uniform with shared config". Today it is per property (`HasConversion<string>()`), not one shared convention. → [ENUM-OVER-STRING]
 - 2025-10-27 #project-nova: "you need to map permissions to any new actions. Otherwise you cant grant them." → [UNREACHABLE-PERMISSION]
 - 2025-10-27 #project-nova: on an upload endpoint, "can I (if i know the ID) upload documents into any health case?" Resolve the owner and authorize before writing, not only on reads. → [AUTH-ORDER]
 - 2025-10-30 #project-nova: a permission follows where the thing is attached ("A company? Use a company action? A customer? customer action? A retailer? retailer action?"). Don't reuse CompanyAdministrator for a domain admin; define a dedicated permission. → [PERMISSION-PLACEMENT]
@@ -902,6 +905,7 @@ Newer decisions override older patterns in this file. Each is reviewer-one' unle
 - 2026-02-17 DM: do a small fix in your own PR now. A follow-up ticket "will never be prioritized until it's actually a problem". LLM text in PRs: "max a few lines… If everything is important, nothing is." → [DEFER-OWN-MESS] [COMMENT-NOISE]
 - 2026-02-23 #project-nova: "We push to accept and prod on every merge to main… Use feature toggles instead of holding back your code from main." Don't deploy branches to accept. "Before writing code, just align the approach!"
 - 2026-02-25 #repo-retailer-b: an integration manifest is all-or-nothing. Partial success: "No… Too many edge cases with catastrophic consequences." → [FAIL-LOUD]
+- 2026-03-02 #project-nova: "dont touch service-a sync with that sort of logic". The backend has no "historical" service-a, only an end date, and the 2-ongoing limit is judged by dates. → [S2S-VS-USER-API]
 - 2026-03-05 #project-nova: **reversal**. A UserPermission may now grant CompanyActions on the targeted user's own company ("That simplification just didnt work out"). → [PRIVILEGE-SCOPE]
 - 2026-03-05 #project-nova: add a DB constraint as well as backend validation "so its totally impossible, if its missed". Hitting it must still be a 400 ("our bad … not giving you a 400"). → [BAD-INPUT-IS-4XX]
 - 2026-03-05 #project-proj-service-b: no domain-specific confidential actions. Identity-number reads go through `UserReadConfidential`. → [ONE-HOME-FOR-A-RULE]
@@ -932,6 +936,7 @@ Newer decisions override older patterns in this file. Each is reviewer-one' unle
 - 2026-07-15 #project-nova: "never commit commented out code … Just delete the code. Git history … works." He calls this a standing team rule. → [NO-COMMENTED-CODE]
 - 2026-08-04 #seru-repo-integration: accepting an arbitrary URL on an anonymous endpoint is "a huge security issue" (phishing). → [AUTH-SPOOF]
 - 2026-08-17 #seru-repo-integration: `/authorizedFeatures` is deprecated for `/features`, which exposes the authorized actions "so the client can do its own decision". → [AUTHORIZED-FEATURES-MISUSE]
+- 2026-08-17 #project-proj-signedin-migration: Nova sends from the legacy sender on repo.se, because customers whitelist it. Migrated customers get notification suppression. → [MIGRATOR-PARITY]
 - 2026-08-24 #project-nova: "the ProductType enum is getting nuked, and replaced with pure data. If you are building any logic around it, think again." → [PRODUCT-IS-DATA]
 - 2026-08-25 #project-nova: an outbound integration must not be "a blackbox". Capture and visualise sends, and "Ensure idempotency, deliverability". → [EVENT-IDEMPOTENCY]
 - 2026-08-28 #seru-repo-integration: the refresh token stays in a cookie the web client cannot read. Handing it to a third party "would make the isolation weaker". → [AUTH-SPOOF]
@@ -939,19 +944,26 @@ Newer decisions override older patterns in this file. Each is reviewer-one' unle
 - 2026-09-07 DM: no new Nova↔SignedIn link table "here and now". Use ServiceC's existing migrations table later. → [REUSE-FIRST]
 - 2026-09-14 #security: wanting to check data is not "a good enough reason" for prod DB access. Script it over the APIs. On 10-14: "Getting access is a PR". → [DATA-FIX-ROUTE]
 - 2026-09-14 #project-nova: use the reports table as an atomicity check, so an outbound report cannot be sent five times. → [EVENT-IDEMPOTENCY]
+- 2026-09-14 #project-proj-signedin-migration (tentative): global templates are a one-time setup, identifiable, with no duplicates. → [MIGRATOR-PARITY]
 - 2026-09-21 DM: automation with "enormous complexity with large interventions in existing architecture" for "very little effort saved" is rejected. "Larger things need to go through a planning process." → [NECESSITY]
 - 2026-09-22/23 DM: he disliked a design "because it poked into the role system — we can do things around it instead". Customer support is a role and global admin "is an override". → [NECESSITY]
 - 2026-09-28 #alerts-polaris: when customer-supplied config (a template font) is unsupported, "default to a font we do have". Installing fonts is "a very shortsighted solution". This is a scoped exception to [FAIL-LOUD].
 - 2026-09-28 / 10-14 #ask-data: service-e "is not migrated... its computed". Verify the source rows and "actually do the math" instead of comparing totals across environments.
 - 2026-09-29 DM: percentage rollout is decided by a sticky client value before the first paint. A failed config fetch falls back to the legacy path as the "safe default", and the default flips only at 100%.
+- 2026-09-29 #project-proj-signedin-migration: migrate VAB templates even where the service is off, but closed for reporting. → [MIGRATOR-PARITY]
+- 2026-09-30 #project-proj-signedin-migration: the deviant engine is paused per customer during migration (`CustomerDeviantPause`). → [MIGRATOR-PARITY]
 - 2026-10-02/06 DM: no department admin yet "without tag actions", because a service cannot ask ServiceC about rights on a tag. → [UNREACHABLE-PERMISSION]
 - 2026-10-06 #alerts-polaris: clearing a dead-letter queue by hand is wrong: "plug the hole instead of just continue scooping out the water". → [EVENT-IDEMPOTENCY]
 - 2026-10-06 DM: "backend, follow what we have." → [REUSE-FIRST]
 - 2026-10-07 #project-proj-signedin-migration: manager and employee roles belong on the company, admin roles on the customer. → [PERMISSION-PLACEMENT]
+- 2026-10-08 #project-proj-signedin-migration (#3906): CoA, CA and DA become one customer-level Administration role. A recursive top-department grant is skipped, because it would escalate to company. → [PRIVILEGE-SCOPE]
+- 2026-10-08 #project-proj-signedin-migration: role names are translation keys; Swedish for the pilot, local + English for new roles. → [REUSE-FIRST]
+- 2026-10-09 #project-proj-signedin-migration: the migrated service-a log shows the real actor, not "system" (PROJ-4328). → [MIGRATOR-PARITY]
 - 2026-10-12 #alerts-signedin-login: user and account ids may be logged ("not PII in itself"). Never log PII on its own (name, email, identity number) or a session-capable token. → [LOG-PII-BOUNDARY]
 - 2026-10-12 #backend: Slack discussion stays in English ("Stick to :gb: in slack"). → [COMMENT-NOISE]
 - 2026-10-14 DM: "Map it but featureflag it on the service." → [PRODUCT-IS-DATA]
 - 2026-10-15 #project-proj-signedin-migration: replace go-live booleans with a go-live date that the dependent flags respect.
+- 2026-10-15 PR #3985 (PROJ-4404, closed): changing how the migration derives employment start, so a re-run rewrites live users' data, is "a big decision to take on a whim". A migration behaviour change for live customers needs agreement first. → [NECESSITY]
 
 **Earlier entries (first mining pass):**
 
@@ -971,7 +983,7 @@ Newer decisions override older patterns in this file. Each is reviewer-one' unle
 acli jira workitem get <TICKET_ID>
 ```
 
-### Step 2 — Ask the architecture questions reviewer-one would ask
+### Step 2 — Ask the architecture questions the tech lead would ask
 
 Before any implementation starts, surface the questions he would ask in review — so they're answered up front:
 
@@ -1052,7 +1064,7 @@ Output as: *"Before implementation, answer these questions:"* — listed per are
 - Run against a ticket during architecture phase: `/ghost-review PROJ-2547`
 - The "Already handled" section is important — it tells you what you can answer immediately if he asks
 - Auth-order, multi-tenancy, privilege-scope, S2S-vs-user-API, unit-of-work (SaveChanges in repo), and scope-disposal/N+1 findings are almost always must-fix — fix before requesting review
-- Missing integration test findings: reviewer-one will always ask. Either add the test (round-trip / access scenario — NOT a unit-logic-path test, which he asks to remove), or pre-empt in the PR description with a linked follow-up ticket
+- Missing integration test findings: the tech lead will always ask. Either add the test (round-trip / access scenario — NOT a unit-logic-path test, which he asks to remove), or pre-empt in the PR description with a linked follow-up ticket
 - Cheap pre-empts that recur in his reviews: search endpoints as GET+query, enums/constants instead of raw strings, fail-loud (throw) over silent defaults, Request/Response DTO suffixes, no FQDN in code
 - Since mid-2026 the cheapest pre-empts are altitude ones: no product checks, contract as the switch, one pipeline for company+customer scope, few comments, one-ticket PR scope
 - Check Mode 2's "Standing decisions" before any architecture proposal; they are newer than the PR-mined patterns
