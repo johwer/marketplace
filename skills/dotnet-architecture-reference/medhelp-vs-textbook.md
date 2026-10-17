@@ -158,7 +158,7 @@ Checked against `main` @ `6d94fcd7b` on 2026-10-17. Book refs: **web-apps** = *A
   - User, company and contract replicas are kept up to date by handlers, for example `services/ServiceA/ServiceA.API/Handlers/UserEventHandler.cs:20`.
   - ServiceB→ServiceE is now an Airflow batch job instead of event handlers.
 - **Decided where:**
-  - Slack #project-proj-service-b 2025-12-03 (CTO agreed): replicate the fields you need, handle deletions, and re-check read access.
+  - Slack #project-proj-service-b 2025-12-03 (current tech lead, backed by the former one): replicate the fields you need, handle deletions, and re-check read access.
   - Slack #project-nova 2025-12-17: a project reference to another service is "Illegal!".
   - Slack #backend 2026-06-02: ServiceB→ServiceE handlers replaced by an Airflow job.
 - **Why (as stated):** autonomy. The 2026-06-02 change was because the handlers were unreliable.
@@ -359,6 +359,8 @@ Checked against `main` @ `6d94fcd7b` on 2026-10-17. Book refs: **web-apps** = *A
 - Does the backend stay without in-process domain events, with services publishing directly after commit? Yes/no.
 
 ## New decisions found in #backend
+
+Sorted 2026-10-17: tech-lead items go to ghost-review / owl-review, the rest are in `~/.claude/skills/backend-decisions/SKILL.md` (with era and Nova relevance). The list below is the raw intake.
 
 Not yet in the ghost-review or owl-review Standing decisions. They are listed here so they can be merged later. Those files were not edited.
 

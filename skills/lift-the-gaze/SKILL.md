@@ -32,6 +32,7 @@ Reference material: `references/layers.md` (Repo layer map, wrong-place symptoms
 | What the tech leads already decided; what they'd flag | `ghost-review`, `owl-review` (Standing decisions, Mode 2 questions) |
 | How this is usually done in .NET / the textbook view (layers, clean architecture, DDD, events, outbox, gateway, resilience) | `dotnet-architecture-reference`. Generic; never overrides a standing decision |
 | Is this EF query / transaction / async / config / DI lifetime right? (once the layer is chosen) | `dotnet-backend-review`. Repo-checked; lists textbook advice we declined |
+| Was this decided by the team, CTO or another dev (not a tech lead)? | `backend-decisions`. Dated, era-tagged; tech-lead decisions stay in ghost/owl |
 | Repo conventions (naming, ApiResponse, DTO mapping, EF) | `backend-conventions` |
 | Two or more radically different interface shapes | `design-an-interface` |
 | A whole module that's hard to work in | `improve-codebase-architecture` |

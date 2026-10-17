@@ -327,6 +327,7 @@ From the full Slack pass (2023-10 → 2026-08), in date order. Format: `YYYY-MM-
 - 2023-10-04 #retired-project-new-statistic-report: a report/API query over "a couple of seconds" is unacceptable; fix the data processing, never raise the timeout.
 - 2024-02-09 #backend: each service owns its AWS infra in Terraform, including its image registry and lifecycle policy. → [TF-HARDCODE]
 - 2024-02-09 #backend: a sub-offering of the base product is not a retailer; it becomes one only if it needs white-labelling. → [PROXY-FACT]
+- 2024-03-04 #backend: `const` only for values meant to be compiled into the assembly; `static readonly` for runtime constants. → [ENUM-OVER-STRING]
 - 2024-03-06 #backend: a new per-customer feature ships dark — its setting false for every production customer — and is switched on customer by customer. → [SEED-SAFETY]
 - 2024-03-11 #general: SQS queues are Terraform resources, never created by the application. → [SECRETS-CONFIG]
 - 2024-05-15 #backend, 2024-12-09 #security: every vulnerability-scanner exception (`.trivyignore`) has an end date and an approver; no open-ended exceptions for criticals; known high/medium CVEs are fixed before go-live.

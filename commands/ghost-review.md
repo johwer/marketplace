@@ -538,7 +538,7 @@ Slack sharpening:
 The bus replicates state. It does not carry requests.
 - "Its prone to error to request information required for an operation asynchronously… Just not emulate a request over a event bus... There is REST for that" (Slack 2025-08-18).
 - Copying harmless data such as contact info over the bus is fine if it is idempotent and eventually consistent. "The thing we wont do is to use it for any authorization."
-- The enrichment pattern is **replicate what you need**: a service replicates the fields it displays, handles the deletion events, and re-checks that the caller may read them ("authorization might differ"). No BFF/facade and no client stitching (2025-12-03, CTO agreed).
+- The enrichment pattern is **replicate what you need**: a service replicates the fields it displays, handles the deletion events, and re-checks that the caller may read them ("authorization might differ"). No BFF/facade and no client stitching (2025-12-03, backed by the former tech lead).
 - A public write API must not enqueue and return 200: "a 200 OK will not mean processing is finished" (2025-11-24).
 Flag: a request-reply pair of messages, a handler that waits for a reply event, an auth decision based on a replicated field, or a 200 from an endpoint whose work happens on a consumer.
 
@@ -878,6 +878,7 @@ Newer decisions override older patterns in this file. Each is reviewer-one' unle
 - 2025-11-10 #project-new-service-e: normalisation happens "in the backend for all reports all the time", not per report in the frontend. → [ONE-HOME-FOR-A-RULE]
 - 2025-11-10 #polaris: no dev authorization-bypass user in accept, because accept holds customer data.
 - 2025-11-13/20 #project-proj-service-b: annotate `[ProducesResponseType]` so Swagger documents the success shape. → [DTO-NAMING]
+- 2025-11-14 #backend: URL-encode special characters in a department-tag value instead of counting on a separator that never appears in a name. → [IDENTIFIER-SEMANTICS]
 - 2025-11-18 #project-nova: "Product config scoped to ServiceB should stay in ServiceB". ServiceC's product is "just an enum". → [PRODUCT-IS-DATA]
 - 2025-11-19 #project-nova: no parallel queries on one `DbContext`, not even untracked ones. Run them sequentially.
 - 2025-11-24 #project-nova: a new appsetting goes in three places (`appsettings.json`, `docker-compose.yml`, `infra/k8s`). → [DEPLOY-PIPELINE]
@@ -885,7 +886,7 @@ Newer decisions override older patterns in this file. Each is reviewer-one' unle
 - 2025-11-24 #project-nova: "Please write tests for new endpoints" (integration), and "still write unit tests for testing branching logic of each layer". → [MISSING-TEST]
 - 2025-11-26 #project-nova: "No int ids. Any mapping between old ids will only be during a migration. And not in the DBs here." → [EF-MODELING]
 - 2025-12-01 #project-proj-service-b: a replicated `company_id` is a non-null FK. Out-of-order events are handled by replaying the message, not by a nullable column. → [EF-MODELING]
-- 2025-12-03 #project-proj-service-b (CTO agreed): no BFF or client stitching. A service replicates the fields it needs, handles deletion events, and re-checks that the caller may read the replicated data. → [BUS-IS-NOT-RPC]
+- 2025-12-03 #project-proj-service-b (with the former tech lead): no BFF or client stitching. A service replicates the fields it needs, handles deletion events, and re-checks that the caller may read the replicated data. → [BUS-IS-NOT-RPC]
 - 2025-12-12 DM: restricting a configuration belongs in the permission/feature system, "not just greyed out in the frontend". → [FEATURE-SCOPE]
 - 2025-12-17 #project-nova: a project reference from one service to another service's project is "Illegal!" → [CROSS-SERVICE]
 - 2026-01-19 DM: code gates on the Action. Which permission grants it is decided in the ActionMap, not in the code. → [PERMISSION-PLACEMENT]
@@ -948,6 +949,7 @@ Newer decisions override older patterns in this file. Each is reviewer-one' unle
 - 2026-10-06 DM: "backend, follow what we have." → [REUSE-FIRST]
 - 2026-10-07 #project-proj-signedin-migration: manager and employee roles belong on the company, admin roles on the customer. → [PERMISSION-PLACEMENT]
 - 2026-10-12 #alerts-signedin-login: user and account ids may be logged ("not PII in itself"). Never log PII on its own (name, email, identity number) or a session-capable token. → [LOG-PII-BOUNDARY]
+- 2026-10-12 #backend: Slack discussion stays in English ("Stick to :gb: in slack"). → [COMMENT-NOISE]
 - 2026-10-14 DM: "Map it but featureflag it on the service." → [PRODUCT-IS-DATA]
 - 2026-10-15 #project-proj-signedin-migration: replace go-live booleans with a go-live date that the dependent flags respect.
 
