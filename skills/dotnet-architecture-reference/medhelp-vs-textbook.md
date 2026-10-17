@@ -10,7 +10,7 @@ Checked against `main` @ `6d94fcd7b` on 2026-10-17. Book refs: **web-apps** = *A
 | Shared event library | Don't share one | One shared library, 43 files | partly |
 | Outbox | Use an outbox for atomic publish | Save-then-publish, one outbox | partly |
 | Gateway / BFF | Gateway per client type | Ingress only, no BFF | deliberate |
-| ApiResponse in services | Result type, mapped in one place | Services return `ApiResponse` | drift |
+| ApiResponse in services | Result type, mapped in one place | Services return `ApiResponse` | deliberate (skill fixed) |
 | HTTP resilience | Retry, breaker, timeout | None on any client | undecided |
 | Testing levels | Pyramid | Sparse integration tests, doc says otherwise | drift |
 | Feature switches | (not covered) | The contract is the switch, leftover PostHog | partly |
@@ -215,8 +215,8 @@ Checked against `main` @ `6d94fcd7b` on 2026-10-17. Book refs: **web-apps** = *A
   - Style guide `CODING_STYLE_BACKEND.md:521`: its example shows a service returning `ApiResponse<List<User>>`.
   - Skill `lift-the-gaze/references/layers.md:40,45`: `ApiResponse` is "Wrong here" in services and repositories.
 - **Why (as stated):** one envelope for every client. No reason is given for the layers.md ban.
-- **Status:** drift. `layers.md` disagrees with both the code and `CODING_STYLE_BACKEND.md:521`. The skill is the outlier.
-- **Worth asking the tech lead:** Is returning `ApiResponse` from a service OK, so that the `lift-the-gaze` rule is wrong? Yes/no.
+- **Status:** deliberate. `layers.md` was the outlier and was fixed on 2026-10-17 to match the code and `CODING_STYLE_BACKEND.md:521`.
+- **Worth asking the tech lead:** —
 
 ### Validation placement
 - **Textbook:** field rules on DTOs, invariants in entity methods, and `[ApiController]` auto-400 or a validation pipeline (web-apps p. 55; microservices p. 223-227).
@@ -345,8 +345,6 @@ Checked against `main` @ `6d94fcd7b` on 2026-10-17. Book refs: **web-apps** = *A
 - Should the ServiceD outbox move into `Repo.Shared.Messaging` before a second service needs one? Yes/no.
 
 - Does MediatR stay out of the backend? Yes/no.
-
-- Is returning `ApiResponse` from a service OK, so that the `lift-the-gaze` layers rule is wrong? Yes/no.
 
 - Should the FluentValidation option be removed from `CODING_STYLE_BACKEND.md:103`, since nothing uses it? Yes/no.
 

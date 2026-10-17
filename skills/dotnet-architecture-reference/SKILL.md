@@ -42,6 +42,10 @@ Both books are "all rights reserved". The digests are in our own words with page
 | Retries, circuit breakers, health checks? | microservices Ch. 7. Repo has **no Polly/resilience handler** on HttpClients (verified 2026-10-17); ServiceC calls matter most |
 | How to test at which level? | web-apps Ch. 8 + ghost [MISSING-TEST] / integration-test sparsity |
 
+## Repo vs textbook, with evidence
+
+`repo-vs-textbook.md` covers 25 topics. Each one gives what the textbook says (with page), what Repo's code does (file:line), where it was decided (PR / Slack channel+date / style guide line), why, a status (deliberate / partly / drift / undecided) and a question for the tech lead. It also lists the #backend decisions that are not yet merged into the reviewer files. Read it before telling anyone "we do X because…".
+
 ## Repo deltas worth knowing
 
 These are where the textbook and Repo differ. Details and page refs are in the source mapping tables.
