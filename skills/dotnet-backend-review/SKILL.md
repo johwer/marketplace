@@ -1,6 +1,6 @@
 ---
 name: dotnet-backend-review
-description: Repo-aligned .NET review checklist for the gap other skills don't cover — EF Core query and write hygiene (tracking, projections, N+1, split queries, ExecuteUpdate, transactions, concurrency tokens), async and CancellationToken, typed configuration (IOptions, ValidateOnStart), DI lifetimes, and a few architecture boundary checks. Every item is checked against Repo's standing decisions, and textbook advice Repo has declined (Result<T>, MediatR, AutoMapper, Dapper-first, stored procedures, aggressive caching, the 4-project layout) is listed so it is never recommended. Use when reviewing or writing C# in services/ or shared/, when someone asks "is this EF query OK", "should this be AsNoTracking / ExecuteUpdate / a transaction", "IOptions or IOptionsSnapshot", "is this lifetime right", or from lift-the-gaze once the layer is chosen.
+description: Repo-aligned .NET review checklist for the gap other skills don't cover — EF Core query and write hygiene (tracking, projections, N+1, split queries, ExecuteUpdate, transactions, concurrency tokens), async and CancellationToken, typed configuration (IOptions, ValidateOnStart), DI lifetimes, Quartz scheduled jobs, soft-delete filtering, and a few architecture boundary checks. Every item is checked against Repo's standing decisions, and textbook advice Repo has declined (Result<T>, MediatR, AutoMapper, Dapper-first, stored procedures, aggressive caching, the 4-project layout) is listed so it is never recommended. Use when reviewing or writing C# in services/ or shared/, when someone asks "is this EF query OK", "should this be AsNoTracking / ExecuteUpdate / a transaction", "IOptions or IOptionsSnapshot", "is this lifetime right", or from lift-the-gaze once the layer is chosen.
 user_invocable: true
 ---
 
@@ -54,6 +54,7 @@ Details and examples: `references/ef-core.md`.
 - **Filter before you materialise.** `ToList()` / `ToListAsync()` and then `Where` filters in memory. So does a `Where` on something EF can't translate (EF throws or, in older code, evaluates client-side).
 - **A large `Contains(ids)`:** Npgsql sends it as one array parameter (`= ANY(@p)`), so it doesn't blow up like SQL Server's `IN` list. Thousands of ids is still a smell: often the filter belongs in a join on a replica table.
 - **InMemory provider won't catch these.** Translation, `ILike`, JSONB and constraint bugs only show on Postgres ([INMEMORY-BLINDSPOT]). One real-Postgres test where translation is at risk.
+- **Soft delete is filtered by hand.** 16 entity models have `DeletedAt`, and no context uses `HasQueryFilter`, so about 63 queries filter `DeletedAt == null` themselves. A new query on such a table must filter too, or say why it wants deleted rows (data erasure, audit). Missing it shows deleted data. Whether a delete should be soft at all is owl [DELETE-SEMANTICS].
 - **Heavy SQL with Dapper is fine** (agreed 2026-02-24). Inline SQL in the repository, never a stored procedure ([NO-STORED-PROC]).
 
 ## 2. EF Core writes and transactions
@@ -92,9 +93,21 @@ Details and examples: `references/ef-core.md`.
 - **Resilience:** Repo has no Polly or `Http.Resilience` today, and there is no decision either way (`repo-vs-textbook.md` "HTTP resilience"). Don't add it inside a feature PR. Raise it as a question if the diff adds a new hot cross-service call ([NECESSITY]).
 - **Timeouts:** a new outbound client sets one. The default of 100 s holds a request thread far too long.
 
-## 6. Architecture boundaries (adapted from clean architecture)
+## 6. Scheduled jobs (Quartz)
 
-Six rules worth keeping, in Repo's terms. The rest of the book's strictness is listed in section 7.
+Quartz runs 19 `IJob`s in five ServiceA and ServiceC workers, with the in-memory store (no `UsePersistentStore`, no clustering). Every pod schedules every job. Today the worker deployments checked (deviant engine, callback engine, export, quarantine) run `replicas: 1`, and the engines take `PostgresDistributedLockService` locks in their services rather than in the job.
+
+- **More than one pod?** If the diff raises `replicas` or adds a job to a worker with more than one, each pod runs it. Guard the work with a distributed lock or a claim row, or keep `replicas: 1` on purpose. Note that this conflicts with "at least 2 replicas" for workers (owl 2025-04-07, [CONCURRENCY-SCOPE]), so say which one wins.
+- **Overlap on one pod:** a job that can run longer than its interval needs `[DisallowConcurrentExecution]` (3 of the 19 have it).
+- **Re-run safe:** a job can fire again after a crash or a deploy. Each item it handles must be idempotent: a claim, an "already sent" marker in the same transaction, or upsert ([REDELIVERY-SAFETY], [EVENT-IDEMPOTENCY]).
+- **Scope per run:** resolve `DbContext` and repositories from a scope created inside `Execute`, not from the job's constructor if the job is a singleton ([SCOPE-DISPOSAL]).
+- **Cancellation:** pass `context.CancellationToken` down, so a shutdown stops the run instead of being killed mid-write.
+- **Batches, not everything:** load work in pages and commit per batch, so one bad row does not roll back the run, and log the row that failed ([FAIL-LOUD]).
+- **Time:** cron in UTC or an explicit time zone, and "today" from `TimeProvider`, not `DateTime.Now`.
+
+## 7. Architecture boundaries (adapted from clean architecture)
+
+Six rules worth keeping, in Repo's terms. The rest of the book's strictness is listed in section 8.
 
 1. **Dependencies point inward.** `*.Domain` never references `*.API`, HTTP types, DTOs or `ApiResponse`. A project reference to another service's project is "Illegal!" ([CROSS-SERVICE], 2025-12-17).
 2. **Thin controller.** Route, token, shape validation, ServiceC check, one service call. Business `if`s go down a layer. A controller may call a repository when a service would only pass through (team agreement 2025-10-08).
@@ -103,7 +116,7 @@ Six rules worth keeping, in Repo's terms. The rest of the book's strictness is l
 5. **Anti-corruption at the legacy edge.** Legacy and SignedIn shapes are translated where they enter (the sync/port code), not spread through Nova's services. A port keeps legacy behaviour unless a decision says otherwise.
 6. **A rule has one home.** If a worker and an API both need it, it lives in `*.Domain` (a Policy or a shared reader), not copied ([ONE-HOME-FOR-A-RULE]).
 
-## 7. Textbook advice Repo has declined
+## 8. Textbook advice Repo has declined
 
 Never recommend these. If someone asks, explain with the source.
 
