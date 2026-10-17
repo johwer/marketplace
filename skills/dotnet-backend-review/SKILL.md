@@ -97,7 +97,7 @@ Details and examples: `references/ef-core.md`.
 
 Quartz runs 19 `IJob`s in five ServiceA and ServiceC workers, with the in-memory store (no `UsePersistentStore`, no clustering). Every pod schedules every job. Today the worker deployments checked (deviant engine, callback engine, export, quarantine) run `replicas: 1`, and the engines take `PostgresDistributedLockService` locks in their services rather than in the job.
 
-- **More than one pod?** If the diff raises `replicas` or adds a job to a worker with more than one, each pod runs it. Guard the work with a distributed lock or a claim row, or keep `replicas: 1` on purpose. Note that this conflicts with "at least 2 replicas" for workers (owl 2025-04-07, [CONCURRENCY-SCOPE]), so say which one wins.
+- **More than one pod?** If the diff raises `replicas` or adds a job to a worker with more than one, each pod runs it. Guard the work with a distributed lock or a claim row, or keep `replicas: 1` on purpose. Note that this conflicts with "at least 2 replicas" for workers (owl 2025-04-07, [CONCURRENCY-SCOPE]), so say which one wins. Open question to the tech lead in `dotnet-architecture-reference/repo-vs-textbook.md`.
 - **Overlap on one pod:** a job that can run longer than its interval needs `[DisallowConcurrentExecution]` (3 of the 19 have it).
 - **Re-run safe:** a job can fire again after a crash or a deploy. Each item it handles must be idempotent: a claim, an "already sent" marker in the same transaction, or upsert ([REDELIVERY-SAFETY], [EVENT-IDEMPOTENCY]).
 - **Scope per run:** resolve `DbContext` and repositories from a scope created inside `Execute`, not from the job's constructor if the job is a singleton ([SCOPE-DISPOSAL]).

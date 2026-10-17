@@ -358,6 +358,12 @@ Checked against `main` @ `6d94fcd7b` on 2026-10-17. Book refs: **web-apps** = *A
 
 - Does the backend stay without in-process domain events, with services publishing directly after commit? Yes/no.
 
+- Workers with Quartz jobs: (A) they stay at `replicas: 1` on purpose, as an exception to the "at least 2 replicas" rule (2025-04-07); (B) they go to 2+ replicas, and every job gets a distributed lock or a claim row first.
+  - Quartz uses the in-memory store with no clustering (no `UsePersistentStore` in `services/` or `shared/`), so every pod runs every job.
+  - 19 `IJob`s across five ServiceA and ServiceC workers, 3 with `[DisallowConcurrentExecution]`, none taking a lock in the job itself.
+  - The worker deployments checked (deviant engine, callback engine, export, quarantine) run `replicas: 1` (e.g. `infra/k8s/service-a-deviant-engine-worker/03-deployment.yaml`).
+  - The engines lock inside their services (`PostgresDistributedLockService`), so some work is already guarded.
+
 ## New decisions found in #backend
 
 Sorted 2026-10-17: tech-lead items go to ghost-review / owl-review, the rest are in `~/.claude/skills/backend-decisions/SKILL.md` (with era and Nova relevance). The list below is the raw intake.
