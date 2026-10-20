@@ -71,7 +71,8 @@ case "$TERMINAL_APP" in
 
   Alacritty)
     TMPSCRIPT="$(make_tmpscript)"
-    alacritty -e "$TMPSCRIPT" &
+    ALACRITTY_BIN="$(command -v alacritty || echo /Applications/Alacritty.app/Contents/MacOS/alacritty)"
+    "$ALACRITTY_BIN" -e "$TMPSCRIPT" &
     raise_terminal_app "Alacritty"
     ;;
 

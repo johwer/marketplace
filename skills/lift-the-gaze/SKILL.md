@@ -166,6 +166,25 @@ A question costs someone else's time and blocks us until it is answered. Before 
 
 Show the user this table for their draft questions before writing any question.
 
+4. **Make the risk concrete instead of asking open-ended.** "Is this OK?" costs the reader a whole investigation. Check who calls it, how it deploys, what breaks and whether data is lost, and send "this is the window, this is the effect".
+5. **Have the fallback ready.** Name the next step if the answer is no (expand/contract across two releases; the bigger change as its own ticket), so a "no" doesn't restart the design.
+6. **Let the PR carry the question.** Write the decision in the PR (Chose / Over / Why / Risk / Fallback), mark it ready and request the tech lead as reviewer. The tech lead decides in review, nothing waits on a side message, and the decision stays next to the code.
+
+In one sentence: find who owns the decision, use what exists, measure the risk, have a fallback ready, and let the PR ask the question.
+
+### Worked example (2026-10-20): PROJ-4405 and PROJ-4406
+
+| | PROJ-4405: duplicate subscriptions | PROJ-4406: who the target picker shows |
+|---|---|---|
+| Hard part | One POST did both "add" and "edit (replace)". Making it create-only (409 on duplicate) breaks edit, so edit needs a PUT. That changes an endpoint's meaning while old clients run: ServiceD before web = 409 on edit for a few minutes. Plus two concurrent adds (advisory lock) and the merge order with PROJ-4423 | The ServiceC user search can't filter on an action (`UserSubscriptionManage`), and the ticket said no ServiceC change. A (company filter) leaks other departments to a department admin; C (filter in ServiceC) is cleanest but an ServiceC change |
+| Who owns it | API_CONVENTIONS: POST creates, PUT updates | ServiceC owns authorization, so reuse its answer (`POST authorization/users`) |
+| Existing, not new | No new create-only route (it would leave POST as replace for good) | B′ = search ∩ `authorization/users`, no ServiceC change |
+| Real question left | Is a few minutes of 409 on rollout acceptable? | Is the web as first caller of an S2S-only endpoint, with a large `limit`, acceptable? |
+| Risk made concrete | Only `apps/web` calls the POSTs; prod deploys backend then web in one workflow; effect is a visible 409 in admin flows, no data loss; open tabs keep old JS until reload | Response size and call time measured on accept (Elastic, service-c-api) |
+| Fallback | Expand/contract: release 1 adds PUT and moves web, release 2 makes POST create-only | (C) as its own ServiceC ticket |
+| How it was asked | PR ready, tech lead requested as reviewer | Same |
+
+
 ## Step 3 — Layer placement
 
 For what remains, walk the request down the layers and place each piece. Use `references/layers.md` for the full table. Short version:
