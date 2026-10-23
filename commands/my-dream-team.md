@@ -102,6 +102,9 @@ Check if the arguments contain `--lite`. If present:
   - **Simple** (1-3 files, single area): Implement directly yourself, no agents needed
   - **Medium** (4-8 files, single discipline): Optionally spawn 1 dev agent (Ingrid or Kenji)
   - **Complex** (8+ files, multiple disciplines): Spawn agents as needed — use your judgement
+  - **Full-stack: commit backend and frontend separately from the start.** One-sided commits make a
+    requested split into two PRs a cherry-pick onto fresh main (~10 tool calls); mixed commits make
+    it a rewrite (PROJ-4622).
 - **Phase 4 (Review)**: Review your own changes against conventions, or spawn Maya if the diff is large (10+ files). Always run the **Security Scan** (Section 6 of `dev-workflow-checklist.md`) — detect backend/frontend from `git diff --name-only origin/main` and run the applicable categories. Also run these checks:
   - **Historical context lens** (run first): For each changed file, run `git log -p -5 -- <file>` and `gh pr list --search "<file path>" --state merged --limit 5 --json number,title,url`. Spot-check prior PR review comments on the top 2–3 with `gh pr view <num> --comments`. Flag MUST FIX if this diff (a) reverts a deliberate prior fix without explanation, or (b) repeats a pattern that was already pushed back on (action-based REST routes, upsert misuse, exception-as-flow, cross-service responsibility, HTML encoding gaps, CompanyPermission vs UserPermission, multi-tenancy validation, SetValues() on immutable fields).
   - **RTK Query stale types**: If you modified backend DTOs, verify the generated RTK Query types include the new fields — grep for the field name in `src/store/rtk-apis/`. If missing, regenerate from the worktree Docker service: `VITE_<SERVICE>_API_PORT=<port> npm run generate:api:<service>`. Do NOT use `as Parameters<...>` assertions as a workaround.
@@ -117,7 +120,7 @@ Check if the arguments contain `--lite`. If present:
   - **Phase 5.5**: Full GitHub review cycle — poll for AI bot reviews (Copilot is the bot that answers on this repo; Gemini has never responded), poll for AI feedback, fix any issues, poll CI checks, mark PR ready only after user confirms. Human reviewers are auto-assigned by `.github/CODEOWNERS` on ready — do NOT manually assign from `reviewers.json` (use the opt-in `/reviewers` command only if extra reviewers are explicitly wanted)
   - **Phase 6**: User review loop — ask user for feedback, route fixes, iterate until "ship it"
   - **Phase 6.5**: Summary (write it yourself instead of spawning Tane)
-  - **Phase 4.75 (Visual verification)**: **Drive the LIVE app in a real browser via `playwright-cli` and save screenshots to `~/Downloads/<TICKET_ID>/`** — that IS the verification. Navigate the worktree dev app (port 31xx), exercise the changed UI, and check network + console (not just the DOM). Save one screenshot per relevant state to `~/Downloads/<TICKET_ID>/` (user-visible folder; NEVER the repo, NEVER `/tmp`), each one taken as `bash ~/.claude/scripts/pw-mask-pii.sh <TICKET_ID>-lead && playwright-cli -s=<TICKET_ID>-lead screenshot ...` (HARD RULE, see Phase 5 gate item 3). **Do NOT** write committed Playwright e2e specs, `toHaveScreenshot` baselines, `page.screenshot()` artifacts in the repo, or GIF/video by default — that is the wrong default and contradicts how this team verifies (see memory `feedback_dtf_visual_verification_contradiction`, `feedback_real_browser_verification_mandatory`, `feedback_screenshots_user_visible_paths`). **New component → add a Cosmos fixture** (Vite/Cosmos for component states) instead of an e2e spec, plus a unit test if it has interactive logic. A committed `toHaveScreenshot` regression test is the rare EXCEPTION — only when the user explicitly asks for one. See `~/.claude/skills/playwright-cli/SKILL.md`.
+  - **Phase 4.75 (Visual verification)**: **Drive the LIVE app in a real browser via `playwright-cli` and save screenshots to `~/Downloads/<TICKET_ID>/`** — that IS the verification. Navigate the worktree dev app (port 31xx), exercise the changed UI, and check network + console (not just the DOM). Save one screenshot per relevant state to `~/Downloads/<TICKET_ID>/` (user-visible folder; NEVER the repo, NEVER `/tmp`), each one taken as `bash ~/.claude/scripts/pw-mask-pii.sh <TICKET_ID>-lead && playwright-cli -s=<TICKET_ID>-lead screenshot ...` (HARD RULE, see Phase 5 gate item 3). **Do NOT** write committed Playwright e2e specs, `toHaveScreenshot` baselines, `page.screenshot()` artifacts in the repo, or GIF/video by default — that is the wrong default and contradicts how this team verifies (see memory `feedback_dtf_visual_verification_contradiction`, `feedback_real_browser_verification_mandatory`, `feedback_screenshots_user_visible_paths`). **New component → add a Cosmos fixture** (Vite/Cosmos for component states) instead of an e2e spec, plus a unit test if it has interactive logic. A committed `toHaveScreenshot` regression test is the rare EXCEPTION — only when the user explicitly asks for one. See `~/.claude/skills/playwright-cli/SKILL.md`. **Any `pages/loginV2` change: also verify in the mobile app.** The app's login IS Nova web in a WebView, so a reviewer's "test in web and mobile" is one more Phase 4.75 run, not an afterthought — Android dev client + raw CDP, memory `reference_mobile_app_webview_verification` (PROJ-4465).
   - **Phase 6.75**: Retrospective — write your own retro learnings using the same 4 categories with destination hints: instruction improvements (`dream-team`/`agent:<name>`/`skill:<name>`), convention discoveries (`project-claude`/`agents-md:<path>`/`repo-docs`), doc gaps (`repo-docs`/`agents-md:<path>`), process improvements (`dream-team`/`memory`). Tag each item with a suggested destination so [`/retro-proposals`](commands.md#team-review) can route it later.
   - **Phase 7**: Completion — runs the **Completion Gate** first (see `dev-workflow-checklist.md` Section 9): all PR comments resolved, visual-verification screenshots present in `~/Downloads/<TICKET_ID>/`, retro done, CI green, PR description complete. Then posts a **Jira completion comment** with PR link + summary, @mentioning the ticket creator if different from assignee. Then transitions ticket to Klart. **Stops there** — no worktree, branch or session teardown (that is `/workspace-cleanup` from the orchestrator; a session cannot remove the worktree it is running in).
 - **Visual verification applies in lite mode too.** The same Phase 4.75 gate (real-browser `playwright-cli` check + `~/Downloads/<TICKET_ID>/` screenshots) applies whether you're in full Dream Team or lite mode. Don't skip it just because you're working solo.
@@ -438,6 +441,14 @@ decision or a late finding in more than one session):
 - **Design-link-only acceptance criteria** (Figma / Claude Design, no screenshots): ask for
   screenshots, and present the codebase precedent for each design element before planning (PROJ-4423).
 - **Before documenting a propagation gap as permanent, grep `replay|sync|backfill`.** ServiceC SQL writes reach the other services through Administration > Platform > Sync; the "ServiceC only" gap needed no code (PROJ-4135).
+- **Filtering against an allowed-ID set: read the set endpoint's page cap first.** Results past the
+  cap are silently dropped, so the filter hides real matches (PROJ-4406: `ListUsersByActions`
+  defaults to 500, no clamp). State the cap and what happens past it in the plan.
+- **Dependency-bump tickets: build a main baseline before the first gate.** A second worktree from
+  `origin/main` in the scratchpad, its own `npm ci` and Vite port; judge every red e2e/browser result
+  as a diff against it. 48 e2e failures reduced to 2 real questions (PROJ-4479). PRs run only
+  `vitest --changed` (`web-ci.yml` runs the full sharded suite post-merge only, PROJ-3201), so a
+  dependency-only PR needs the full suite run locally, reported with count + duration.
 - **Removal tickets:** sweep the originating PR's file list (`git show --stat <feature-commit>`) for
   helpers that become orphaned, and ask whether data created through the removed UI keeps acting
   (PROJ-4049).
@@ -922,6 +933,7 @@ After Maya's code review is approved (all MUST FIX items resolved), spawn:
     - Verify request/response shapes match the architect's API contract
     - Test edge cases: invalid input, missing fields, unauthorized access
     - Verify migrations applied cleanly: check `bash ~/.claude/scripts/worktree-service.sh logs <service>` for EF Core errors
+    - **Logging tickets: verify through the real pipeline, not a unit test of the logger.** Clone the worktree service container from `docker inspect` env with ONE override (e.g. the vendor API URL → a host stub), assert on `docker logs`, and grep the logs for the stub's sentinel values to prove nothing leaks. Delete the env file afterwards — it holds the container's secrets (PROJ-4568).
   - **Frontend testing** (if frontend changes were made):
     - Run `npx tsc --noEmit` from `apps/web/` to verify type safety
     - Run existing tests if any: `npx vitest run` from `apps/web/`
@@ -978,6 +990,7 @@ After Maya's code review is approved (all MUST FIX items resolved), spawn:
     2. Confirm requests route correctly — **but note there is NO `playwright-cli network` subcommand.** Prefer a static check (`grep` that no caller of the old endpoint remains) plus `console error`; see the note in Ingrid's prompt for the `performance.getEntriesByType('resource')` approach and its 250-entry buffer trap.
     3. `playwright-cli -s=<TICKET_ID>-lena console error` — confirm no JS/React errors.
     4. Confirm rendered text/labels are correct (translations live in S3), not raw i18n keys; check both positive and negative cases where relevant.
+    4a. **`pages/loginV2` changes: repeat the check in the mobile app's WebView** (Android dev client + raw CDP, memory `reference_mobile_app_webview_verification`, PROJ-4465).
     4b. **Locale-display tickets: verify in a non-`sv` locale.** For any ticket whose change is about how locale-sensitive content renders (dates, numbers, translated copy, formatting), switch the app to a non-Swedish locale before capturing — `sv` is the default and hides bugs that only surface in other locales (PROJ-3200).
     5. Capture screenshots: `mkdir -p ~/Downloads/<TICKET_ID> && bash ~/.claude/scripts/pw-mask-pii.sh <TICKET_ID>-lena && playwright-cli -s=<TICKET_ID>-lena screenshot --filename=~/Downloads/<TICKET_ID>/<state>.png` (one per state). NEVER the repo, NEVER `/tmp`.
   - **Close session**: `playwright-cli -s=<TICKET_ID>-lena close`
@@ -1198,6 +1211,7 @@ The script exits early on first failure — no waiting for remaining checks. If 
 - **CSharpier format check** → Kenji/Ravi run `dotnet csharpier .` and commit
 - **.NET build/test** → Kenji/Ravi fix compilation or test failures
 - **Web app build** → Ingrid/Elsa fix TypeScript or build errors
+- **A red test outside your diff: check origin/main first.** `git log origin/main --since=<branch base date> -- <test file and its subject>` — if main has touched it, rebase and re-run before debugging (PROJ-4405; CI tests the merge result).
 - **When CI fails after a code change**, grep the test directory for usage of modified behavior before assuming the test is flaky — the failure may be a legitimate regression from your change.
 - After fixes, commit, push, and re-poll CI.
 
@@ -1958,6 +1972,14 @@ trivia item; it is the mechanism by which a green result reaches the user with r
   (`git diff --name-only -z | xargs -0 git add --`), or write the script in bash. Two more zsh
   traps: `"$B:src/x"` applies the `:s` history modifier (write `"${B}:src/x"`), and an argument
   starting with `=` is =-expanded (`echo ====` fails with "= not found").
+- **Commands with optional or computed arguments: run them in bash, not the zsh lead shell.** The
+  rule above keeps recurring as an applied rule that still bites: `echo ===` (PROJ-4584) and
+  `${1:+-H "..."}` passing one argument to curl, so every login 400'd (PROJ-4622). Anything with a
+  loop, `${x:+...}`, a `$VAR` list or a leading `=` goes in `bash -c '...'` or a scratchpad `.sh`
+  file run with `bash`. Do not rely on remembering the zsh traps.
+- **A background job's notification reports the LAST command's status.** `cmd; RC=$?; echo $RC > f`
+  shows "exit code 0" while the gate failed (Playwright 86 failures read as success, PROJ-4479). End
+  every background gate job with `exit $RC`, and read the `.rc` file, never the notification.
 - **Gate, then act: chain with `&&`, never `;`.** `quality-gate.sh <wt>; git commit ...; git push`
   commits and pushes after a FAILED gate (PROJ-4327, PROJ-4423 — a freshness failure was pushed and
   had to be rebased and force-pushed back).

@@ -158,11 +158,34 @@ else
   sed -E 's/\x1b\[[0-9;]*m//g' /tmp/qg-comments.log > /tmp/qg-comments-plain.log
   CG_LINES=$(grep -oE '[^[:space:]]+:[0-9]+[[:space:]]+//.*' /tmp/qg-comments-plain.log 2>/dev/null | head -5 | tr '\n' ';' | sed 's/;$//' || true)
   if [[ $CG_EXIT -ne 0 ]]; then
-    add_result "Added comments" "FAIL" "restating comment(s) added — each says what the line below already says. Delete them in one pass. Full list in /tmp/qg-comments.log: ${CG_LINES:-see log}"
+    # Pass comment-gate's own reason(s) through: it refuses for ticket numbers as well as
+    # restating comments, and a hard-coded "restating" message named the wrong fix (PROJ-4622).
+    CG_REASONS=$(grep -E 'REFUSED' /tmp/qg-comments-plain.log 2>/dev/null | sed -E 's/^[[:space:]]*REFUSED[[:space:]]*—[[:space:]]*//' | tr '\n' ';' | sed 's/;$//' || true)
+    add_result "Added comments" "FAIL" "${CG_REASONS:-comment-gate refused} — delete them in one pass. Full list in /tmp/qg-comments.log: ${CG_LINES:-see log}"
   elif grep -q 'flagged for judgement' /tmp/qg-comments-plain.log; then
     add_result "Added comments" "WARN" "added comment(s) the gate could not auto-judge — keep only the non-obvious WHY: ${CG_LINES:-see /tmp/qg-comments.log}"
   else
     add_result "Added comments" "PASS" ""
+  fi
+fi
+echo ""
+
+# ── Secrets (GitGuardian) ───────────────────────
+# GitGuardian runs on every PR commit; a hit after push needs a history rewrite of the
+# introducing commit. Three PRs paid that (PROJ-4327, PROJ-4374, PROJ-4465), including a
+# LOW-entropy fixture passed to a *Password* hook. Scan the branch range before push.
+echo "▸ Secrets (ggshield)..."
+if ! command -v ggshield &>/dev/null; then
+  add_result "Secrets (ggshield)" "WARN" "ggshield not installed — GitGuardian will scan after push instead (brew install ggshield && ggshield auth login)"
+elif [[ -z "$BASE_REF" ]]; then
+  add_result "Secrets (ggshield)" "WARN" "no origin/main ref to scan against"
+else
+  GG_EXIT=0
+  (cd "$WORKTREE" && ggshield secret scan commit-range "$BASE_REF..HEAD" 2>&1) > /tmp/qg-ggshield.log 2>&1 || GG_EXIT=$?
+  if [[ $GG_EXIT -eq 0 ]]; then
+    add_result "Secrets (ggshield)" "PASS" "$BASE_REF..HEAD"
+  else
+    add_result "Secrets (ggshield)" "FAIL" "exit $GG_EXIT — see /tmp/qg-ggshield.log; rewrite the introducing commit before push (fixup + autosquash)"
   fi
 fi
 echo ""
@@ -315,6 +338,11 @@ if [[ "$RUN_FRONTEND" == "true" ]]; then
       add_result "ESLint" "PASS" "no changed src files"
     elif (cd "$WEB_DIR" && $ESLINT_CMD --fix "${ESLINT_TARGETS[@]}" 2>&1) > /tmp/qg-eslint.log 2>&1; then
       add_result "ESLint" "PASS" "$ESLINT_CMD, ${#ESLINT_TARGETS[@]} changed file(s)"
+    elif [[ "$ESLINT_CMD" == "eslint_d" ]] && grep -q 'Timed out waiting' /tmp/qg-eslint.log \
+      && (cd "$WEB_DIR" && npx eslint --fix "${ESLINT_TARGETS[@]}" 2>&1) > /tmp/qg-eslint.log 2>&1; then
+      # eslint_d's daemon can time out loading the config; that is a tool failure, not a lint
+      # failure, so retry once with plain eslint before reporting (PROJ-4467).
+      add_result "ESLint" "PASS" "npx eslint (eslint_d timed out), ${#ESLINT_TARGETS[@]} changed file(s)"
     else
       ESLINT_ERRORS=$(grep -c "error" /tmp/qg-eslint.log 2>/dev/null || echo "?")
       add_result "ESLint" "FAIL" "$ESLINT_ERRORS errors (see /tmp/qg-eslint.log)"

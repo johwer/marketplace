@@ -214,7 +214,17 @@ playwright-cli close-all
 playwright-cli kill-all
 ```
 
+### History and navigation
+
+- **Replace vs push is measurable in the live app:** read `history.length` before and after the
+  navigation; unchanged means the entry was replaced. Stronger evidence than reading the call
+  (PROJ-4491).
+
 ## Local installation
+
+**After a Playwright version bump** (even a minor), local e2e fails at launch with "Executable
+doesn't exist" until `npx playwright install chromium` runs in `apps/web`, while CI stays green.
+Say so in the PR body (PROJ-4479).
 
 The npm package is **`@playwright/cli`**, not `playwright-cli`, so `npx playwright-cli` fails with "could not determine executable". If `playwright-cli` is not on PATH (a global npm install belongs to one nvm Node version, so switching Node loses it), install it or run it through npx with the package name:
 
@@ -350,7 +360,12 @@ date bugs invisible, so the test passes on broken code.
   `POST /api/service-c/v1/usernamepassword/login` through the Vite proxy, then
   `localStorage.loggedIn = "true"` and reload — the refresh-token cookie does the rest (PROJ-4389).
 - **External-IdP paths (BankID/GrandID) can still be driven end to end** by routing the ServiceC endpoints
-  that wrap the IdP in a Playwright context (PROJ-4420).
+  that wrap the IdP in a Playwright context (PROJ-4420). **Mint a new session/order id on every
+  init** in the stub: reusing one makes RTK Query serve the previous order's cached status and fakes
+  the result (PROJ-4568).
+- **Failed-login checks: use a username that does not exist**, which has no lockout counter, or stay
+  under the ServiceC `LockoutThreshold`. Five wrong passwords lock a shared seed user for 15 min in the
+  shared ServiceC database, main stack included (PROJ-4622).
 
 ### Analytics (PostHog) verification
 

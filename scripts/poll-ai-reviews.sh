@@ -7,7 +7,9 @@
 # Logs timing data to ~/.claude/logs/ai-review-times.csv for optimization.
 # Exits with 0 when comments are found, 1 on timeout, 2 on error, 3 when the only bot review is a
 # "wasn't able to review any files" decline (PROJ-4148, PROJ-4049, PROJ-4179 — that body used to
-# count as a review, so a PR nobody reviewed read as reviewed).
+# count as a review, so a PR nobody reviewed read as reviewed). Also exit 3 on the quota decline
+# ("unable to review this pull request because the user who requested the review has reached
+# their quota limit", PROJ-4584/PROJ-4622) — it used to exit 0 as a found review.
 
 set -euo pipefail
 
@@ -30,7 +32,8 @@ fi
 # Known AI bot patterns (case-insensitive match on login)
 BOT_PATTERNS="gemini-code-assist|copilot|github-actions|coderabbit|sourcery|sweep"
 # A review whose body says the bot reviewed nothing is not a review.
-DECLINE_PATTERN="(wasn.t|was not|were not|weren.t) able to review any files|unable to review any files"
+DECLINE_PATTERN="(wasn.t|was not|were not|weren.t) able to review any files|unable to review any files|unable to review this pull request|reached (their|the) quota"
+QUOTA_PATTERN="quota"
 
 echo "Polling PR #${PR_NUMBER} on ${OWNER_REPO} for AI bot reviews..."
 echo "Max wait: ${MAX_MINUTES} minutes, checking every ${INTERVAL} seconds"
@@ -59,8 +62,14 @@ while [ "$ELAPSED" -lt "$MAX_SECONDS" ]; do
   if [ "$TOTAL" -eq 0 ] && [ "$BOT_DECLINES" -gt 0 ]; then
     ACTUAL=$(($(date +%s) - START_TIME))
     echo "$(date +%Y-%m-%d_%H:%M),${OWNER_REPO},${PR_NUMBER},${ACTUAL},declined,0" >> "$LOG_FILE"
-    echo "DECLINED: the bot posted a review saying it was not able to review any files. This is NOT a review."
-    echo "Re-request: gh pr edit ${PR_NUMBER} -R ${OWNER_REPO} --add-reviewer @copilot  (then poll .reviews again)"
+    if echo "$REVIEWS" | jq -e --arg pat "$BOT_PATTERNS" --arg q "$QUOTA_PATTERN" \
+      'any(.[]; (.user.login | test($pat; "i")) and ((.body // "") | test($q; "i")))' >/dev/null 2>&1; then
+      echo "DECLINED (quota): the requester's Copilot quota is used up. This is NOT a review."
+      echo "Do NOT re-request — each re-request bills the same quota. Rely on the pre-emptive review pass."
+    else
+      echo "DECLINED: the bot posted a review saying it was not able to review any files. This is NOT a review."
+      echo "Re-request once: gh pr edit ${PR_NUMBER} -R ${OWNER_REPO} --add-reviewer @copilot  (then poll .reviews again)"
+    fi
     exit 3
   fi
 

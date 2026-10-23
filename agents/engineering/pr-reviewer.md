@@ -48,11 +48,18 @@ Ask what the diff CAUSES, not only whether it matches the contract:
   hash) must take that input as required. An optional prop with a fallback is a silent default; this
   was found three times in one review (PROJ-4158).
 - **"Once per occurrence" analytics: ask which UI path is NOT disabled while navigating away.** A
-  double-click on a still-enabled button doubled the event (PROJ-4361).
+  double-click on a still-enabled button doubled the event (PROJ-4361). For every emit site, name
+  the mechanism that blocks a second click (unmount, disabled, guard); a `window.location` redirect
+  keeps the page mounted and clickable until the browser leaves (PROJ-4465, Nova Microsoft login).
 - **Reuse proposals: separate sharing the markup from sharing the logic.** A shared dialog can be
   right while merging its text logic into another component's timer logic is not (PROJ-4179).
 - **Verifying a count: print the raw list first, then check the arithmetic reconciles** before
   writing "matches" (PROJ-4036: 6+1 reported as matching 7).
+- **A removed log field or event property is not a cleanup until you know why it was added.**
+  For each one: (1) `git log -S '<template text>' -- <file>` and cite the PR that added it, (2) list
+  the lines in the same flow (controller + service) that still log it, (3) ask for one consistent
+  decision recorded in the PR body. PROJ-4568 dropped an audit session id an earlier review fix had
+  added, while the success line still logged it and the PR body claimed "never session id".
 - **"Does ticket X exist": check Jira, not git log.** A real ticket with no commits yet is not a
   fabricated id (PROJ-4055).
 

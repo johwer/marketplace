@@ -39,7 +39,14 @@ if [ -z "$BASE" ]; then
 fi
 
 # Added lines only, with real file:line numbers, for source files we have a comment rule for.
-DIFF=$(git diff "$BASE"...HEAD -U0 -- '*.ts' '*.tsx' '*.cs' '*.mts' '*.js' '*.mjs' 2>/dev/null)
+# Diff BASE against the WORKING TREE, not HEAD, and append untracked files: a new file's
+# header JSDoc used to pass the first run and fail only after `git add` + commit (PROJ-4491).
+PATTERNS=('*.ts' '*.tsx' '*.cs' '*.mts' '*.js' '*.mjs')
+DIFF=$(git diff "$BASE" -U0 -- "${PATTERNS[@]}" 2>/dev/null)
+while IFS= read -r -d '' f; do
+  DIFF+=$'\n'"$(git diff --no-index -U0 -- /dev/null "$f" 2>/dev/null)"
+done < <(git ls-files -z --others --exclude-standard -- "${PATTERNS[@]}" 2>/dev/null)
+DIFF=$(printf '%s' "$DIFF" | sed -E '/^[[:space:]]*$/d')
 if [ -z "$DIFF" ]; then
   printf '  \033[32m✓\033[0m comment-gate: no source changes to check\n'
   exit 0

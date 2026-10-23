@@ -306,13 +306,17 @@ VERIFIED vs UNVERIFIED — the one rule that matters more than coverage:
 - A 'remove X' / 'reuse X' instruction needs `git grep X origin/main` plus an ancestry check — reviews of
   unmerged commits name symbols that do not exist on main.
 - Proposing an env var or flag: grep every reader of it, not the one you found first.
+- A "no existing endpoint" / "must build new" claim lists the controllers you grepped and the grep
+  (route + action filter), e.g. `git grep -n 'UserAction' -- 'services/ServiceC/**/Controllers/*.cs'`. A
+  bare "none exists" is `[unverified]`: PROJ-4406's said stop while `POST authorization/users`
+  already filtered by any UserAction.
 Half a report with honest [unverified] tags is worth more than a full one stated with equal confidence.
 
 Return your analysis as a structured report. If you haven't finished all 13 points by tool use 25, wrap up with what you have — partial is fine, Amara will fill gaps."
 ```
 
-> **Why the VERIFIED/UNVERIFIED rule is in the prompt (A6, nine sessions):** pre-hydration asserted
-> unopened facts in PROJ-3978, 4019, 4036, 4055, 4158, 4179, 4005, 4231, 4361 — each stated with the
+> **Why the VERIFIED/UNVERIFIED rule is in the prompt (A6, ten sessions):** pre-hydration asserted
+> unopened facts in PROJ-3978, 4019, 4036, 4055, 4158, 4179, 4005, 4231, 4361, 4406 — each stated with the
 > same confidence as the true claims beside it, each fixed in one worktree's copy while the generator
 > kept producing them. The 30-tool budget is why the agent may not verify everything; it is not
 > permission to assert what it did not verify.
