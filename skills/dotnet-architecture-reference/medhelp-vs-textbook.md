@@ -374,7 +374,7 @@ Checked against `main` @ `6d94fcd7b` on 2026-10-17. Book refs: **web-apps** = *A
   - Today: 7 interpolated log lines in 4 files and one `throw ex;`. CA2016 would flag many calls, so it may need to wait or be `suggestion`.
 
 - Should enum columns read by several pods (e.g. `product_available_services.service`) skip unknown values with a warning instead of failing, so that an enum value and the data using it can ship in the same release? Yes/no.
-  - Today an unknown value is a 500 on old pods during rollout. PROJ-4061 had to split into two PRs (#4044 enum, #4050 catalog migration) and wait for a manual prod deploy in between.
+  - Today an unknown value is a 500 on old pods during rollout. PROJ-4061 had to split into two PRs (#4044 enum, #4050 catalog migration), merged one main deploy apart (main deploys all four environments on every push).
   - It trades [FAIL-LOUD] for rollout safety; the warning log is the "loud" part. It would also cover the column-rename class from 2026-10-13 only partly (renames still need expand/contract).
 
 ## New decisions found in #backend

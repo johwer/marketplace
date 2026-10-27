@@ -1,6 +1,6 @@
 ---
 name: lift-the-gaze
-description: Lift the gaze before writing backend code — find the highest place a decision can live (product scope, contract, retailer, feature flag, ServiceC permission, endpoint) so the layers below never have to handle it; then ball 2-3 architectural options with the user, spell out each one's consequences, and check that what remains lands in the right backend layer (Controller → Service → Domain/Repository, DTO vs entity). Teaching mode, not a gate. Use when a ticket or plan asks "which controller/service/repository do we change", when a feature is only for one retailer or behind a flag, when the user says "lyft blicken", "bolla alternativ", "var ska det här ligga", "vilket lager", "why do we need a DTO", or wants to understand the backend architecture of a change.
+description: Lift the gaze before writing backend code — find the highest place a decision can live (product scope, contract, retailer, feature flag, ServiceC permission, endpoint) so the layers below never have to handle it; then ball 2-3 architectural options with the user, spell out each one's consequences, and check that what remains lands in the right backend layer (Controller → Service → Domain/Repository, DTO vs entity). Teaching mode, not a gate. Use when a ticket or plan asks "which controller/service/repository do we change", when a feature is only for one retailer or behind a flag, when the user says "lyft blicken", "bolla alternativ", "var ska det här ligga", "vilket lager", "why do we need a DTO", or wants to understand the backend architecture of a change. Also for a PR review with "lyft blicken" (Step 0.7: the shared mechanisms and decisions the PR passes through).
 user_invocable: true
 ---
 
@@ -11,6 +11,8 @@ The user is stronger on frontend than backend. This skill does three things, in 
 1. **Altitude** — before discussing *which* controller/service/repo to change, ask whether the question disappears if the decision is made higher up.
 2. **Ball the options** — 2-3 real alternatives, one question at a time, each with its consequences. The user decides.
 3. **Layer placement** — for the code that remains, show which layer each piece belongs in and what it looks like when it lands in the wrong one.
+
+On a PR, Step 0.7 comes first: the shared mechanisms and decisions the diff passes through.
 
 It is a conversation that teaches, not a review that blocks. Talk in the user's language (Swedish if they write Swedish). Keep each turn short: one diagram, one table, one question.
 
@@ -41,6 +43,8 @@ Reference material: `references/layers.md` (Repo layer map, wrong-place symptoms
 | Domain terms or an ADR need writing down | `grill-with-docs` |
 | A question that belongs to PO or tech lead | `stakeholder-questions` (after Step 2b) |
 | Recording the decision in the PR | `pr-decisions` |
+| Posting a PR review (line comments, approve) | `review-pr` |
+| Could this PR be fewer lines, what does it make deletable | `hard-simplify` |
 | A diagram | `mermaid-diagram` |
 
 Naming a skill in this table loads nothing. Invoke it, or read its `SKILL.md`, before using what it says, and never report a skill as consulted because it was named.
@@ -86,6 +90,24 @@ What the numbers can and cannot say: accept has little traffic and test data. Us
 **Generic advice that does not apply here, so don't offer it:** an API gateway or BFF to absorb orchestration (ruled out 2025-12-03); CQRS through workers; switching to another architecture style as the fix for one ticket. "Invert dependencies" applies at the API edge only: the DTO protects the contract, while entities deliberately match the tables.
 
 Write the answer as one line before Step 1, e.g. "Logic problem, synchronous, read-heavy, no new mechanism needed."
+
+## Step 0.7 — Reviewing a PR: the mechanisms it passes through
+
+Run this when the input is a PR, not a ticket. The author rarely asks a question, so don't wait for one: the findings come from what the diff passes through. Read the PR body first; a trade-off the author already states is not a finding.
+
+1. **List what the diff touches but does not own:** utilities, interceptors, analytics allowlists, auth/session helpers, shared DTOs, anything another ticket built. Ask the user which of these they built or know well; their knowledge of a mechanism is what makes a review sharp.
+2. **For each one:**
+   - **The decision behind it:** `git log --follow` on the file → the ticket key in the commit → read that ticket. Also memory, and ghost/owl/backend-decisions for backend.
+   - **Its consumers:** grep the concept across `apps/web`, `apps/mobile` and `services/`. Another app or service that reads or writes the same thing is part of the mechanism (a native WebView, an ServiceC log attribute, a pinned test list). Check open PRs that touch the same consumer (`gh pr list --search <concept>`).
+   - **Does the PR keep the decision?** A docstring or comment rewritten in a file the PR does not own is an alarm: the code moved away from a decision and the text was bent to match.
+3. **Two paths doing the same job?** If the PR adds a second way to do what an existing flow already does, suggest that both share one path, with a code sketch. This is where the refactor comes from ("Existing before new", Step 1).
+4. **A feature flag?** What must be live elsewhere (other PRs, services, config) before the flag goes on for anyone? Can the old and new paths be told apart in analytics and logs during the rollout? And the flag trap in Step 1: what happens the day the flag is deleted?
+
+Then continue with Step 1 for what the PR decides (is the flag the right rung?), Step 2 only where a finding has real alternatives, and Step 3 for where the new code landed.
+
+**Writing the review:** suggestions, not questions; addressed to the author ("you", and check whose PR it is); no praise; say up front whether anything blocks. Show the user the text first; it goes out through `review-pr`.
+
+**Tested 2026-10-27 on PR #4205 (PROJ-4548, PKCE login),** blind at the pre-fix commit, against the human review. Without this step the skill found the missing ServiceC log, the analytics flow tag and the WebView reason, but only noted the loosened docstring. With it, point 2 traced the docstring to PROJ-4622's "never in storage" decision, and point 3 proposed the fix the author shipped: carry the attempt id in `state` like the implicit flow, with one shared encoder. The blind run also misjudged one trade-off the PR body already stated, which is why the body comes first.
 
 ## Step 1 — The altitude ladder
 
@@ -237,4 +259,4 @@ Kvar att bygga: <layer → file>
 Risk vi accepterar: <the trap we consciously accept, if any>
 ```
 
-Don't write code. Don't edit tickets or post anywhere. If the user wants the decision in a PR, hand off to `pr-decisions`; into the ticket spec, to `ticket-spec`.
+Don't write production code; a code sketch inside a review suggestion is fine. Don't edit tickets or post anywhere; a PR review goes out through `review-pr` once the user has approved the text. If the user wants the decision in a PR, hand off to `pr-decisions`; into the ticket spec, to `ticket-spec`.
