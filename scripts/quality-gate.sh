@@ -37,6 +37,10 @@ done
 #
 # Changed set = committed-since-main (origin/main...HEAD) ∪ working-tree (vs HEAD)
 # ∪ untracked, excluding deletions. Paths are relative to the worktree root.
+# --diff-filter=d alone is not enough: a file the branch adds in one commit and
+# deletes in the working tree (or deletes uncommitted) still shows as changed in
+# origin/main...HEAD, and ESLint then crashes on the missing path (PROJ-4647). So
+# keep only paths that exist on disk.
 BASE_REF=""
 if (cd "$WORKTREE" && git rev-parse --verify --quiet origin/main >/dev/null 2>&1); then
   BASE_REF="origin/main"
@@ -49,7 +53,9 @@ collect_changed() {
   git diff --name-only --diff-filter=d HEAD 2>/dev/null
   git ls-files --others --exclude-standard 2>/dev/null
 }
-CHANGED=$(collect_changed | sort -u)
+CHANGED=$(collect_changed | sort -u | while IFS= read -r f; do
+  [[ -n "$f" && -e "$WORKTREE/$f" ]] && echo "$f"
+done)
 
 # If no flags, auto-detect from changed files. Detect by AREA (path), not just
 # extension — a frontend-only branch that touches config/docs (e.g. eslint.config.mjs,
