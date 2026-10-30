@@ -8,7 +8,8 @@
 #   1. `echo ===...` / `printf ==...`   unquoted leading `=` is zsh =-expansion ("= not found")
 #   2. `${VAR:+word with spaces}`       zsh passes the alternative as ONE argument
 #   3. `NAME="cmd args"; $NAME ...`     zsh does not word-split a scalar at command position
-# Commands already handed to bash (`bash -c`, `bash <<`, `bash script.sh`) are allowed through.
+# Commands already handed to bash (`bash -c`, `bash <<`, `bash script.sh`) are allowed through,
+# and heredoc bodies are ignored.
 #
 # Exit 0 = allow, exit 2 = block (stderr goes back to Claude).
 
@@ -23,6 +24,20 @@ cmd = os.environ["CMD"]
 # Already running under bash: the traps do not apply.
 if re.search(r'(^|[\s;&|(])(/bin/)?bash\s+(-[a-z]*c\b|<<|-s\b|\S+\.sh\b)', cmd):
     raise SystemExit(0)
+
+# Drop heredoc bodies: they are data (a PR body, a script written to a file), not commands zsh runs.
+def strip_heredocs(text):
+    out, delims = [], []
+    for line in text.split("\n"):
+        if delims:
+            if line.strip() == delims[0]:
+                delims.pop(0)
+            continue
+        out.append(line)
+        delims = [m.group(2) for m in re.finditer(r"<<(?!<)-?\s*(['\"]?)(\w+)\1", line)]
+    return "\n".join(out)
+
+cmd = strip_heredocs(cmd)
 
 # Drop single-quoted strings so quoted text (e.g. commit messages, jq/awk programs) never matches.
 unq = re.sub(r"'[^']*'", "''", cmd)
