@@ -310,6 +310,11 @@ VERIFIED vs UNVERIFIED — the one rule that matters more than coverage:
   (route + action filter), e.g. `git grep -n 'UserAction' -- 'services/ServiceC/**/Controllers/*.cs'`. A
   bare "none exists" is `[unverified]`: PROJ-4406's said stop while `POST authorization/users`
   already filtered by any UserAction.
+- A name or field translated at a boundary (legacy ↔ Nova, service ↔ service) is traced in BOTH
+  directions — read path AND write/submit path — before you scope it as one-sided, and the writers
+  (producer service, its data migrations, seeds) are grepped, not only the UI that reads it.
+  PROJ-4696's report marked the submit half `[unverified]` and scoped the ticket as read-only; the
+  submit half was broken too.
 Half a report with honest [unverified] tags is worth more than a full one stated with equal confidence.
 
 Return your analysis as a structured report. If you haven't finished all 13 points by tool use 25, wrap up with what you have — partial is fine, Amara will fill gaps."

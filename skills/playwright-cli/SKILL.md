@@ -196,6 +196,13 @@ You can also take a snapshot on demand using `playwright-cli snapshot` command.
 
 If `--filename` is not provided, a new snapshot file is created with a timestamp. Default to automatic file naming, use `--filename=` when artifact is a part of the workflow result.
 
+**Where the snapshot `.yml` files land:** in `.playwright-cli/` under the **daemon's cwd** — the
+directory the session was opened from. Opened from inside a worktree's `apps/web/src`, they landed
+there, and `prettier --check src` then blocked every commit without naming a file (PROJ-4647). Open
+DTF sessions from `~/Downloads/<TICKET_ID>` so these page snapshots stay out of the repo. This is
+about playwright-cli's own page snapshots only — it is not a rule about screenshots or committed
+e2e snapshot baselines.
+
 ## Browser Sessions
 
 ```bash
@@ -346,6 +353,10 @@ date bugs invisible, so the test passes on broken code.
   is not in `route-list`, and `unroute` reports success having removed a *different* CLI route. A
   throwing handler never settles the request, i18n never initialises, and **every page renders
   blank** with no console error. Only `close` + `open` clears it. `require` is undefined there (ESM).
+- **`globalThis` does not persist between `run-code` calls.** A recorder stored on `globalThis` in
+  one call is gone in the next. Keep state on `page.context()` (e.g. `ctx.__rec ??= []`): listeners
+  attached with `ctx.on('response' | 'console', ...)` survive navigations and count a whole session
+  (PROJ-4647).
 - **`route --body` cannot carry a fixture larger than `ARG_MAX`** (1 MB on macOS); there is no
   `--body-file`. Serve the file from a local CORS-enabled `http.server` instead.
 - **A 302 from an https URL to `http://127.0.0.1` is silently not followed** (scheme downgrade).

@@ -436,7 +436,11 @@ decision or a late finding in more than one session):
 - **Negative claims cite their grep.** "Nothing does X", "the flag covers it", "never used" carries the
   command and hit count, run over the whole `services/<Svc>` tree (and every service the claim
   crosses), targeting the readers (queries that filter), not just the field name. Otherwise tag it
-  `[unverified]` in notes; the reviewer clears or confirms each tag before ready (PROJ-4231).
+  `[unverified]` in notes; the reviewer clears or confirms each tag before ready (PROJ-4231). For a
+  key or name that crosses a service or repo boundary, grep the WRITERS too — the producer service,
+  its data migrations and seeds — not only the UI that reads it: PROJ-4696 grepped the sibling UI
+  repo for "legacy never uses spelling X", while legacy's data migration wrote exactly that spelling
+  onto stored reports, and the first commit hid data Nova used to show.
 - **You may question the ticket's MECHANISM, not only its design.** Name the concrete click path for
   every claimed cause; a "confirm the route" phrasing repeats a false premise into the PR (PROJ-4036).
 - **Design-link-only acceptance criteria** (Figma / Claude Design, no screenshots): ask for
@@ -1980,13 +1984,19 @@ trivia item; it is the mechanism by which a green result reaches the user with r
   rule above keeps recurring as an applied rule that still bites: `echo ===` (PROJ-4584) and
   `${1:+-H "..."}` passing one argument to curl, so every login 400'd (PROJ-4622). Anything with a
   loop, `${x:+...}`, a `$VAR` list or a leading `=` goes in `bash -c '...'` or a scratchpad `.sh`
-  file run with `bash`. Do not rely on remembering the zsh traps.
+  file run with `bash`. Do not rely on remembering the zsh traps. Since 2026-10-30 a PreToolUse hook
+  (`scripts/zsh-trap-guard.sh`) refuses the three shapes that kept recurring (`echo ===`,
+  `${x:+a b}` unquoted, `P="cmd args"; $P`) and says to wrap them in `bash -c` — four sessions
+  (PROJ-4584, 4622, 4472, 4647) bit after the rule was written, so the rule became a mechanism.
 - **A background job's notification reports the LAST command's status.** `cmd; RC=$?; echo $RC > f`
   shows "exit code 0" while the gate failed (Playwright 86 failures read as success, PROJ-4479). End
   every background gate job with `exit $RC`, and read the `.rc` file, never the notification.
 - **Gate, then act: chain with `&&`, never `;`.** `quality-gate.sh <wt>; git commit ...; git push`
   commits and pushes after a FAILED gate (PROJ-4327, PROJ-4423 — a freshness failure was pushed and
-  had to be rebased and force-pushed back).
+  had to be rebased and force-pushed back). On a busy main where freshness refuses again after the
+  rebase, use `bash ~/.claude/scripts/rebase-and-regate.sh <wt> && git push --force-with-lease
+  origin HEAD`: it loops rebase + gate until fresh and green, stops on a real failure or a conflict,
+  and refuses a dirty tree rather than stashing (PROJ-4472).
 - **A removal or negative check must restore the whole old surface and still compile.** Revert to
   `origin/main`'s sources for every layer the guard spans, make the reverted code build
   (`currentData → data` everywhere), then read the failure REASON, not the count — a ReferenceError

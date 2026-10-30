@@ -269,6 +269,13 @@ out of the logs (2025-03-20). Alert on any non-empty error queue (2025-09-03).
 
 ---
 
+**Before writing a "dead code" / "can never fire" / "unreachable" finding**, read the PRODUCER of
+the value the guard checks, not only the code around it. PROJ-4472: owl said the `RoleExternal`
+channel filter could never fire, but `AddRoleSubscribersAsync` merges role-assigned external
+receivers into the same row with `RoleExternal` — deleting the guard would have been the bug. Name
+the producer you read (`file:line`) in the finding; if you could not find one, file it under
+Questions, not Must Fix.
+
 ### Step 4 — Format findings
 
 Output in the former tech lead's style: systemic, pragmatic, grouped by severity. Lead with the messaging/concurrency/infra concerns; defer small stuff explicitly.

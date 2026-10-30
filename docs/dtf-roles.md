@@ -564,7 +564,7 @@ Personal config, never committed. Created by `dtf install` or upgraded by `dtf c
   "roleConfig": {
     "displayName": "Developer (Frontend)",
     "agents": ["frontend-dev", "architect", "pr-reviewer"],
-    "skills": ["frontend-conventions", "tdd", "playwright-cli", "visual-development-workflow", "mermaid-diagram"]
+    "skills": ["frontend-conventions", "tdd", "playwright-cli", "mermaid-diagram"]
   },
   "workflowSteps": [
     { "name": "ESLint check", "type": "automated", "command": "npm run lint", "when": "before-commit" },

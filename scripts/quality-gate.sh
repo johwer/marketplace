@@ -404,7 +404,12 @@ fi
 # Note there is no cheap bundler check here: mobile builds via EAS (cloud) or expo run:*
 # (needs a simulator), so the dependency-change build gate above has no mobile equivalent.
 MOBILE_DIR="$WORKTREE/apps/mobile"
-if echo "$CHANGED" | grep -qE '^apps/mobile/' && [[ -d "$MOBILE_DIR" ]]; then
+# Regenerating a shared client (service-c/service-a) writes into apps/mobile; without its node_modules
+# every mobile check below fails with a tooling error that reads like a code error. The preflight
+# could only warn (it cannot know the plan); here the diff says it, so it is a FAIL (PROJ-4467, PROJ-4647).
+if echo "$CHANGED" | grep -qE '^apps/mobile/' && [[ -d "$MOBILE_DIR" && ! -d "$MOBILE_DIR/node_modules" ]]; then
+  add_result "Mobile checks" "FAIL" "branch changes apps/mobile but apps/mobile/node_modules is missing — run 'npm ci' in apps/mobile (not --ignore-scripts: the postinstall downloads translations), then re-run the gate"
+elif echo "$CHANGED" | grep -qE '^apps/mobile/' && [[ -d "$MOBILE_DIR" ]]; then
   echo ""
   echo "▸ Mobile checks..."
 

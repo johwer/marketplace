@@ -49,9 +49,9 @@ get_role_agents() {
 
 get_role_skills() {
   case "$1" in
-    frontend-dev)  echo "frontend-conventions frontend-performance tdd playwright-cli visual-development-workflow mermaid-diagram code-insights" ;;
+    frontend-dev)  echo "frontend-conventions frontend-performance tdd playwright-cli mermaid-diagram code-insights" ;;
     backend-dev)   echo "backend-conventions backend-performance tdd mermaid-diagram code-insights" ;;
-    fullstack-dev) echo "frontend-conventions backend-conventions frontend-performance backend-performance tdd playwright-cli visual-development-workflow mermaid-diagram data-conventions code-insights" ;;
+    fullstack-dev) echo "frontend-conventions backend-conventions frontend-performance backend-performance tdd playwright-cli mermaid-diagram data-conventions code-insights" ;;
     data-engineer) echo "data-conventions data-analysis-workflows mermaid-diagram" ;;
     data-analyst)  echo "data-analysis-workflows" ;;
     infra)         echo "infra-conventions aws-performance" ;;

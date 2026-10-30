@@ -54,6 +54,22 @@ else
   fi
 fi
 
+# Reaching github.com is not being allowed to push to THIS remote: PROJ-4696 passed the :22
+# check and then `git push origin` was refused (access rights). A dry-run push opens
+# git-receive-pack with the real remote URL and credentials, which GitHub refuses without write
+# access; nothing is sent.
+if git -C "$WORKTREE" remote get-url origin >/dev/null 2>&1; then
+  PROBE_REF="refs/heads/dtf-preflight-probe-$$"
+  if GIT_SSH_COMMAND="ssh -o ConnectTimeout=8 -o BatchMode=yes" GIT_TERMINAL_PROMPT=0 \
+      git -C "$WORKTREE" push --dry-run --no-verify origin "HEAD:$PROBE_REF" >/tmp/dtf-preflight-push.log 2>&1; then
+    pass "authenticated push to origin works (dry-run)"
+  elif gh auth status >/dev/null 2>&1; then
+    warn "git push origin refused ($(grep -m1 -iE 'denied|error|fatal' /tmp/dtf-preflight-push.log)); HTTPS via gh: git -c credential.helper='!gh auth git-credential' push https://github.com/<OWNER>/<REPO>.git HEAD:<branch>"
+  else
+    fail "git push origin refused and gh is not authenticated — see /tmp/dtf-preflight-push.log"
+  fi
+fi
+
 # GitGuardian scans every PR commit; a hit after push costs a history rewrite (PROJ-4465).
 if command -v ggshield >/dev/null 2>&1; then
   pass "ggshield on PATH (quality-gate scans the branch range before push)"
@@ -64,7 +80,7 @@ fi
 # Shared service-c/service-a codegen writes into apps/mobile too; its tests and type-check need
 # apps/mobile/node_modules, and `npm ci --ignore-scripts` skips the translation postinstall (PROJ-4467).
 if [[ -d "$WORKTREE/apps/mobile" && ! -d "$WORKTREE/apps/mobile/node_modules" ]]; then
-  warn "apps/mobile/node_modules missing — if this ticket regenerates shared API clients, run 'npm ci' in apps/mobile (not --ignore-scripts)"
+  warn "apps/mobile/node_modules missing — if this ticket regenerates shared API clients, run 'npm ci' in apps/mobile (not --ignore-scripts); quality-gate FAILs once the branch touches apps/mobile"
 fi
 
 if [[ "$NO_LOGIN" == "true" ]]; then

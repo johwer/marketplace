@@ -46,6 +46,12 @@ which is rare — if you cannot name a cost, you probably have not found the rea
 the decision reversible rather than permanent by accident.>
 ```
 
+**Check that the `Revisit if` condition is not already true.** It is a claim about the present as
+well as the future, so verify it the way you would any other claim before posting. PROJ-4647 wrote
+"revisit if codegen can generate this as a query"; it already could (`endpointOverrides` in
+`scripts/api-codegen/openapi-config-service-c.ts`), and owl-review caught it — the decision itself was
+the wrong call. If the condition is met, the decision is not reversible-later, it is wrong-now.
+
 ## The alternatives must be real
 
 The failure mode that makes these sections worthless is the strawman: listing an alternative nobody would pick, so the chosen option wins by default. A reviewer spots this instantly and stops reading the section.

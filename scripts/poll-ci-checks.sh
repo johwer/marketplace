@@ -29,6 +29,18 @@ fi
 # present, CI has not really started — treating that as "all checks complete" is a false green.
 TRIVIAL_CHECKS="${TRIVIAL_CHECKS:-label|validate-title|title|semantic}"
 
+# Advisory checks run on every push (drafts included) and fail for reasons unrelated to the code,
+# e.g. the Copilot reviewer job failing with 402 when the requester's quota is spent. They must not
+# trigger the early exit while the real checks are still pending (PROJ-4472); they are reported
+# separately and never decide the exit code. Matched case-insensitively against the check name.
+ADVISORY_CHECKS="${ADVISORY_CHECKS:-copilot}"
+print_advisory() {
+  [ -n "${ADVISORY:-}" ] || return 0
+  echo "=== Advisory checks (not counted) ==="
+  echo "$ADVISORY"
+  echo ""
+}
+
 # The SHA is re-read every iteration, not captured once: a poll started immediately after a push can
 # otherwise pin to the PRE-push commit (GitHub takes a moment to update the PR head) and then report
 # the OLD commit's results — including a failure the push just fixed.
@@ -58,6 +70,8 @@ while [ "$ELAPSED" -lt "$MAX_SECONDS" ]; do
 
   # Get all check runs for this commit
   CHECKS=$(gh api "repos/${OWNER_REPO}/commits/${HEAD_SHA}/check-runs" 2>/dev/null || echo '{"check_runs":[]}')
+  ADVISORY=$(echo "$CHECKS" | jq -r --arg re "$ADVISORY_CHECKS" '.check_runs[] | select(.name | test($re; "i")) | "  \(.conclusion // .status) — \(.name)"')
+  CHECKS=$(echo "$CHECKS" | jq --arg re "$ADVISORY_CHECKS" '.check_runs |= map(select(.name | test($re; "i") | not)) | .total_count = (.check_runs | length)')
 
   TOTAL=$(echo "$CHECKS" | jq '.total_count // 0')
   COMPLETED=$(echo "$CHECKS" | jq '[.check_runs[] | select(.status == "completed")] | length')
@@ -93,6 +107,7 @@ while [ "$ELAPSED" -lt "$MAX_SECONDS" ]; do
     echo "$CHECKS" | jq -r '.check_runs[] | select(.conclusion == "failure") | "FAIL: \(.name)\n  URL: \(.html_url)\n"'
     echo ""
     echo "Stopped polling early: ${FAILED} check(s) failed, ${PENDING} still pending."
+    print_advisory
 
     # Log timing
     echo "$(date +%Y-%m-%d_%H:%M),${OWNER_REPO},${PR_NUMBER},${ACTUAL},fail,${PASSED},${FAILED},${PENDING}" >> "$LOG_FILE"
@@ -119,6 +134,8 @@ while [ "$ELAPSED" -lt "$MAX_SECONDS" ]; do
     echo "$CHECKS" | jq -r '.check_runs[] | "  \(if .conclusion == "success" then "PASS" elif .conclusion == "skipped" then "SKIP" else .conclusion end) — \(.name)"'
     echo ""
     echo "All CI checks passed. (${PASSED} passed, ${TOTAL} total)"
+    echo ""
+    print_advisory
 
     # Log timing
     echo "$(date +%Y-%m-%d_%H:%M),${OWNER_REPO},${PR_NUMBER},${ACTUAL},pass,${PASSED},0,0" >> "$LOG_FILE"

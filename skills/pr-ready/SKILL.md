@@ -233,6 +233,10 @@ does — the reader cannot tell which mode wrote it, so neither can the gate.
    prints an error to stderr and nothing to stdout, so a rewrite pipeline builds the new body from
    "". Always pass `-R <owner>/<repo>` when not inside the repo, and refuse to write a body that
    lost its images (PROJ-4421).
+9. **A reviewer asks for a section whose heading is banned.** "Please add an Architecture section"
+   puts `## Architecture` in the body and the gate refuses it. Before writing it, offer the nearest
+   allowed home: scope and key files go in `## Scope`, design detail in the notes comment. Say so
+   in the reply to the reviewer up front rather than discovering it on the gate run (PROJ-4472).
 
 ## Related
 

@@ -58,7 +58,6 @@ How Claude Code receives instructions, conventions, and context. Each mechanism 
 | `data-conventions` | Data engineering conventions for the monorepo |
 | `playwright-cli` | Browser automation reference |
 | `mermaid-diagram` | Diagram creation with syntax validation |
-| `visual-development-workflow` | Write code → verify visually → iterate |
 | `strategic-compact` | When/how to compact context at phase boundaries |
 | `context-modes` | Dev/review/research mindsets with distinct priorities |
 
