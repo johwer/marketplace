@@ -85,7 +85,6 @@ agents/
 | `code-review-skill` | React 19, TypeScript, perf, security, architecture review guides |
 | `tdd` | Test-driven development (red → green → refactor) |
 | `playwright-cli` | Browser automation for testing and visual verification |
-| `visual-development-workflow` | Write code, verify visually, iterate |
 | `mermaid-diagram` | Diagram creation with syntax validation |
 | `memory-hygiene` | Review and clean up memory files to keep token costs low |
 
