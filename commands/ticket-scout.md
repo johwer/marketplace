@@ -14,7 +14,7 @@ $ARGUMENTS
 
 Previously scouted tickets (skip these unless `--force` or single ticket by ID):
 
-!`cat ~/.claude/projects/-Users-username/memory/scouted-tickets.json 2>/dev/null || echo "[]"`
+!`cat ~/.claude/projects/-Users-johan-wergelius/memory/scouted-tickets.json 2>/dev/null || echo "[]"`
 
 This is a JSON array of objects tracking previously scouted tickets:
 
@@ -108,7 +108,7 @@ Assign points 1-4 based on effort and risk. These map roughly to t-shirt sizes:
 
 ## Output
 
-Write the analysis to `~/.claude/projects/-Users-username/memory/ticket-scout.md`:
+Write the analysis to `~/.claude/projects/-Users-johan-wergelius/memory/ticket-scout.md`:
 
 ```markdown
 # Ticket Scout — [date]

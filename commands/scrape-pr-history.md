@@ -5,7 +5,7 @@ Extract review findings from merged GitHub PRs using parallel Haiku agents and s
 ## Config
 
 - **Repo**: `RepoAB/Repo`
-- **Storage**: `~/.claude/projects/-Users-username-Documents-Repo/memory/pr-learnings.json`
+- **Storage**: `~/.claude/projects/-Users-johan-wergelius-Documents-Repo/memory/pr-learnings.json`
 - **Batch size**: 30 agents in parallel
 - **Default PRs to fetch**: 100
 
@@ -20,7 +20,7 @@ Extract review findings from merged GitHub PRs using parallel Haiku agents and s
 
 ## Step 1: Load Existing Data
 
-Read `~/.claude/projects/-Users-username-Documents-Repo/memory/pr-learnings.json` if it exists.
+Read `~/.claude/projects/-Users-johan-wergelius-Documents-Repo/memory/pr-learnings.json` if it exists.
 
 Extract the list of already-processed PR numbers. These will be skipped unless `--force` is passed.
 

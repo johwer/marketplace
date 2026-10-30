@@ -55,10 +55,10 @@ After refinement, if new gaps or patterns are discovered, update the knowledge b
 
 Previously refined tickets are tracked in:
 ```
-~/.claude/projects/-Users-username/memory/ticket-refinements.json
+~/.claude/projects/-Users-johan-wergelius/memory/ticket-refinements.json
 ```
 
-!`cat ~/.claude/projects/-Users-username/memory/ticket-refinements.json 2>/dev/null || echo "[]"`
+!`cat ~/.claude/projects/-Users-johan-wergelius/memory/ticket-refinements.json 2>/dev/null || echo "[]"`
 
 Each entry records the refinement outcome so future sessions can reference past findings:
 
@@ -345,7 +345,7 @@ acli jira workitem comment create --key "<TICKET_ID>" --body-file "/tmp/refine-<
 After posting, check if any ticket writing tips are new patterns worth saving. Update the coaching file:
 
 ```
-~/.claude/projects/-Users-username/memory/ticket-writing-tips.md
+~/.claude/projects/-Users-johan-wergelius/memory/ticket-writing-tips.md
 ```
 
 Only add genuinely new patterns — check existing tips first. Format:
@@ -367,7 +367,7 @@ Only add genuinely new patterns — check existing tips first. Format:
 
 Append the refinement result to the tracking file:
 ```
-~/.claude/projects/-Users-username/memory/ticket-refinements.json
+~/.claude/projects/-Users-johan-wergelius/memory/ticket-refinements.json
 ```
 
 Read the current file, append a new entry with:
