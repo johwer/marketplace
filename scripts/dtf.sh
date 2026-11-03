@@ -617,12 +617,13 @@ merge_settings() {
   fi
 
   # Deep merge: repo values as base, user values override
-  # But for hooks arrays, concatenate (no duplicates by command)
+  # But for hooks arrays, concatenate (no duplicates by command).
+  # User hook events the repo does not define are kept as they are.
   local merged
   merged=$(jq -s '
     .[0] as $repo | .[1] as $user |
     ($repo * $user) |
-    .hooks = (
+    .hooks = (($user.hooks // {}) + (
       ($repo.hooks // {}) | to_entries | map(
         .key as $event |
         .value as $repo_hooks |
@@ -636,7 +637,7 @@ merge_settings() {
           )
         }
       ) | from_entries
-    )
+    ))
   ' "$repo_settings" "$user_settings" 2>/dev/null || cat "$user_settings")
 
   echo "$merged" > "$user_settings"

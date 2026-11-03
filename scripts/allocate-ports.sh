@@ -225,10 +225,20 @@ fi
 # generated above and re-proxied by worktree-service.sh; AGENTS.md/CLAUDE.md get
 # a DTF section appended. DTF scripts still edit them on disk — git just ignores
 # the local modifications. Recurring-leak fix (see dream-team-learnings PROJ-2961).
-for _wt_local in apps/web/vite.config.worktree.mts apps/web/cosmos.worktree.config.json AGENTS.md CLAUDE.md; do
+# Files that are NOT tracked (the Cosmos pair) cannot be skip-worktree'd; they go in
+# info/exclude instead, or they show up as untracked changes in git status, in
+# quality-gate.sh's change detection (every branch looks like a frontend branch) and
+# in `git add -A`. info/exclude lives in the common git dir, so one entry covers every
+# worktree. Never filter them in quality-gate.sh: it must keep counting untracked files.
+_wt_exclude="$(git -C "$WORKTREE_DIR" rev-parse --path-format=absolute --git-path info/exclude)"
+for _wt_local in apps/web/vite.config.worktree.mts apps/web/cosmos.worktree.config.json apps/web/cosmos.vite.config.worktree.mts AGENTS.md CLAUDE.md; do
     if git -C "$WORKTREE_DIR" ls-files --error-unmatch "$_wt_local" >/dev/null 2>&1; then
         git -C "$WORKTREE_DIR" update-index --skip-worktree "$_wt_local" 2>/dev/null \
             && echo "Marked $_wt_local skip-worktree (per-worktree local state — never committed)"
+    elif ! grep -qxF "/$_wt_local" "$_wt_exclude" 2>/dev/null; then
+        mkdir -p "$(dirname "$_wt_exclude")"
+        echo "/$_wt_local" >> "$_wt_exclude" \
+            && echo "Excluded $_wt_local via info/exclude (untracked per-worktree local state)"
     fi
 done
 

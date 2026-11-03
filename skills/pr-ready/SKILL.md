@@ -106,7 +106,7 @@ In `RepoAB/Repo.SignedIn.Web`, every PR body must **end** with the checklist fro
 one. That includes a leftover `## Progress` item, which is one more reason to drop that section.
 
 - If the body has no checklist, add it from the template, ticked, after everything else
-  (including the `🤖 Generated with Claude Code` line).
+  (including the Dream Team Flow ASCII footer, which comes from `attribution.pr` in settings).
 - It does not count toward the word budget and is not reviewer detail, so never move it.
 - `pr-body-gate.sh` checks it for SignedIn PRs: items read from the template, all ticked,
   no unticked box anywhere, checklist last. The other gate checks do not run on SignedIn.

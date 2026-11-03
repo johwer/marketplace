@@ -215,8 +215,6 @@ gh pr create --title "PROJ-2345: Enable RDS Enhanced Monitoring" --body "$(cat <
 - [ ] After merge: confirm GH Actions `terraform-apply` runs
 - [ ] After apply: verify Enhanced Monitoring active in AWS Console
 - [ ] After apply: verify CloudWatch alarm created
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
 EOF
 )"
 ```
