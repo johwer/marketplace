@@ -22,7 +22,7 @@ If an item here disagrees with 1 or 2, 1 or 2 wins, and the item is a bug in thi
 |---|---|
 | Naming, file layout, DTO mapping, JSONB, seeds, enum migrations, Rebus basics, the four security rules | `backend-conventions` |
 | Security ordering, ServiceC/RBAC, tenancy | repo skill `security-review`, ghost [AUTH-ORDER] [MULTI-TENANCY] |
-| Idempotency, abstraction depth | repo skill `quality-review` |
+| Idempotency, abstraction depth | repo skill `reviewing-changes` (`quality.md`, `replay.md`; `quality-review` on branches before #4470) |
 | Event shape, outbox, redelivery, multi-pod workers | `owl-review` |
 | Query plans, indexes, load | `backend-performance` |
 | Which layer, which rung | `lift-the-gaze` |

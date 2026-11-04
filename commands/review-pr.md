@@ -278,6 +278,9 @@ Also read project-level conventions:
 - `docs/CODING_STYLE_BACKEND.md` (if .cs files changed)
 - `docs/CODING_STYLE_FRONTEND.md` (if .ts/.tsx files changed)
 - `docs/API_CONVENTIONS.md` (if API routes changed)
+- Every `.claude/rules/*.md` whose `paths:` frontmatter matches a changed file (migrations, generated API clients, ServiceC permissions, tests). These are the repo's path-scoped rules and do not load for a reviewer on their own.
+- The **Comments** section of the root `AGENTS.md` for any comment finding: only its listed exceptions are allowed, and a finding cites it as `AGENTS.md: Comments`.
+- If a test file changed: `.claude/skills/writing-tests/references/mistakes-we-make.md` (when present), the catalogue of test shapes the repo has shipped bugs with.
 
 Compile a **conventions summary** — a condensed bullet list of the rules that apply to this PR's changed files. This will be passed to all review agents so they don't each re-read the full docs.
 
@@ -324,7 +327,9 @@ Split the changed files into two halves (by file count). Launch 4 agents **in pa
 
 **Agent 7: Structural Reviewer** (Opus) — skip if `--no-improve`
 - Reviews ALL changed files
-- **First, read `.claude/skills/quality-review/patterns/design-quality.md` and `structural-health.md`** from the repo under review (plus `replay-safety.md` only if the diff touches messaging, handlers, or event consumers). Those pattern files are the source of truth for the dimensions.
+- **First, read `.claude/skills/reviewing-changes/quality.md`** from the repo under review (plus `.claude/skills/reviewing-changes/replay.md` only if the diff touches messaging, handlers, or event consumers). Those lens files are the source of truth for the dimensions. Use the lenses only, not that skill's loop or its "bar": this agent reports, it never edits, and the validation below measures concept count, not lines.
+  - **Fallback** (a repo or branch without `reviewing-changes/`, e.g. Repo before #4470): read `.claude/skills/quality-review/patterns/design-quality.md` and `structural-health.md` (plus `replay-safety.md` under the same condition). If neither exists, use the prompt below on its own.
+  - Give every finding that comes from the replay lens a `finding_id` starting with `REPLAY-`, so the validation's REPLAY-SAFETY OVERRIDE applies to it.
 - Also apply `improve-codebase-architecture`'s boundary lens, but **to the diff only**: did this change make a module boundary worse, add a shallow module, or push a responsibility into the wrong service? A whole-module audit is that command's job, not this one's.
 - Prompt: "You are a structural reviewer. Same hard rule as the improvement reviewer: every finding carries a `proposal` with real replacement code, or it is dropped. Reject your own findings that add abstraction or code without reducing the number of concepts a reader must hold. Return: `{file, line, category: 'IMPROVEMENT', description, proposal: '<code>', tradeoff, evidence}`."
 
@@ -372,11 +377,23 @@ TWO HARD GATES — a finding fails if either is unmet:
    concrete replacement can be written, the finding is DROPPED. "Consider whether…",
    "should this be…", and "was this intentional?" are not findings.
 
-Apply the nine hard exclusions in `.claude/skills/quality-review/SKILL.md` Phase 2
-verbatim (formatting covered by tooling, naming preferences, untouched pre-existing code,
-speculative future cost, approach complaints with no sketchable alternative, test-file
-nits below HIGH, micro-optimisation, abstraction that does not reduce concept count,
-docs-only). That list is the source of truth — read it, don't work from memory.
+HARD EXCLUSIONS — dismiss automatically if the finding is:
+1. Formatting or style covered by tooling (CSharpier, ESLint, Prettier)
+2. A naming preference with no comprehension impact
+3. Entirely about pre-existing code the diff neither touches nor worsens
+4. Speculative ("might need this later" / "could become a problem") with no concrete current cost
+5. A complaint about the PR's approach with no concrete, sketchable simpler alternative
+6. A test-file-only nit below HIGH severity
+7. Micro-optimization without evident impact
+8. A suggestion that adds abstraction or code without reducing the number of concepts
+9. Only about documentation files
+
+REPLAY-SAFETY OVERRIDE (finding id starts with REPLAY-):
+- Do NOT dismiss because redelivery or reordering "is unlikely" or "hasn't happened" —
+  at-least-once delivery with no ordering guarantee is the platform contract.
+- Do NOT dismiss because the publisher currently sends each event once.
+- DO dismiss if a unique constraint, natural-key upsert, or dedup check genuinely makes the
+  handler convergent — but verify that in the schema/migrations, don't take the code's word.
 
 Output: {
   "finding_id": "...",

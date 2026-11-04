@@ -327,7 +327,7 @@ His, stated before he left. Treat them as fixed unless a later `/ghost-review` s
 - **2026-05-28 (#project-proj-service-b):** a formatted string used as a load-bearing key between ServiceA and ServiceB (deviant rule `Code`, e.g. `"{MaxDays}/{Months}"`) with no contract enforcing it is the highest-severity integration risk — make it a typed contract/enum. Same review: an enum that conflates two orthogonal axes (Sweden/Nova vs Finland/RetailerB) breeds special cases — split the axes. → [PROXY-FACT]
 - **2026-06-03 (#dream-team):** domain terminology is ecosystem-wide (backend, frontend, events), not backend-specific. → [NAMING-CONSISTENCY]
 - **2026-06-15 (#security):** no break-glass access to the production DB with PII. Only in a major incident and with the Head of Engineering and/or the CISO involved. Investigations go through logs and APIs.
-- **2026-07-23 (#project-nova):** run the repo skills `quality-review` (idempotency, spaghetti) and `security-review` (RBAC-aware) on backend branches.
+- **2026-07-23 (#project-nova):** run the repo skills `quality-review` (idempotency, spaghetti) and `security-review` (RBAC-aware) on backend branches. *`quality-review` was replaced by `reviewing-changes` in Repo #4470 (2026-11-03); the rule now reads: run `reviewing-changes` (report-only on someone else's PR) and `security-review`.*
 
 From the full Slack pass (2023-10 → 2026-08), in date order. Format: `YYYY-MM-DD #channel: rule`.
 
@@ -470,5 +470,5 @@ Output as: *"Before implementation, answer these questions:"* — listed per are
 - He defers small stuff; don't pad the output. Lead with the systemic concern.
 - Cheap pre-empts that recur in his reviews: enums for routing keys/event types, shared paginated-search DTOs, Terraform variables instead of hardcoded names, per-entity (not global) locks in workers, awaited publishers.
 - Since mid-2026 the most frequent must-fixes were about redelivery and commit order: publish after commit, validate before the first write, idempotent handlers, no throw for a by-design no-op.
-- Also run the repo skills `quality-review` (idempotency, spaghetti) and `security-review` (RBAC-aware) on backend branches. He set this as a standing rule on 2026-07-23.
+- Also run the repo skills `reviewing-changes` (report-only on someone else's PR; its quality and replay lenses cover idempotency and spaghetti) and `security-review` (RBAC-aware) on backend branches. He set this as a standing rule on 2026-07-23 for `quality-review`, which `reviewing-changes` replaced in Repo #4470. On a branch without `reviewing-changes/`, run `quality-review`.
 - Do not refresh by re-scraping: his history is complete (through 2026-08-06) and he has left, so this file is a fixed record. Change it only to mark a pattern overridden by a later `/ghost-review` standing decision.
