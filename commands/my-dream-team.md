@@ -75,6 +75,8 @@ Before starting Phase 1, check the ticket type and suggest the right skill if ap
 **Backend tickets** (Jira label `backend`, or the work touches `services/` or `shared/`) where the plan touches the domain model or terminology:
 > "This is a backend ticket touching the domain model. Want me to run `/grill-with-docs` first? It stress-tests the plan against the existing language and decisions, sharpening terminology before implementation. Or say 'just build it' to go straight to Phase 1."
 
+**`/grill-me` and root `AGENTS.md` "Plan" (Repo):** AGENTS.md asks for `/grill-me` before building unless the change is straightforward, and lets you skip it when the plan is already agreed or there is no user to ask. In DTF the agreed plan is Amara's architecture report (or yours in lite mode) **approved by the user** in Phase 1.4; that approval counts as the grill. So: a straightforward ticket needs nothing more; a non-trivial one either gets the user's explicit plan approval in Phase 1.4 or runs with `--interview`, which invokes `/grill-me`. A dev or tester subagent never runs it (no user to ask). If the user is not there to approve a non-trivial plan, say so in `## Agent` (Process) instead of claiming it was agreed.
+
 (These are upstream-vs-implementation distinct from `create-stories` GRILL FIRST → `/grill-me`, which is for fleshing out a *vague idea before the ticket exists*. `grill-fe`/`grill-with-docs` run here, during implementation, on a ticket that already exists.)
 
 ## Flags
@@ -88,7 +90,7 @@ Check if the arguments contain `--local`. If present:
 - Do NOT run retrospective or cleanup phases
 
 Check if the arguments contain `--interview`. If present:
-- **Before any other phase**, interview the user about the ticket using the AskUserQuestion tool
+- **Before any other phase**, interview the user about the ticket. In the Repo repo, do it by invoking **`/grill-me`** (`.claude/skills/grill-me/SKILL.md`, root `AGENTS.md` "Plan"); elsewhere, or on a branch without that skill, use the AskUserQuestion tool as below
 - Ask about: technical constraints they know about, edge cases, UX expectations, things the ticket description doesn't cover, dependencies on other work, and what "done" looks like to them
 - Don't ask obvious questions — dig into the hard parts they might not have considered
 - Keep interviewing until you've covered everything (typically 3-6 questions)
@@ -111,6 +113,7 @@ Check if the arguments contain `--lite`. If present:
   - **Dead redirect files**: If you moved types/classes between projects or namespaces, DELETE the old file entirely. Do not leave comment-only redirects like `// Moved to X`.
   - **Business defaults at wrong layer**: Check for magic number defaults (`?? 30`, etc.) in repository/data-access code. Move them to the controller or service layer for visibility — repos can keep a defensive fallback.
 - **All other phases run normally** — this is critical, lite mode only changes WHO does the work, not WHAT gets done:
+  - **Phase 1.4**: Plan agreement with the user (unless straightforward)
   - **Phase 1.5**: Draft PR created
   - **Phase 4.5**: Functional testing (if flagged)
   - **Phase 4.75**: Visual verification hard gate (if UI changes)
@@ -466,11 +469,21 @@ decision or a late finding in more than one session):
    - **Treat `context.md` as a hypothesis, not fact.** Every "reuse X" / "file Y already does Z" claim must be re-checked against disk (`git diff`/Read the actual file) before you build on it — the pre-hydration may be stale or wrong. If the ticket was split from or shares a parent with sibling tickets, `grep` for the merged/sibling work on `main` before assuming a component or endpoint still needs creating (it may already exist). Recurring miss across sessions 3062/3235/3278/3245.
    - **Still spawn Amara**, but with a much shorter prompt: "You are **Amara**. Two files are available: `.dream-team/jira-ticket.md` (source of truth — full Jira output) and `.dream-team/context.md` (pre-hydrated analysis). Read BOTH. Your job is to **diff and validate**: compare the pre-hydrated context against the Jira ticket and list any scope items, acceptance criteria, or specifics in the ticket that are MISSING from the pre-hydrated context. Add them to your architecture report. Verify that key file paths still exist, check for any recent changes on main that affect the plan. If the pre-hydrated context is accurate, you can reuse it directly — just add any missing details (API contract specifics, edge cases, conventions Amara-level details). This should take ~30% of the time of a full analysis."
    - Amara still produces the full architecture report format — but gets there faster by building on the pre-hydrated context rather than starting from scratch.
-   - Continue to Phase 1.5 as normal.
+   - Continue to Phase 1.4 (plan agreement), then 1.5, as normal.
+
+### Phase 1.4: Plan agreement (Repo, root `AGENTS.md` "Plan")
+
+Unless the change is straightforward (one obvious approach, no open call), show the user the plan
+in five lines or fewer — approach, PR slices, open calls — and ask with AskUserQuestion:
+"Agree this plan" / "Grill me first" / "Change it". "Grill me first" invokes `/grill-me` on the
+plan and folds the answers into Amara's report before continuing. Skip the question when
+`--interview` already ran `/grill-me`, or the user already agreed the plan in this session. With no
+user to ask (an autonomous run), continue and write "plan not agreed with a user" in the
+`## Agent` Process line. Never ask a dev or tester subagent to do this.
 
 ### Phase 1.5: Create Draft PR
 
-Immediately after receiving Amara's analysis, create a **draft PR** so the user and colleagues can follow progress on GitHub:
+After the plan is agreed (Phase 1.4), create a **draft PR** so the user and colleagues can follow progress on GitHub:
 
 > **If Amara's report proposes a stack** (see her Stacked-PR assessment in Phase 1), build it with **plain git**: create each layer branch off the one below it (`git switch -c <ticket>-layer2 <ticket>-layer1`), open the draft PR for the bottom layer against `main`, and each upper layer's PR with `gh pr create --draft --base <lower-layer-branch>`. When a lower layer merges, rebase the next one onto `main` and retarget it with `gh pr edit <n> --base main`. There is no `stacked-prs` skill or `gh stack` here (the skill lives only on unmerged PROJ-3825). Note that `validate-title` does not run on drafts, so a malformed title only fails when the PR goes ready.
 
