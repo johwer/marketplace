@@ -1,6 +1,6 @@
 ---
 name: pr-ready
-description: Assemble a Repo DTF pull request body at the ready transition — cut it down to the four sections a human actually reads (Why, What changes, Visual verification, Scope) and move all reviewer detail into a single "Implementation notes" comment below the diff. Use immediately before `gh pr ready`, when a PR description has grown into a wall nobody reads, or when the pr-body-gate script refuses. Repo/DTF only — not for personal-project PRs.
+description: Assemble a Repo DTF pull request body at the ready transition — cut it down to the sections a human actually reads, in the shape the repo's PR template asks for (Summary, Visual verification, Considerations, Agent; or Why, What changes, Visual verification, Scope when the repo has no such template) and move all reviewer detail into a single "Implementation notes" comment below the diff. Use immediately before `gh pr ready`, when a PR description has grown into a wall nobody reads, or when the pr-body-gate script refuses. Repo/DTF only — not for personal-project PRs.
 ---
 
 # PR Ready — cut the body down to what a human reads
@@ -26,7 +26,53 @@ Anything that answers "should I care, and what am I looking at" stays in the bod
 answers "how does it work, and did you check X" goes below the diff, where the reader who wants
 it will scroll and the reader who doesn't is unaffected.
 
-## Target shape — four sections, ~180 words, 250 hard cap
+## Target shape — pick it from the repo's PR template, ~180 words, 250 hard cap
+
+```bash
+SHAPE=$(bash ~/.claude/scripts/pr-body-shape.sh)   # template | dtf; non-zero exit → stop, don't guess
+```
+
+### `template` — the repo's template has `## Summary` and `## Agent` (Repo since #4470)
+
+AGENTS.md says to follow `.github/pull_request_template.md`, so the body uses its headings. The
+DTF sections still exist; they live under the template's headings:
+
+| DTF section | Goes to |
+|---|---|
+| Why + What changes | `## Summary`, 1–3 lines: why, then what is now true for users or other services |
+| Visual verification | `## Visual verification`, its own section right after Summary (the one heading the template lacks; images don't fit in 1–3 lines) |
+| Resolved decisions (the 1–3 that matter) | `## Considerations`, `- **Decision:** chose X over Y because Z` (the rest go to the notes comment) |
+| Risk, where to look | `## Considerations`, `- **Look closely:** …` |
+| Scope / Not in this PR | `## Considerations`, `- **Out of scope:** … (PROJ-XXXX)` |
+| (new) | `## Agent`: Process, Agent, Skills, filled from the session |
+
+```markdown
+## Summary
+
+<1–3 lines. Why it was needed, then what is now true. No internal type names.>
+
+## Visual verification
+
+<captioned before/after images — pr-screenshot-captions owns this section's content>
+
+## Considerations
+
+- **Decision:** <chose X over Y because Z>
+- **Look closely:** <file or behaviour where a reviewer should spend time>
+- **Out of scope:** <one line> (PROJ-XXXX)
+
+## Agent
+
+- **Process:** <e.g. DTF full, 2 slices, /reviewing-changes 2 rounds, ghost-review fixes>
+- **Agent:** <tool and exact model, e.g. Claude Code, claude-opus-5-5>
+- **Skills:** <every skill actually invoked, e.g. `/writing-tests`, `/reviewing-changes` (2 rounds)>
+```
+
+Drop Visual verification or Considerations only when there is genuinely nothing to put there.
+`## Agent` is always present on a DTF PR and does not count toward the word budget.
+`pr-body-gate.sh` refuses `## Why`, `## What changes`, `## Scope` or `## Risk` in this shape.
+
+### `dtf` — no such template (other repos, other DTF users)
 
 ```markdown
 ## Why
@@ -58,11 +104,13 @@ Anything inside `<details>` does not count.
 
 | Section | Action |
 |---|---|
-| `## Why`, `## What changes` | **keep** — trim to budget if over |
+| `## Why`, `## What changes` | **keep** (`dtf`) — trim to budget if over · **fold into `## Summary`** (`template`) |
+| `## Summary`, `## Considerations`, `## Agent` | **keep** (`template`) — Agent must be filled in, never deleted |
+| `## Risk` / `## Risks` | `## Considerations` → `Look closely:` (`template`) · fold into `## Scope` (`dtf`) |
 | `## Visual verification` / `## Visual Verification Evidence` + all images | **keep**, byte-identical |
-| `## Scope` / `## Not in this PR` | **keep**, compressed to one line + follow-up ticket |
+| `## Scope` / `## Not in this PR` | **keep**, compressed to one line + follow-up ticket (`dtf`) · `## Considerations` → `Out of scope:` (`template`) |
 | `## Walkthrough of the changes`, `## Reading this diff`, per-file tables | **move** |
-| `## Decisions` (resolved) | **move** as one line each: `Chose X over Y because Z` |
+| `## Decisions` (resolved) | **move** as one line each: `Chose X over Y because Z` (`template`: the 1–3 that matter go to `## Considerations` as `Decision:` bullets) |
 | `## Verification`, `## Runtime verification`, `Verified, not assumed` | **move** |
 | `## Pre-emptive review`, ghost/owl findings, `One suggestion deliberately not taken` | **move** — this is what buys off a review round; do not lose it |
 | `## What the audit turned up`, `## Also landed, beyond the ticket's ask`, `## Pre-existing issues found` | **move** |
@@ -138,9 +186,11 @@ IMG_BEFORE=$(grep -c -e '<img' -e '!\[' /tmp/pr-body.md || true)
 
 1. **Inventory and classify.** Every heading goes into keep / move / drop using the table above.
    An unrecognised heading is a **move**, not a judgement call.
-2. **Write the new body** to `/tmp/pr-new-body.md` — the four sections, in order, images
-   byte-identical. Trim `Why` and `What changes` to budget; do not compress them into jargon to
-   hit a number, move detail out instead.
+2. **Write the new body** to `/tmp/pr-new-body.md` — the sections of `$SHAPE`, in order, images
+   byte-identical. Trim the purpose text (`Summary`, or `Why` + `What changes`) to budget; do not
+   compress it into jargon to hit a number, move detail out instead. In `template` shape, fill
+   `## Agent` from the session: the DTF mode and rounds actually run, the exact model, and only
+   skills that were invoked.
 3. **Write the notes comment** to `/tmp/pr-notes.md` (format below).
 4. **Verify before writing anything:**
    ```bash
@@ -235,12 +285,13 @@ does — the reader cannot tell which mode wrote it, so neither can the gate.
    lost its images (PROJ-4421).
 9. **A reviewer asks for a section whose heading is banned.** "Please add an Architecture section"
    puts `## Architecture` in the body and the gate refuses it. Before writing it, offer the nearest
-   allowed home: scope and key files go in `## Scope`, design detail in the notes comment. Say so
+   allowed home: scope and key files go in `## Scope` (`template`: `## Considerations`), design detail in the notes comment. Say so
    in the reply to the reviewer up front rather than discovering it on the gate run (PROJ-4472).
 
 ## Related
 
-- `pr-description` — writes `## Why` and `## What changes`; owns their content, not the body shape
+- `pr-description` — writes the purpose text (`## Summary`, or `## Why` + `## What changes`); owns its content, not the body shape
+- `scripts/pr-body-shape.sh` — reads the repo's PR template and says which shape applies
 - `pr-decisions` — writes the decision entries this skill relocates once they are resolved
 - `code-walkthrough` — targets the notes comment, not the body
 - `pr-screenshot-captions` — owns everything under `## Visual verification`

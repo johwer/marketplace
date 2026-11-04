@@ -7,6 +7,10 @@
 #
 # Usage:  bash ~/.claude/scripts/pr-body-gate.sh <PR_NUMBER>
 #
+# Body shape comes from pr-body-shape.sh (the repo's PR template):
+#   template  ## Summary, ## Visual verification, ## Considerations, ## Agent (Repo since #4470)
+#   dtf       ## Why, ## What changes, ## Visual verification, ## Scope (no such template)
+#
 # Exit codes:
 #   0  passed, or deliberately out of scope (not the Repo repo; SignedIn gets only the
 #      template-checklist check)
@@ -141,10 +145,20 @@ tmp=$(mktemp -t prbodygate)
 printf '%s\n' "$body_raw" >"$tmp"
 trap 'rm -f "$tmp" "$tmp.stripped"' EXIT
 
+# --- 2b. Which shape this repo expects -----------------------------------------------
+shape=$(bash "$(dirname "$0")/pr-body-shape.sh" "$repo")
+if [ -z "$shape" ]; then
+  fail+=("could not read $repo's PR template to decide the body shape — refusing rather than assuming")
+  refuse
+fi
+
 # --- 3. Strip what does not count toward the word budget -------------------------------
-# Images and their markup, collapsed <details> blocks, HTML comments and fenced code.
+# Images and their markup, collapsed <details> blocks, HTML comments and fenced code, and the
+# template's ## Agent section (fixed metadata, not prose to read).
 # Captions are prose a human reads, so they are NOT stripped — only the markup lines.
 awk '
+  /^## /            { inagent = ($0 ~ /^## Agent[[:space:]]*$/) }
+  inagent           { next }
   /^```/            { infence = !infence; next }
   infence           { next }
   /<!--/            { incomment = 1 }
@@ -166,8 +180,23 @@ if [ -n "$banned_hits" ]; then
 fi
 
 # --- 5. Required headings --------------------------------------------------------------
-for required in '## Why' '## What changes'; do
-  if ! grep -qF "$required" "$tmp"; then
+if [ "$shape" = template ]; then
+  required_headings=('## Summary' '## Agent')
+  for misplaced in 'Why' 'What changes' 'Scope' 'Not in this PR' 'Risk' 'Risks'; do
+    if grep -qEi "^#{1,4} +${misplaced}[[:space:]]*$" "$tmp"; then
+      fail+=("section '## $misplaced' is the dtf shape — this repo's template wants it folded into ## Summary (why, what) or ## Considerations (scope, risk)")
+    fi
+  done
+  for field in 'Process' 'Agent' 'Skills'; do
+    if ! awk '/^## /{a=($0 ~ /^## Agent[[:space:]]*$/)} a' "$tmp" | grep -qE "^- \*\*${field}:\*\* *[^ ]"; then
+      fail+=("## Agent is missing a filled-in '- **${field}:**' line (see the repo's PR template)")
+    fi
+  done
+else
+  required_headings=('## Why' '## What changes')
+fi
+for required in "${required_headings[@]}"; do
+  if ! grep -qE "^${required}[[:space:]]*$" "$tmp"; then
     fail+=("missing required section: $required")
   fi
 done
@@ -206,7 +235,7 @@ if [ "${#fail[@]}" -gt 0 ]; then
   refuse
 fi
 
-printf '  \033[32m✓\033[0m PR #%s body: %s words, no banned sections\n' "$PR" "$words"
+printf '  \033[32m✓\033[0m PR #%s body (%s shape): %s words, no banned sections\n' "$PR" "$shape" "$words"
 if [ "${#warn[@]}" -gt 0 ]; then
   for w in "${warn[@]}"; do printf '  \033[33m!\033[0m %s\n' "$w"; done
 fi

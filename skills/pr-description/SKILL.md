@@ -37,6 +37,22 @@ the body, including the pros/cons and verification tables other skills put there
 
 ~200 words covers `## Why` + `## What changes` only — see "Word budget".
 
+**First, pick the headings from the repo's PR template:**
+
+```bash
+SHAPE=$(bash ~/.claude/scripts/pr-body-shape.sh)   # template | dtf; non-zero exit → stop, don't guess
+```
+
+- **`template`** (the repo's template has `## Summary` and `## Agent`; Repo since #4470, whose
+  AGENTS.md says to follow the template): write the same content under the template's headings.
+  Why + What changes become **`## Summary`**, 1–3 lines (why it was needed, then what is now true;
+  every rule below about outcomes and plain language still applies). How to see it becomes
+  **`## Visual verification`**. Not in this PR and the risks become bullets in
+  **`## Considerations`** (`- **Out of scope:** …`, `- **Look closely:** …`), where
+  `pr-ready` also puts the resolved decisions as `- **Decision:** …` bullets at the ready transition.
+  `## Agent` is filled by the DTF PR step, not by this skill; leave it alone.
+- **`dtf`** (no such template): the shape below.
+
 ```markdown
 ## Why
 
@@ -87,7 +103,7 @@ only if there is genuinely nothing to say, which is rarer than it feels.>
 
 **The PR body is one field, and other skills write into it too.** A PR you run this on may already carry a reviewer walkthrough, captioned screenshots, a test guide and a progress checklist. Replacing the body with only your five sections destroys all of it. That has to be a deliberate act, never a side effect.
 
-**Sections this skill owns:** `## Why`, `## What changes`, `## How to see it`, `## Not in this PR`, and the `## Decisions` slot (content delegated — see `pr-decisions`).
+**Sections this skill owns:** `## Why`, `## What changes`, `## How to see it`, `## Not in this PR`, and the `## Decisions` slot (content delegated — see `pr-decisions`). In `template` shape: `## Summary`, and the `Out of scope:` / `Look closely:` bullets in `## Considerations`.
 
 **Sections owned by others — never rewrite or drop:**
 
@@ -101,12 +117,13 @@ only if there is genuinely nothing to say, which is rarer than it feels.>
 | The body's overall **shape** at the ready transition — which sections survive at all | `pr-ready` |
 
 **One exception to "compose, never replace":** at the ready transition, `pr-ready` (Repo DTF
-only) deletes and relocates sections body-wide, cutting it to `## Why` / `## What changes` /
-`## Visual verification` / `## Scope` and moving reviewer detail into an "Implementation notes"
+only) deletes and relocates sections body-wide, cutting it to the shape the repo's template asks for
+(`## Summary` / `## Visual verification` / `## Considerations` / `## Agent`, or `## Why` /
+`## What changes` / `## Visual verification` / `## Scope`) and moving reviewer detail into an "Implementation notes"
 comment. That is a deliberate, once-per-PR act by a skill that owns the whole field. It does not
 license *you* to replace the body — your rule above is unchanged.
 
-**Heading collisions.** Real PRs here usually open with `## Summary` rather than `## Why`. If a `## Summary` (or `## Overview`) exists, **replace it** with `## Why` + `## What changes` — do not append, or the PR ends up with two purpose sections saying the same thing differently. `## Not in this PR` and `## How to see it` likewise replace their existing counterpart rather than duplicating it. If a PR splits observation across several sections by audience — local repro, deployed verification, evidence — leave that split alone and treat them collectively as your "How to see it".
+**Heading collisions.** In `template` shape, `## Summary` is the purpose section: if a `## Why` / `## What changes` (or `## Overview`) exists, **fold it into `## Summary`**. In `dtf` shape it is the reverse: if a `## Summary` (or `## Overview`) exists, **replace it** with `## Why` + `## What changes`. Either way, do not append, or the PR ends up with two purpose sections saying the same thing differently. `## Not in this PR` and `## How to see it` likewise replace their existing counterpart rather than duplicating it. If a PR splits observation across several sections by audience — local repro, deployed verification, evidence — leave that split alone and treat them collectively as your "How to see it".
 
 **Procedure:**
 
@@ -126,7 +143,7 @@ Then verify: section count did not shrink, `grep -c '<img'` is unchanged, and th
 
 ## Word budget
 
-~200 words covers `## Why` + `## What changes`. That is the target, not a cap on the description as a whole — `## How to see it` and `## Not in this PR` sit outside it, and a full-stack PR that reversed a decision mid-flight will exceed it. When it does, that is the signal to move the reasoning into `## Decisions` via `pr-decisions`, not to compress it until it is unreadable.
+~200 words covers `## Why` + `## What changes` (in `template` shape, `## Summary` should be well under that: 1–3 lines). That is the target, not a cap on the description as a whole — `## How to see it` and `## Not in this PR` sit outside it, and a full-stack PR that reversed a decision mid-flight will exceed it. When it does, that is the signal to move the reasoning into `## Decisions` via `pr-decisions`, not to compress it until it is unreadable.
 
 ## Rules
 

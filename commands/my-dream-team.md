@@ -497,6 +497,23 @@ Immediately after receiving Amara's analysis, create a **draft PR** so the user 
    EOF
    )"
    ```
+   **Pick the body shape from the repo's PR template first:** `SHAPE=$(bash ~/.claude/scripts/pr-body-shape.sh)` (non-zero exit → stop and tell the user, don't guess).
+   - `dtf` (no template with `## Summary` + `## Agent`): use the body structure below as is.
+   - `template` (Repo since #4470; AGENTS.md says to follow `.github/pull_request_template.md`): same body, but replace `## Why` + `## What changes` with
+     ```
+     ## Summary
+     [1-3 sentences: why it was needed, then what is now true. Provisional until pr-description runs.]
+
+     ## Considerations
+     [Decision / Look closely / Out of scope bullets — filled by pr-description and pr-ready.]
+
+     ## Agent
+     - **Process:** DTF <full|lite>, in progress
+     - **Agent:** Claude Code, <exact model id>
+     - **Skills:** <skills invoked so far>
+     ```
+     and keep the `[session-only]` sections below it unchanged. **After every push**, update `## Agent` (rounds, slices, skills actually invoked) and any other part the new commits made stale, in place — keep everything a person wrote.
+
    Body structure:
 
 ```
@@ -510,7 +527,7 @@ Immediately after receiving Amara's analysis, create a **draft PR** so the user 
 > **Before marking the PR ready:** run the `pr-description` skill to rewrite `## Why` and
 > `## What changes` properly — the draft version is a placeholder, and a description that
 > restates the ticket is the default failure. Then run **`pr-ready`**, which cuts the body to
-> the four reader-facing sections and moves everything else into the `Implementation notes`
+> the reader-facing sections of the repo's shape and moves everything else into the `Implementation notes`
 > comment. Pair with `pr-screenshot-captions` for the images (before `pr-ready`), and note that
 > `code-walkthrough` writes to the notes comment, not here.
 >
@@ -1145,11 +1162,11 @@ Then **commit, push, and generate the initial PR summary**:
 3. **Spawn Tane for initial summary** (see Tane's prompt below) — this summary helps GitHub AI reviewers and human reviewers understand the changes
 3b. **Invoke the `code-walkthrough` skill** to add a `## Walkthrough of the changes` section. It explains the diff file by file for a reviewer who has not read it, and — the part that matters — splits hand-written production code from tests and generated output, because a 1,890-line diff that is 75% tests is a small change wearing a big number and a reviewer who doesn't know that budgets their attention wrongly. It also forces the scope statement: anything in the diff that is NOT what the ticket asked for (an opportunistic fix, a pre-existing bug fixed in passing, endpoints that rode along in a regeneration) gets named with a line count. Unannounced extras read as scope creep; labelled ones read as diligence.
 
-3c. **Invoke the `pr-description` skill** to write `## Why` and `## What changes`. This REPLACES the placeholder text from the draft — do not ship the draft version. The skill's one rule is never restate the ticket: write outcomes ("HR users no longer see the Products tab"), not activities ("added a permission check"). It carries a measurable readability bar (sentences 15-20 words, active voice, no unexpanded acronyms, no internal type names in `## Why`) and forces a `## Not in this PR` section so a reviewer cannot assume the whole ticket is covered.
+3c. **Invoke the `pr-description` skill** to write `## Why` and `## What changes` (in `template` shape: `## Summary` plus the `Out of scope:` / `Look closely:` bullets in `## Considerations`). This REPLACES the placeholder text from the draft — do not ship the draft version. The skill's one rule is never restate the ticket: write outcomes ("HR users no longer see the Products tab"), not activities ("added a permission check"). It carries a measurable readability bar (sentences 15-20 words, active voice, no unexpanded acronyms, no internal type names in `## Why`) and forces a `## Not in this PR` section so a reviewer cannot assume the whole ticket is covered.
 
 3d. **Invoke the `pr-decisions` skill** if — and only if — a real judgement call was made: the implementation diverged from what the ticket proposed, a domain-model gate was resolved, you picked one of several viable mechanisms, or you accepted a known cost. It adds a `## Decisions` section with the alternative and the trade-off for each. **Diverging from the ticket ALWAYS qualifies** — say so in the PR before a reviewer finds it. Omit the section entirely when there were no real decisions; a padded one teaches readers to skip it.
 
-4. **Update the draft PR description** with Tane's summary using `gh pr edit <PR_NUMBER> --body "..."`. Include the `## Why` / `## What changes` from step 3c, any `## Decisions` from step 3d, architecture section, progress checkboxes, the walkthrough from step 3b, and the **"How to Test" section** with concrete steps. The "How to Test" section must include:
+4. **Update the draft PR description** with Tane's summary using `gh pr edit <PR_NUMBER> --body "..."`. Include the purpose section from step 3c (`## Why` / `## What changes`, or `## Summary` + `## Considerations` in `template` shape), any `## Decisions` from step 3d, the updated `## Agent` (`template` shape), architecture section, progress checkboxes, the walkthrough from step 3b, and the **"How to Test" section** with concrete steps. The "How to Test" section must include:
    - The exact URL path (e.g., `http://localhost:<VITE_DEV_PORT>/<customerId>/employees/<employeeId>`)
    - Step-by-step user actions to verify the change
    - What to look for (expected results as a checklist)
@@ -1258,7 +1275,7 @@ The decision is split into TWO user-confirmable steps (PROJ-3039 retro, user-man
 3. **If "Mark ready":**
    - **Screenshot-caption check (BEFORE marking ready)**: Ask the user: "Have you added screenshots to the PR description?" If yes (or if `<img`/`![` tags appear in the PR body that you didn't put there), **invoke the `pr-screenshot-captions` skill** — it groups the images into before/after pairs by step, captions each with what it shows + what it proves, adds spacing, drops broken/error captures, collapses intermediate/exploration shots, verifies each against the local source files (never from filenames alone), and uses a re-fetch-before-write flow so a concurrent user edit isn't clobbered. (If the skill isn't installed, do it manually: caption under EACH image grouped under a "Visual Verification Evidence" heading, label non-evidentiary shots honestly, preserve images where the user placed them.)
    - **Pre-emptive review HARD GATE (before `gh pr ready`)**: Run `/ghost-review` (backend diffs) and `/owl-review` (tech-lead lens) and resolve their MUST FIX items first. These catch the issues human reviewers push back on before the PR is visible — treat a clean pass as a prerequisite for marking ready, not an optional nicety (PROJ-3250). In the same gate, always run **`/hard-simplify`**, frontend and backend alike, and resolve every REUSE block. If the diff touches a contract or boundary, also run the **`lift-the-gaze`** Step 0.7 lens: which shared mechanisms and decisions does this PR pass through? These are the same passes we run on other people's PRs. PROJ-4696 ran only `pr-reviewer` and owl before ready, and the human reviewer found what these two passes look for.
-   - **Assemble the body HARD GATE (before `gh pr ready`)**: invoke the **`pr-ready`** skill. It cuts the description to the four sections a human reads — `## Why`, `## What changes`, `## Visual verification`, `## Scope` (~180 words, 250 cap) — and moves the walkthrough, resolved decisions, verification log, pre-emptive review findings and audit notes into a single `Implementation notes — reviewer detail` comment below the diff. `Progress`, `Architecture`, `How to Test`, `Questions` and the ASCII banner are dropped here. Run it AFTER `tester-handoff` (6.4) and `pr-screenshot-captions`, and confirm with the gate — **paste the output**:
+   - **Assemble the body HARD GATE (before `gh pr ready`)**: invoke the **`pr-ready`** skill. It cuts the description to the sections a human reads, in the shape `pr-body-shape.sh` reports — `template`: `## Summary`, `## Visual verification`, `## Considerations`, `## Agent`; `dtf`: `## Why`, `## What changes`, `## Visual verification`, `## Scope` (~180 words, 250 cap, `## Agent` not counted) — and moves the walkthrough, resolved decisions, verification log, pre-emptive review findings and audit notes into a single `Implementation notes — reviewer detail` comment below the diff. `Progress`, `Architecture`, `How to Test`, `Questions` and the ASCII banner are dropped here. Run it AFTER `tester-handoff` (6.4) and `pr-screenshot-captions`, and confirm with the gate — **paste the output**:
      ```bash
      bash ~/.claude/scripts/pr-body-gate.sh <PR_NUMBER>   # exit 1 = REFUSED, do not go ready
      ```
@@ -1383,7 +1400,7 @@ _Step-by-step instructions for manually verifying this change._
   - Be thorough but concise — every bullet should add information
   - **IMPORTANT**: The "How to Test" section must include the exact URL path to navigate to, specific user actions, and concrete expected results. Read the router config to determine the correct URL. This section is what the PO and team use to verify the fix — make it clear enough that anyone can follow it.
 
-After receiving Tane's summary, **update the PR description using the read-then-edit approach** (see Important Rules). Merge Tane's content into the existing PR body — update the `## Why`, `## What changes`, `## How to Test`, etc. sections but **preserve** any user-added images and screenshots. If `## Why` / `## What changes` still contain the draft placeholder text, run the `pr-description` skill now — shipping the placeholder is a completion-gate failure.
+After receiving Tane's summary, **update the PR description using the read-then-edit approach** (see Important Rules). Merge Tane's content into the existing PR body — update the purpose section (`## Why` / `## What changes`, or `## Summary` in `template` shape), `## Agent`, `## How to Test`, etc. but **preserve** any user-added images and screenshots. If the purpose section still contains the draft placeholder text, run the `pr-description` skill now — shipping the placeholder is a completion-gate failure.
 
 ### Phase 6.75: Agent Retrospectives & Self-Improvement
 
@@ -1616,7 +1633,7 @@ The description a human actually reads is not optional in lite mode. Run `pr-rea
 
 ```
 ✓ PR BODY ASSEMBLED
-  skill:    pr-ready — body cut to Why / What changes / Visual verification / Scope
+  skill:    pr-ready — body cut to the repo's shape (template: Summary / Visual verification / Considerations / Agent; dtf: Why / What changes / Visual verification / Scope)
   moved:    <walkthrough | decisions | verification | pre-emptive review | audit findings — or "nothing to move">
   comment:  <URL of the "Implementation notes — reviewer detail" comment, or "n/a">
   gate:     bash ~/.claude/scripts/pr-body-gate.sh <PR_NUMBER>
