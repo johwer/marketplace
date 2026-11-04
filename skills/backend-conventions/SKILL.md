@@ -5,7 +5,7 @@ description: Backend coding conventions for the Repo monorepo
 
 ## Loading Conventions
 
-Nothing loads these conventions automatically: the repo has no `.claude/skills/backend-conventions.md` (checked 2026-10-18). The `backend-skill-reminder.sh` hook nudges once per session when C# under `services/` or `shared/` is edited. Read these files directly:
+Nothing loads these docs automatically: the repo has no `.claude/skills/backend-conventions.md` (checked 2026-11-04). What does load by path since #4470 is `.claude/rules/*.md`: `ef-migrations.md`, `service-c-permissions.md` and `writing-tests.md`. Comments follow root `AGENTS.md#comments` (analyzer `MH0001` fails the build on comments in member bodies), and `/writing-tests` gates every test change. The `backend-skill-reminder.sh` hook nudges once per session when C# under `services/` or `shared/` is edited. Read these files directly:
 - `docs/CODING_STYLE_BACKEND.md`
 - `docs/API_CONVENTIONS.md`
 - `docs/TESTING_GUIDELINES_BACKEND.md`

@@ -134,8 +134,8 @@ echo ""
 
 # ── Added comments ──────────────────────────────
 # CI does NOT cover this: lint, type-check and prettier all pass on a comment that
-# merely restates the line below it. The rule is docs/CODING_STYLE_FRONTEND.md:256
-# (PROJ-3283) and until now it was enforced only when a skill happened to tell a model
+# merely restates the line below it. The rule is AGENTS.md#comments (in C# the build also
+# enforces it through analyzer MH0001), and until now it was enforced only when a skill happened to tell a model
 # to run the script — which means it was skipped exactly when a model chose to skip it.
 #
 # Runs for both areas: comment-gate filters by extension itself (.ts/.tsx/.cs/.mts/.js/.mjs),
@@ -149,7 +149,7 @@ echo ""
 #
 # A missing script FAILS rather than warns: deleting the checker must not be the way
 # around a refusal.
-echo "▸ Added comments (restating-comment gate)..."
+echo "▸ Added comments (comment gate)..."
 COMMENT_GATE="$HOME/.claude/scripts/comment-gate.sh"
 if [[ ! -x "$COMMENT_GATE" ]]; then
   add_result "Added comments" "FAIL" "comment-gate.sh not found or not executable at $COMMENT_GATE — the gate cannot run, so it refuses rather than passing silently. Restore it (/sync-config) and re-run."
@@ -169,7 +169,7 @@ else
     CG_REASONS=$(grep -E 'REFUSED' /tmp/qg-comments-plain.log 2>/dev/null | sed -E 's/^[[:space:]]*REFUSED[[:space:]]*—[[:space:]]*//' | tr '\n' ';' | sed 's/;$//' || true)
     add_result "Added comments" "FAIL" "${CG_REASONS:-comment-gate refused} — delete them in one pass. Full list in /tmp/qg-comments.log: ${CG_LINES:-see log}"
   elif grep -q 'flagged for judgement' /tmp/qg-comments-plain.log; then
-    add_result "Added comments" "WARN" "added comment(s) the gate could not auto-judge — keep only the non-obvious WHY: ${CG_LINES:-see /tmp/qg-comments.log}"
+    add_result "Added comments" "WARN" "added comment(s) the gate could not auto-judge — keep one only if it is an external gotcha the code cannot state (AGENTS.md#comments): ${CG_LINES:-see /tmp/qg-comments.log}"
   else
     add_result "Added comments" "PASS" ""
   fi

@@ -28,7 +28,12 @@ Never spend model tokens on something a script can count.
 ```bash
 bash ~/.claude/scripts/comment-gate.sh          # every added comment, in one list
 cd apps/web && npm run lint && npm run type-check
+dotnet build services/<Domain>/<Service>        # C#: MH0001 fails the build on comments in member bodies
 ```
+
+The rule is `AGENTS.md#comments`: comments are a smell, and only its listed exceptions survive.
+In C#, `comment-gate.sh` covers what sits outside member bodies (`///` on non-endpoint/DTO
+types, class-level comments); the analyzer covers the bodies.
 
 The comment gate exists because "remove the comments" used to take four passes. It lists all
 of them with `file:line` so the fix is one pass. Fix everything it prints before reading on.

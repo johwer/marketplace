@@ -30,7 +30,7 @@ Side doors that skip the controller: Rebus handlers (`*.API/Handlers`, `Messagin
 - Inherits `RepoController`; `[ApiController]`, `[Authorize]`, `[AcceptTokens]`.
 - Validates **shape**: required fields, `StartDate <= EndDate`, GUID not empty → `ApiResponse.ValidationError("…")`.
 - Asks ServiceC: `authorizationAdapter.CanDoActionOnCompany(token, action, companyId)` → `Forbidden` if false.
-- Calls one service method and returns its `ApiResponse<T>`. In Repo the service builds the envelope (`CODING_STYLE_BACKEND.md:521`, ~200 services); the textbook would put a result type in the service and the HTTP mapping in the controller (see `dotnet-architecture-reference/repo-vs-textbook.md`).
+- Calls one service method and returns its `ApiResponse<T>`. In Repo the service builds the envelope (`CODING_STYLE_BACKEND.md § Concurrency, the `GetUsersAsync` example`, ~200 services); the textbook would put a result type in the service and the HTTP mapping in the controller (see `dotnet-architecture-reference/repo-vs-textbook.md`).
 - **Wrong here:** business rules (`if (company.HasContract…)`), EF queries, loops that compute things, mapping repeated in several actions.
 - **Symptom:** the controller is long and its tests need a database.
 

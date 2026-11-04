@@ -214,7 +214,7 @@ For what remains, walk the request down the layers and place each piece. Use `re
 | Layer | Belongs here | Wrong-place smell |
 |-------|--------------|-------------------|
 | Controller | HTTP, token type, shape validation, ServiceC check, call the service and return its `ApiResponse<T>` | `if (retailer == …)` business rules, EF queries, `DbContext` |
-| Service (`*.API/Services`) | Orchestration, business rules for this API, ServiceC/other-service calls, publish events, returns `ApiResponse<T>` (Repo convention, `CODING_STYLE_BACKEND.md:521`) | `HttpContext`, raw SQL, a rule a worker also needs |
+| Service (`*.API/Services`) | Orchestration, business rules for this API, ServiceC/other-service calls, publish events, returns `ApiResponse<T>` (Repo convention, `CODING_STYLE_BACKEND.md § Concurrency, the `GetUsersAsync` example`) | `HttpContext`, raw SQL, a rule a worker also needs |
 | Domain (`*.Domain`) | Entities, Repositories, Policies, shared readers used by API **and** workers | Knowing about HTTP, DTOs or `ApiResponse` |
 | Repository | Queries, filters, includes, projections | Deciding *whether* the user may see it (that's a rule) |
 | DTO (`*.API/Models/DTOs`) | The contract with the frontend (becomes RTK types via `generate-api`) | An EF entity returned straight from a controller |

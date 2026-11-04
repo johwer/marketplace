@@ -44,6 +44,7 @@ DTF sections still exist; they live under the template's headings:
 | Resolved decisions (the 1–3 that matter) | `## Considerations`, `- **Decision:** chose X over Y because Z` (the rest go to the notes comment) |
 | Risk, where to look | `## Considerations`, `- **Look closely:** …` |
 | Scope / Not in this PR | `## Considerations`, `- **Out of scope:** … (PROJ-XXXX)` |
+| Over 500 added production lines | `## Considerations`, `- **Size:** N production lines; can't split because …` (required, both shapes; in `dtf` it goes under `## Scope`) |
 | (new) | `## Agent`: Process, Agent, Skills, filled from the session |
 
 ```markdown
@@ -60,6 +61,7 @@ DTF sections still exist; they live under the template's headings:
 - **Decision:** <chose X over Y because Z>
 - **Look closely:** <file or behaviour where a reviewer should spend time>
 - **Out of scope:** <one line> (PROJ-XXXX)
+- **Size:** <only past 500 added production lines: why it can't split>
 
 ## Agent
 
@@ -297,3 +299,12 @@ does — the reader cannot tell which mode wrote it, so neither can the gate.
 - `pr-screenshot-captions` — owns everything under `## Visual verification`
 - `tester-handoff` — owns the test guide, as a local file only (never posted)
 - `scripts/pr-body-gate.sh` — the fail-closed check; DTF Phase 6 and the Completion Gate both run it
+
+## Size: past 500 production lines
+
+Root `AGENTS.md` (Slice): past 500 added production lines (generated files, tests, docs and
+prototypes excluded), the PR body says why it can't split. `/reviewing-changes` prints the
+count up front, and `pr-body-gate.sh` counts it the same way and refuses without a
+`- **Size:**` bullet. The reason is the slicing argument ("the migration and its only
+reader must ship together"), not the line count restated. If no honest reason exists,
+split the PR instead of writing one.

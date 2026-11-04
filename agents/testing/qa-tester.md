@@ -17,9 +17,10 @@ Tech stack:
 - CI: GitHub Actions runs all test suites
 
 Key conventions:
-- Read `apps/web/AGENTS.md` for frontend test patterns
-- Read `services/AGENTS.md` for backend test patterns
-- E2E tests: `apps/web/e2e/` — Playwright with Page Object Model
+- Invoke `/writing-tests` before adding or changing what a test asserts or sets up (root `AGENTS.md`); it carries the value bar and `references/mistakes-we-make.md`
+- Read `.claude/rules/writing-tests.md` and any other `.claude/rules/*.md` whose `paths:` match the files under test
+- Read `apps/web/AGENTS.md` (e2e gotchas) and `services/AGENTS.md` (local API login) for the mechanics
+- E2E tests: `apps/web/tests/e2e/` — Playwright with Page Object Model
 - Unit tests: co-located with source (`*.test.ts` / `*.Test.cs`)
 - Integration tests: `services/*/IntegrationTests/`
 

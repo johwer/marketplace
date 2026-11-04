@@ -19,6 +19,7 @@
 # Env overrides (rarely needed):
 #   PR_GATE_REPO         default RepoAB/Repo
 #   PR_GATE_WORD_LIMIT   default 250
+#   PR_GATE_SIZE_LIMIT   default 500 (added production lines before a '- **Size:**' line is required)
 #
 # NOTE ON `set -e`: deliberately NOT used. Every check must run so the operator sees the
 # full list of violations in one pass, and a failed check must REFUSE rather than let the
@@ -230,12 +231,66 @@ if printf '%s' "$notes" | grep -qE '^[0-9]+$' && [ "$notes" -eq 0 ]; then
   warn+=("no 'Implementation notes — reviewer detail' comment found (fine if there was no detail to move)")
 fi
 
+# --- 8b. Size: past 500 production lines the body says why it can't split --------------
+# Root AGENTS.md: "Past 500 added production lines (generated files, tests, docs and
+# prototypes excluded), say in the PR body why it can't split." The exclusions are the
+# pathspec /reviewing-changes measures with, so both report the same number. Counted
+# locally against the PR's own base (not origin/main: stacked PRs). An uncountable diff
+# refuses: this is the check most likely to be argued away.
+SIZE_LIMIT="${PR_GATE_SIZE_LIMIT:-500}"
+pr_refs=$(gh pr view "$PR" --json baseRefName,headRefName,headRefOid --jq '[.baseRefName,.headRefName,.headRefOid]|@tsv' 2>/dev/null)
+IFS=$'\t' read -r base_ref head_ref head_oid <<<"$pr_refs"
+if [ -z "${head_oid:-}" ]; then
+  fail+=("could not read PR #$PR base/head to count production lines — refusing rather than assuming")
+else
+  git cat-file -e "$head_oid" 2>/dev/null || git fetch -q --no-tags origin "pull/$PR/head" 2>/dev/null
+  git rev-parse -q --verify "origin/$base_ref" >/dev/null || git fetch -q --no-tags origin "$base_ref" 2>/dev/null
+  mb=$(git merge-base "origin/$base_ref" "$head_oid" 2>/dev/null)
+  if [ -z "$mb" ]; then
+    # No local commits (fetch blocked, or not run from the checkout): count from the API's
+    # per-file additions with the same exclusions. linguist-generated is read from the
+    # local .gitattributes when there is one.
+    prod_lines=$(gh api --paginate "repos/$repo/pulls/$PR/files?per_page=100" \
+      --jq '.[] | [.filename, (.additions|tostring)] | @tsv' 2>/dev/null | python3 -c '
+import re, subprocess, sys
+rows = [l.rstrip("\n").split("\t") for l in sys.stdin if "\t" in l]
+if not rows:
+    sys.exit(1)
+EXCL = re.compile(r"(^|/)[^/]*\.(Test|IntegrationTests)/|^shared/Repo\.Shared\.IntegrationTesting/|\.test\.tsx?$|\.spec\.ts$"
+                  r"|(^|/)__tests__/|(^|/)tests/|[Ff]ixtures\.ts$|(^|/)test_[^/]*\.py$|\.md$|^apps/web/prototypes/")
+gen = set()
+out = subprocess.run(["git", "check-attr", "linguist-generated", "--"] + [r[0] for r in rows],
+                     capture_output=True, text=True).stdout
+for line in out.splitlines():
+    f, _, v = line.rpartition(": linguist-generated: ")
+    if v.strip() == "true":
+        gen.add(f)
+print(sum(int(a) for f, a in rows if f not in gen and not EXCL.search(f)))
+')
+    if ! printf '%s' "$prod_lines" | grep -qE '^[0-9]+$'; then
+      fail+=("could not count PR #$PR production lines (no local merge-base, API read failed) — refusing rather than assuming")
+      prod_lines=0
+    fi
+  else
+    prod_lines=$(git diff --shortstat "$mb" "$head_oid" -- . ':(exclude,attr:linguist-generated=true)' \
+      ':(exclude,glob)**/*.Test/**' ':(exclude,glob)**/*.IntegrationTests/**' \
+      ':(exclude)shared/Repo.Shared.IntegrationTesting' ':(exclude,glob)**/*.test.ts*' \
+      ':(exclude,glob)**/*.spec.ts' ':(exclude,glob)**/__tests__/**' ':(exclude,glob)**/tests/**' \
+      ':(exclude,glob)**/*[Ff]ixtures.ts' ':(exclude,glob)**/test_*.py' ':(exclude,glob)**/*.md' \
+      ':(exclude)apps/web/prototypes' 2>/dev/null | sed -nE 's/.* ([0-9]+) insertion.*/\1/p')
+    prod_lines=${prod_lines:-0}
+  fi
+  if [ "$prod_lines" -gt "$SIZE_LIMIT" ] && ! grep -qE '^[-*] \*\*Size:\*\* *[^ ]' "$tmp"; then
+    fail+=("$prod_lines added production lines (over $SIZE_LIMIT) and no '- **Size:** <why it can't split>' line in the body (AGENTS.md: Slice)")
+  fi
+fi
+
 # --- 9. Verdict ------------------------------------------------------------------------
 if [ "${#fail[@]}" -gt 0 ]; then
   refuse
 fi
 
-printf '  \033[32m✓\033[0m PR #%s body (%s shape): %s words, no banned sections\n' "$PR" "$shape" "$words"
+printf '  \033[32m✓\033[0m PR #%s body (%s shape): %s words, %s production lines, no banned sections\n' "$PR" "$shape" "$words" "${prod_lines:-?}"
 if [ "${#warn[@]}" -gt 0 ]; then
   for w in "${warn[@]}"; do printf '  \033[33m!\033[0m %s\n' "$w"; done
 fi

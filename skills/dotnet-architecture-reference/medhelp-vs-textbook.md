@@ -191,7 +191,7 @@ Checked against `main` @ `6d94fcd7b` on 2026-10-17. Book refs: **web-apps** = *A
 - **Textbook:** DTOs at the boundary. The reference app maps by hand and the book never prescribes AutoMapper (web-apps p. 37, 56-57, 63).
 - **Repo does:** static `MapFromDomain` / `MapToDto` methods. There is no AutoMapper reference in `services/` or `shared/`.
 - **Decided where:**
-  - Style guide `docs/CODING_STYLE_BACKEND.md:480`: "Do not use AutoMapper — explicit mapping is preferred for traceability and compile-time safety".
+  - Style guide `docs/CODING_STYLE_BACKEND.md § DTO Mapping`: "Do not use AutoMapper — explicit mapping is preferred for traceability and compile-time safety".
   - Slack #project-nova 2025-10-08: "Never return a domain object from a controller."
 - **Why (as stated):** traceability and compile-time safety.
 - **Status:** deliberate.
@@ -212,10 +212,10 @@ Checked against `main` @ `6d94fcd7b` on 2026-10-17. Book refs: **web-apps** = *A
   - 207 service files return `Task<ApiResponse…>`, for example `services/ServiceA/ServiceA.API/Services/SocialInsuranceReportService.cs:20`.
 - **Decided where:**
   - Slack #style-guide-backend 2024-11-26: the `{status, result, data?, reason?}` standard (owl [RESPONSE-CONTRACT]).
-  - Style guide `CODING_STYLE_BACKEND.md:521`: its example shows a service returning `ApiResponse<List<User>>`.
+  - Style guide `CODING_STYLE_BACKEND.md § Concurrency, the `GetUsersAsync` example`: its example shows a service returning `ApiResponse<List<User>>`.
   - Skill `lift-the-gaze/references/layers.md:40,45`: `ApiResponse` is "Wrong here" in services and repositories.
 - **Why (as stated):** one envelope for every client. No reason is given for the layers.md ban.
-- **Status:** deliberate. `layers.md` was the outlier and was fixed on 2026-10-17 to match the code and `CODING_STYLE_BACKEND.md:521`.
+- **Status:** deliberate. `layers.md` was the outlier and was fixed on 2026-10-17 to match the code and `CODING_STYLE_BACKEND.md § Concurrency, the `GetUsersAsync` example`.
 - **Worth asking the tech lead:** —
 
 ### Validation placement
@@ -283,8 +283,7 @@ Checked against `main` @ `6d94fcd7b` on 2026-10-17. Book refs: **web-apps** = *A
   - Style guide `docs/TESTING_GUIDELINES_BACKEND.md:10`: "If the behavior depends on infrastructure… write an integration test".
   - The same doc at `:8`, "Business logic through API endpoints", and at `:112-122`, InMemory repository tests.
 - **Why (as stated):** integration tests are "quite expensive (time budget-wise)". InMemory cannot see translation or index bugs (owl [INMEMORY-BLINDSPOT]).
-- **Status:** drift. `TESTING_GUIDELINES_BACKEND.md:8-10` is staler than the sparsity rule from the PRs.
-- **Worth asking the tech lead:** Should `TESTING_GUIDELINES_BACKEND.md:8-10` be rewritten to "one happy-path integration test per endpoint, branching in unit tests"? Yes/no.
+- **Status:** resolved 2026-11-04 by #4470 (PROJ-4795). `TESTING_GUIDELINES_BACKEND.md` lost its `:8-10` rules and now defers to `/writing-tests`, which says "Integration tests: 1 to 3 per feature, for the critical path and its wiring … The edge-case matrix goes into unit tests". Root `AGENTS.md` adds "a new endpoint's happy path becomes its integration test". The line refs above are pre-#4470.
 
 ### Enumeration classes vs enums
 - **Textbook:** enumeration classes are optional. Branching on enums across the code is a smell (microservices p. 221-222).
@@ -351,8 +350,6 @@ Checked against `main` @ `6d94fcd7b` on 2026-10-17. Book refs: **web-apps** = *A
 - Should the ServiceC `AuthorizationAdapter` HttpClient get the standard resilience handler (timeout, retry, breaker)? Yes/no.
 
 - Where does a new cache go? (A) a decorator on the repository, like ServiceC today; (B) a decorator on the service.
-
-- Should `TESTING_GUIDELINES_BACKEND.md:8-10` become "one happy-path integration test per endpoint, branching in unit tests"? Yes/no.
 
 - Can the unused ServiceD PostHog flag service and the PostHog references in the ServiceA workers be removed (PROJ-3473)? Yes/no.
 

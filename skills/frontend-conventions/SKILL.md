@@ -5,9 +5,7 @@ description: Frontend coding conventions for the Repo monorepo
 
 ## Loading Conventions
 
-Project-level conventions are loaded automatically via `.claude/skills/frontend-conventions.md` when editing `apps/web/src/**/*.ts{x}` files.
-
-If project-level skills are not available (e.g., older branch), read these files directly:
+Nothing loads the frontend docs automatically: the repo has no `.claude/skills/frontend-conventions.md`. What does load by path is `.claude/rules/*.md` (`generated-api-clients.md` for `rtk-apis/`, `writing-tests.md` for tests). The comment rule is root `AGENTS.md#comments`, and `/writing-tests` gates every test change. Read these files directly:
 - `docs/CODING_STYLE_FRONTEND.md`
 - `docs/FRONTEND_COMPONENTS.md`
 - `docs/TAILWIND_CONVENTIONS.md`

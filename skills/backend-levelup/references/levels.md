@@ -9,7 +9,7 @@ Each item: id · what you can do · anchor (verify before quoting).
 | Id | Can do | Anchor |
 |---|---|---|
 | L1.1 | Trace one call: route → controller → service → repository → DB, and back | `services/ServiceA/ServiceA.API/Controllers/ServiceAReportController.cs`, `lift-the-gaze/references/layers.md` |
-| L1.2 | Explain why the API returns a DTO and not the entity (contract, data leaks, over-posting) | `layers.md#why-dtos`, `CODING_STYLE_BACKEND.md:480` (no AutoMapper) |
+| L1.2 | Explain why the API returns a DTO and not the entity (contract, data leaks, over-posting) | `layers.md#why-dtos`, `CODING_STYLE_BACKEND.md § DTO Mapping` (no AutoMapper) |
 | L1.3 | Say where authorization happens and who decides it (the service asks ServiceC over HTTP) | `ServiceAReportController.cs:70` `CanDoActionOnUser`, `docs/SERVICE_ARCHITECTURE.md` |
 | L1.4 | Read the `ApiResponse<T>` envelope and pick the right status (400 vs 403 vs 404 vs 409) | `shared/Repo.Shared.Models/ApiResponse.cs`, owl [RESPONSE-CONTRACT], ghost [BAD-INPUT-IS-4XX] |
 | L1.5 | Explain what middleware/attributes do before the action runs (`[Authorize]`, `[AcceptTokens]`) | any controller deriving `RepoController` |

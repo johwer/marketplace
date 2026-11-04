@@ -491,6 +491,9 @@ Slack instances of the same rule:
 - "Do we have more than one way to define default activities? … are we hardcoding something somewhere?" (2026-03-27).
 
 **[UNREACHABLE-PERMISSION] A new action no assignable permission can reach for some retailer**
+Background for every ServiceC finding (resolver scopes, platform-action grants needing a retailer-scoped
+assignment, the Redis cache that hides hand-edited grants): `~/.claude/skills/permission-gate/references/service-c-resolver-and-platform-actions.md`.
+The repo keeps only the summary, in `.claude/rules/service-c-permissions.md`.
 Adding a `CustomerAction`/`CompanyAction` and mapping it into `DefaultPermissionsMappings` is not
 enough: for each retailer, check that a permission in `ServicePermissionMap.AlwaysOn[<Retailer>]`
 (or a contract entry) that users can actually be assigned maps the action. Blanket grants to
@@ -674,6 +677,7 @@ permission: return 200 with `[]`, not 403 ("A wrong assumption in the backend th
 users means no permission", 2026-01-29).
 
 **[MISSING-TEST] No integration test for new persistence round-trip**
+Now also repo policy: root `AGENTS.md` ("a new endpoint's happy path becomes its integration test"); cite that alongside the tech lead.
 Look for new `POST`/`PUT`/`DELETE` controller endpoints with no corresponding `IntegrationTests` project test that exercises the full round-trip: HTTP call → database write → verification. Unit tests that mock the repository do not count.
 
 Important nuance he repeats: integration tests should test **round-trips and access/permission scenarios**, NOT unit-level logic paths. He explicitly notes that "Claude tends to ALWAYS" write integration tests that are really unit tests, and he asks for them to be removed. So when an agent adds integration tests, check they exercise the HTTP→DB→verify path or permission/access matrix — not branch coverage of a single method. Schema changes with no test touched also draw a "why no test?" question.

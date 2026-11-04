@@ -74,7 +74,7 @@ Details and examples: `references/ef-core.md`.
 ## 3. Async and cancellation
 
 - **Async all the way.** No `.Result`, `.Wait()` or `GetAwaiter().GetResult()` (none on `main` today, keep it that way). No `async void`.
-- **Pass the `CancellationToken` on long-running and worker paths** (`CODING_STYLE_BACKEND.md:517` scopes it to long-running operations). Few controllers take one today (4 of 138), so don't flag its service-a on an ordinary request path or retrofit it in an unrelated PR ([PR-SCOPE]). Do flag a worker, job or long export that drops the token it was given.
+- **Pass the `CancellationToken` on long-running and worker paths** (`CODING_STYLE_BACKEND.md § Concurrency, the CancellationToken paragraph` scopes it to long-running operations). Few controllers take one today (4 of 138), so don't flag its service-a on an ordinary request path or retrofit it in an unrelated PR ([PR-SCOPE]). Do flag a worker, job or long export that drops the token it was given.
 - **Don't `Task.WhenAll` over one `DbContext`.** A context is not thread-safe, and two queries in parallel on it throw. Parallel is fine for independent HTTP calls. The generic "use WhenAll" advice is a trap here.
 - **No `Task.Run` around code that is already async.**
 - **New time logic takes `TimeProvider`,** not `DateTime.UtcNow`, so tests can fix the clock. It is registered in ServiceC.API, ServiceD.API, ServiceB.Worker and Billing.API (`Program.cs`); a service elsewhere registers `TimeProvider.System` first. Tests share one fake per test project (there are two hand-rolled `FixedTimeProvider`s today). Don't convert the ~377 existing `DateTime.UtcNow` call sites in an unrelated PR ([PR-SCOPE]).
@@ -140,10 +140,10 @@ Never recommend these. If someone asks, explain with the source.
 
 | Advice | Repo | Source |
 |---|---|---|
-| Return `Result<T>` from services, map to HTTP in one place | Services return `ApiResponse<T>` | `CODING_STYLE_BACKEND.md:521`, owl [RESPONSE-CONTRACT] |
+| Return `Result<T>` from services, map to HTTP in one place | Services return `ApiResponse<T>` | `CODING_STYLE_BACKEND.md § Concurrency, the `GetUsersAsync` example`, owl [RESPONSE-CONTRACT] |
 | MediatR, command/query handlers, pipelines | Not used; plain services | [REUSE-FIRST], #backend 2025-08-18 |
 | CQRS writes through a worker | Rejected, "one of the biggest painpoints" | #backend 2025-08-18, [BUS-IS-NOT-RPC] |
-| AutoMapper | Static `MapFromDomain` / `MapToDto` | `CODING_STYLE_BACKEND.md:480` |
+| AutoMapper | Static `MapFromDomain` / `MapToDto` | `CODING_STYLE_BACKEND.md § DTO Mapping` |
 | Prefer Dapper for reads | EF by default, Dapper for heavy SQL | #dream-team 2026-02-24 |
 | Stored procedures | Banned | [NO-STORED-PROC], 2025-09-24 |
 | Cache aggressively | Only with invalidation on change, measured first | [CACHE-INVALIDATION] |

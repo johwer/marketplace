@@ -154,7 +154,7 @@ Before proceeding to the next step (CI polling, marking ready, etc.):
 ### Draft → Ready → Reviewers
 
 1. **Phase 1.5**: PR created as **DRAFT** (`gh pr create --draft`)
-2. **AI review + CI**: PR stays as draft throughout
+2. **AI review + CI**: PR stays as draft throughout. In the Repo repo the AI review starts with `/reviewing-changes` (root `AGENTS.md`: required before a PR goes to review or ready; it edits code, so run it in the worktree), and runs again before ready if commits landed since. Past 500 added production lines the body needs a `- **Size:**` bullet, which `pr-body-gate.sh` checks.
 3. **User review**: After AI review and CI are green, notify the user. PR is still a draft.
 4. **Tester handoff (never posted, on request only)**: Do not run `tester-handoff` automatically and never post a test guide: no Jira attachment, no Jira comment (not even a skip-reason one), no `Test guide:` line in the PR body (user decision, 2026-10-12, PROJ-4231). If the user explicitly asks for a guide, the skill writes `howtotest-<TICKET-ID>.txt` locally and you hand over the path.
 5. **Assemble the body (auto, before going ready) — HARD GATE**: invoke the **`pr-ready`** skill. It cuts the description to the sections a human reads, in the shape `pr-body-shape.sh` reports from the repo's PR template — `template`: `## Summary`, `## Visual verification`, `## Considerations`, `## Agent`; `dtf`: `## Why`, `## What changes`, `## Visual verification`, `## Scope` (~180 words, 250 cap, `## Agent` not counted) — and moves the walkthrough, resolved decisions, verification log, pre-emptive review and audit findings into a single `Implementation notes — reviewer detail` comment below the diff. `Progress`, `Architecture`, `How to Test`, `Questions` and the ASCII banner are dropped; no test-guide pointer is added (guides are never posted). Order matters: `pr-screenshot-captions` runs **before** this. **Mandatory in both lite and team mode** — lite mode self-enforces it at `/my-dream-team` Phase 6.9 Marker 3, since no hooks fire there.
@@ -182,6 +182,8 @@ Before proceeding to the next step (CI polling, marking ready, etc.):
 ---
 
 ## Section 5: Testing — Empty State & API Actions
+
+In the Repo repo, invoke `/writing-tests` before adding or changing what any test asserts or sets up (root `AGENTS.md`). It decides whether the test should exist; the testing guides only cover mechanics.
 
 ### Empty State Tests
 

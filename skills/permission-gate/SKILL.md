@@ -39,8 +39,8 @@ These already exist. Do not rebuild them, and do not summarise them into a new d
 |---|---|
 | Which page/tab is revealed by which action, and whether that action is overloaded | `docs/authorization-surfaces.md` — PO-readable, 699 lines |
 | The consumption vs administration test (read reveals vs write reveals) | same file, "The test applied to each surface" |
-| Resolver method semantics, and how a **PlatformAction** grant is actually made | `services/ServiceC/CLAUDE.md` — "Permission Resolver Methods", "Granting a Platform Action" |
-| TT vs Repo permission naming | `services/ServiceC/CLAUDE.md` — "TT vs Repo Permission Naming" |
+| The short rules (no permission → platform action mapping, retailer-agnostic platform check, `UserCompany` never for company mutations, TranslationService key per permission) | `.claude/rules/service-c-permissions.md` in the repo |
+| Resolver method semantics (the 9-method table), how a **PlatformAction** grant is actually made (`TargetRetailer != null`, global admin holds all, Redis cache), TT vs Repo permission naming | [`references/service-c-resolver-and-platform-actions.md`](references/service-c-resolver-and-platform-actions.md): DTF's copy, since `services/ServiceC/AGENTS.md` dropped these sections in #4470 |
 
 ## Step 2 — Locate the concept in the model
 

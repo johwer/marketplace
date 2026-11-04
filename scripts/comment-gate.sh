@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 # comment-gate.sh — deterministic, fail-closed check on comments ADDED by a change.
 #
-# The rule it enforces is docs/CODING_STYLE_FRONTEND.md:256 (PROJ-3283): a comment earns
-# its place only when it says something the code cannot. Restating comments must go.
+# The rule it enforces is AGENTS.md#comments: comments are a smell. The only exceptions are
+# XML `///` on endpoints and their DTOs (OpenAPI), tooling directives, `// Arrange/Act/Assert`
+# in tests, and an external gotcha the code can't state. JSDoc/TSDoc, `@deprecated`, TODOs and
+# `///` on other members are deliberately NOT exceptions. In C#, analyzer MH0001 also fails
+# the build on comments in member bodies; this gate covers TS/JS and the C# outside bodies.
 #
 # WHY A SCRIPT: judging "why vs what" is a model's job, but ENUMERATING every added comment
 # is not — and that is where the partial passes came from. A model asked to "remove the
@@ -13,8 +16,9 @@
 #         BASE_REF defaults to the merge-base with origin/main (falls back to HEAD~1).
 #
 # Exit codes:
-#   0  no high-confidence restating comment survived (a REVIEW list may still be printed)
-#   1  REFUSED — at least one added comment restates the code on the line below it
+#   0  nothing refused (a REVIEW list may still be printed — those want a human judgement)
+#   1  REFUSED — an added comment carries a ticket number, is a JSDoc/TSDoc block in TS/JS,
+#      or restates the code on the line below it
 #
 # Env overrides:
 #   COMMENT_GATE_OVERLAP   default 0.60  — token overlap at which a comment counts as restating
@@ -58,10 +62,18 @@ import os, re, sys
 OVERLAP = float(os.environ["OVERLAP"])
 STRICT  = os.environ["STRICT"] == "1"
 
-# Declaration-level documentation is the sanctioned kind and is never flagged:
-# C# XML docs, JSDoc/TSDoc blocks, and lint suppressions carrying their justification.
-DOC = re.compile(r"^\s*(///|/\*\*|\*\s|\*/)")
-ALLOW = re.compile(r"eslint-disable|eslint-enable|@ts-|prettier-ignore|TODO\(|NOSONAR|#pragma|#region|#endregion|csharpier-ignore")
+# AGENTS.md#comments exceptions. Only tooling directives and the test-phase markers are
+# allowed outright; TODO(, NOSONAR and #region were allowed before and are not any more.
+# The ReSharper/language= prefixes mirror the tooling list in MH0001.
+ALLOW = re.compile(r"eslint-disable|eslint-enable|@ts-|prettier-ignore|#pragma|csharpier-ignore|//\s*(ReSharper |language=|lang=)")
+AAA = re.compile(r"^\s*//\s*(Arrange|Act|Assert)(\s*(&|and|/)\s*(Act|Assert))?\s*:?\s*$")
+XMLDOC = re.compile(r"^\s*///")
+JSDOC_START = re.compile(r"^\s*/\*\*")
+DOC_CONT = re.compile(r"^\s*(\*\s|\*$|\*/)")
+DOC = re.compile(r"^\s*(///|/\*\*|\*\s|\*$|\*/)")
+# XML docs are the OpenAPI exception, which applies to endpoints and their DTOs only. A path
+# is the cheapest deterministic proxy; anything else lands on the REVIEW list.
+API_PATH = re.compile(r"(Controller|Dto|Request|Response|Contract|Model)s?(/|\.cs$)|/(Controllers|Dtos?|Contracts|Models|Requests|Responses)/")
 LINE_COMMENT = re.compile(r"^\s*//(?!/)\s*(.+?)\s*$")
 BLOCK_ONELINE = re.compile(r"^\s*/\*(?!\*)\s*(.+?)\s*\*/\s*$")
 
@@ -84,24 +96,69 @@ for raw in sys.stdin.read().splitlines():
         added.append((path, lineno, raw[1:]))
         lineno += 1
 
+# Generated clients (linguist-generated in .gitattributes) carry the backend XML docs as
+# JSDoc and are regenerated, never hand-edited. Prototypes are a sandbox on fake data,
+# shipped to accept only. Neither is held to the comment rule.
+import subprocess
+paths = sorted({q for q, _, _ in added if q})
+generated = set()
+if paths:
+    out = subprocess.run(["git", "check-attr", "linguist-generated", "--"] + paths,
+                         capture_output=True, text=True).stdout
+    for row in out.splitlines():
+        f, _, val = row.rpartition(": linguist-generated: ")
+        if val.strip() == "true":
+            generated.add(f)
+SKIP = re.compile(r"(^|/)apps/web/prototypes/")
+skipped = {q for q in paths if q in generated or SKIP.search(q)}
+added = [row for row in added if row[0] not in skipped]
+if skipped:
+    sys.stdout.write("  comment-gate: skipped %d generated/prototype file(s)\n" % len(skipped))
+
 TICKET = re.compile(r"\b(?:NOVA|PLRS)-\d+\b")
 COMMENTISH = re.compile(r"^\s*(//|/\*|\*)")
+TSJS = re.compile(r"\.(ts|tsx|mts|js|mjs)$")
 
-restating, review, ticketed = [], [], []
+PRAGMA_OFF = re.compile(r"#pragma\s+warning\s+disable\b.*\bMH0001\b")
+PRAGMA_ON = re.compile(r"#pragma\s+warning\s+restore\b.*\bMH0001\b")
+
+restating, review, ticketed, jsdoc = [], [], [], []
+suppressed = set()
 for i, (p, n, text) in enumerate(added):
-    # A ticket number is banned in ANY comment, TSDoc and XML docs included
-    # (CODING_STYLE_FRONTEND "Never put a ticket number in a code comment"; PROJ-4179).
+    # A gotcha wrapped in #pragma warning disable MH0001 is the sanctioned C# form.
+    if PRAGMA_OFF.search(text):
+        suppressed.add(p); continue
+    if PRAGMA_ON.search(text):
+        suppressed.discard(p); continue
+    # A ticket number is banned in ANY comment, TSDoc and XML docs included. AGENTS.md no
+    # longer says so explicitly; DTF keeps the ban (PROJ-4179): it belongs in the PR/commit.
     if COMMENTISH.match(text) and TICKET.search(text) and not ALLOW.search(text):
         ticketed.append((p, n, text.strip()[:78], 1.0))
         continue
-    if DOC.match(text) or ALLOW.search(text):
+    if ALLOW.search(text) or AAA.match(text) or p in suppressed:
+        continue
+    if JSDOC_START.match(text):
+        # TS/JS has no OpenAPI exception, so a doc block there is never one of the
+        # allowed kinds. Elsewhere (a C# /** */) it wants a judgement.
+        shown = text.strip()
+        if shown == "/**" and i + 1 < len(added) and added[i+1][0] == p:
+            shown += " " + added[i+1][2].strip()
+        (jsdoc if TSJS.search(p or "") else review).append((p, n, shown[:78], 1.0))
+        continue
+    if XMLDOC.match(text):
+        prev_xml = i > 0 and added[i-1][0] == p and added[i-1][1] == n - 1 and XMLDOC.match(added[i-1][2])
+        if not prev_xml and not API_PATH.search(p or ""):
+            review.append((p, n, text.strip()[:78] + "  [/// outside an endpoint/DTO file]", 0.0))
+        continue
+    if DOC_CONT.match(text):
         continue
     m = LINE_COMMENT.match(text) or BLOCK_ONELINE.match(text)
     if not m:
         continue
-    # The rule covers function bodies. A column-0 comment is module-level (file header,
-    # section divider above a top-level declaration), not body narration (PROJ-4185).
+    # A column-0 comment (file header, section divider) used to be exempt (PROJ-4185).
+    # AGENTS.md has no such exception, so it is listed for judgement, never auto-refused.
     if not text[:1].isspace():
+        review.append((p, n, m.group(1).strip()[:78], 0.0))
         continue
     if i > 0:
         pp, pn, ptext = added[i-1]
@@ -128,15 +185,20 @@ if ticketed:
     sys.stdout.write("\n  \033[31mREFUSED\033[0m — %d added comment(s) carry a ticket number"
                      " (put it in the PR or commit message)\n\n" % len(ticketed))
     show(ticketed, "x", "31")
+if jsdoc:
+    sys.stdout.write("\n  \033[31mREFUSED\033[0m — %d added JSDoc/TSDoc block(s) in TS/JS"
+                     " (AGENTS.md#comments: not an allowed exception; use names and types)\n\n" % len(jsdoc))
+    show(jsdoc, "x", "31")
 if restating:
     sys.stdout.write("\n  \033[31mREFUSED\033[0m — %d added comment(s) restate the code below them\n"
-                     "  (docs/CODING_STYLE_FRONTEND.md:256 — a comment must say what the code cannot)\n\n" % len(restating))
+                     "  (AGENTS.md#comments — comments are a smell; prefer names, small functions, types)\n\n" % len(restating))
     show(restating, "x", "31")
 if review:
-    sys.stdout.write("\n  \033[33m!\033[0m %d other added comment(s) — keep only the non-obvious WHY:\n\n" % len(review))
+    sys.stdout.write("\n  \033[33m!\033[0m %d other added comment(s) — keep one only if it is an external gotcha"
+                     " the code cannot state (AGENTS.md#comments); in C# wrap it in #pragma warning disable MH0001:\n\n" % len(review))
     show(review, "?", "33")
 
-if ticketed or restating or (STRICT and review):
+if ticketed or jsdoc or restating or (STRICT and review):
     sys.stdout.write("\n  Delete every line listed above in ONE pass, then re-run this gate.\n\n")
     sys.exit(1)
 

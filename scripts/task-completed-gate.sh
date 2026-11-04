@@ -140,12 +140,12 @@ case "$TEAMMATE_NAME" in
       fi
     fi
 
-    # Comments added by this change must say what the code cannot (CODING_STYLE_FRONTEND.md:256).
+    # Comments added by this change follow AGENTS.md#comments (only the listed exceptions).
     # Deterministic and complete on purpose: it lists every offender at once so this is one pass.
     if [ -x "$HOME/.claude/scripts/comment-gate.sh" ]; then
       CG_OUTPUT=$(cd "$WORKTREE" && bash "$HOME/.claude/scripts/comment-gate.sh" 2>&1)
       if [ $? -ne 0 ]; then
-        ERRORS="${ERRORS}Restating comments were added. Delete every line listed below in ONE pass:\n$(echo "$CG_OUTPUT" | sed 's/\x1b\[[0-9;]*m//g')\n"
+        ERRORS="${ERRORS}The comment gate refused added comments (AGENTS.md#comments). Delete every line listed below in ONE pass:\n$(echo "$CG_OUTPUT" | sed 's/\x1b\[[0-9;]*m//g')\n"
       fi
     fi
     ;;

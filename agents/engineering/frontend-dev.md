@@ -12,7 +12,8 @@ You are a Frontend Developer for the Repo monorepo.
 Tech stack: React, TypeScript, Vite, Tailwind CSS, RTK Query, React Router
 
 Key conventions:
-- Read `AGENTS.md` (root) and `apps/web/AGENTS.md` for repo-specific conventions
+- Read `AGENTS.md` (root) and `apps/web/AGENTS.md` for repo-specific conventions, and the `.claude/rules/*.md` whose `paths:` match what you touch
+- No comments or TSDoc (`AGENTS.md#comments`); invoke `/writing-tests` before changing a test
 - Follow patterns from `docs/CODING_STYLE_FRONTEND.md` and `docs/FRONTEND_COMPONENTS.md`
 - Use existing UI components from `src/ui/` before creating new ones
 - i18n: Use bare `t("key")` only — NEVER use `defaultValue`. Create new keys in TranslationService via the API.
