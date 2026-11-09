@@ -29,30 +29,50 @@ done
 Extend the term list with the key terms of the current batch. A cluster seen in 3+ sessions counts as
 `(recurred: 2+)` whatever its lines say.
 
-While scanning, check each deferred item for a `(recurred: N)` annotation. Items with `(recurred: 2+)` are **auto-promoted** — they bypass the normal deferral path and go straight to Ticket+PR regardless of any previous rationale for deferring them. Flag these prominently.
+While scanning, check each deferred item for a `(recurred: N)` annotation. Items with `(recurred: 2+)` are **auto-promoted**: they bypass the normal deferral path and must be routed this pass, whatever the earlier reason for deferring them. Flag these prominently. Auto-promotion decides *that* an item is routed now, not *where*: its level (STEP 0b) decides the destination, and a level 3 item lands in personal config, not a shared-repo PR.
 
-Classify each item using the Repo File Decision Tree (see Learning Router section below). Then output:
+## STEP 0b — Give every item a level before routing
+
+Recurrence alone says nothing about whether the team should read it. A reviewer on #4701 (2026-11-09) asked whether the learnings were production bugs or things Claude hit while coding, and said the latter needs a much higher bar of generalisation. All of them were the latter. So grade each item on four things, using the session's `[found-by · cost · if-missed · scope]` tag where it has one, and the session block and journals where it doesn't:
+
+| Axis | Values |
+|---|---|
+| Found by | prod · human-review · ci/test · self (Claude while working) |
+| Cost | time or rounds lost; recurrence multiplies it |
+| Consequence if missed | data-loss · security · prod-error · wrong-result · annoyance |
+| Scope | whole repo / a stack (all backend, all frontend) · one module · one ticket |
+
+| Level | Rule | Destination |
+|---|---|---|
+| **1. Team rule** | Found in prod or by a human reviewer, or consequence ≥ prod-error **and** scope is repo or stack | Shared docs (`docs/*`, repo skills): Ticket+PR, with the evidence in the PR body |
+| **2. Local knowledge** | Scope is one module, and it recurred in 2+ sessions or cost more than about an hour | That module's `AGENTS.md` or a repo skill: Ticket+PR |
+| **3. Agent friction** | Found by self, consequence annoyance or wrong-result caught before merge, not repo-wide | Personal config: `dream-team`, scripts, skills, memory. Never shared docs |
+| **Drop** | Seen once, cheap, or obvious from the code | Nowhere: strike it with the reason |
+
+Write the rule general: name the mechanism, not the ticket. A ticket number may stay as evidence, but a line that only makes sense for one ticket is level 3 or drop. Every shared-repo PR body says where its learnings came from (production bug or found while building) and invites reviewers to name anything they don't want in the docs. The level is the first filter, and the reviewer still has a veto.
+
+Classify each item's destination file with the Repo File Decision Tree (see Learning Router section below), within the level's allowed destinations. Then output:
 
 ```
 ## Route Pre-Declaration
 
 I found [N] unresolved learnings. Here is how I will route them:
 
-### ⚠ Auto-promoted (recurred 2+ times — Ticket+PR is mandatory, no deferral allowed)
-| # | Learning | Recurrences | Destination | File |
-|---|---------|------------|-------------|------|
-| 1 | [description] | 3 | repo-docs | docs/CODING_STYLE_BACKEND.md |
+### ⚠ Auto-promoted (recurred 2+ times — routed this pass, destination by level)
+| # | Learning | Recurrences | Level | Destination | File |
+|---|---------|------------|-------|-------------|------|
+| 1 | [description] | 3 | 3 | dream-team | my-dream-team.md |
 
-### Ticket + PR required (shared repo — I WILL create Jira + branch + PR for these)
-| # | Learning | Destination | File |
-|---|---------|-------------|------|
-| 2 | [description] | repo-docs | docs/CODING_STYLE_BACKEND.md |
-| 3 | [description] | agents-md:services/ServiceB | services/ServiceB/AGENTS.md |
+### Ticket + PR required (shared repo, level 1 and 2 only — I WILL create Jira + branch + PR for these)
+| # | Learning | Found by · cost · if missed | Level | Destination | File |
+|---|---------|-----------------------------|-------|-------------|------|
+| 2 | [description] | prod · 2 h · data-loss | 1 | repo-docs | docs/CODING_STYLE_BACKEND.md |
+| 3 | [description] | self · 3 sessions · wrong-result | 2 | agents-md:services/ServiceB | services/ServiceB/AGENTS.md |
 
-### Direct apply (personal config — I will edit these files directly)
-| # | Learning | Destination | File |
-|---|---------|-------------|------|
-| 4 | [description] | dream-team | my-dream-team.md |
+### Direct apply (personal config, level 3 — I will edit these files directly)
+| # | Learning | Level | Destination | File |
+|---|---------|-------|-------------|------|
+| 4 | [description] | 3 | dream-team | my-dream-team.md |
 
 ### No route (already addressed or not actionable)
 - [item] — [reason]

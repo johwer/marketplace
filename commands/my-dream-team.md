@@ -1613,6 +1613,8 @@ Before shutting down the team, run a retrospective to capture learnings that imp
      ```
      Destination values use the registry format: `dream-team`, `agent:<name>`, `skill:<name>`, `project-claude`, `agents-md:<path>`, `repo-docs`, `memory`.
 
+     **Tag each Deferred, Convention and Doc Gap line** with what the journal recorded, so `/retro-proposals` can give it a level without guessing: `[found-by: self|test|ci|human-review|prod · cost: ~40 min · if-missed: prod-error · scope: repo|<module>]`. Suggest `repo-docs` or `agents-md:` only for a line that would reach level 1 or 2 under `/retro-proposals` STEP 0b; anything only you hit with low consequence suggests `memory` or a personal file.
+
      **Increment, never duplicate (recurrence check — before writing any Deferred line).** For each
      item, grep the file for its key term (script name, symbol, tool, error code):
      `grep -n -i "<key term>" <memory-dir>/dream-team-learnings.md | grep -v '~~'`. If an unresolved
@@ -2277,6 +2279,9 @@ The PreCompact hook automatically saves a CHECKPOINT.md file. Subagents have the
    - **category**: instruction-gap | communication | convention-gap | codebase-surprise | tool-failure | assumption-wrong | positive
    - **detail**: [what happened]
    - **impact**: high | medium | low
+   - **found-by**: prod | human-review | ci | test | self (you noticed it while working)
+   - **cost**: [time or rounds it took, e.g. "~40 min", "2 CI rounds", "1 review round"]
+   - **consequence-if-missed**: data-loss | security | prod-error | wrong-result | annoyance
    - **confidence**: [how sure you were before discovering the issue, 0.0–1.0]
    - **fix**: [what would have prevented this, or "n/a" for positives]
    ```

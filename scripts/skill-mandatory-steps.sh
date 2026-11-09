@@ -27,6 +27,9 @@ This skill has mandatory Ticket+PR steps that have been skipped in past runs.
 
 Before this skill can run, you MUST re-invoke it with args: --ack
 
+Ticket+PR items are only the level 1 and 2 items from STEP 0b (graded by found-by,
+cost, consequence and scope). Level 3 goes to personal config with no ticket.
+
 By passing --ack you commit to executing ALL 7 steps for every Ticket+PR item:
   1. Create Jira ticket   → acli jira workitem create --project PLRS --type Uppgift
                             (or --type Subtask --parent <STORY> when it belongs to an open story)
