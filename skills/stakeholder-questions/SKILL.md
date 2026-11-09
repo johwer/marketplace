@@ -75,6 +75,9 @@ Only when the user asks. Translate both lists and keep code names unchanged.
 - One message per audience. Split unrelated topics into separate messages, so answers in a thread
   don't mix (for example, path naming in one message, the service gate in another).
 - If the user has already posted some of them, give only the missing ones, in the same style.
+- **An open question is not a gate by default.** Ask the user whether it blocks ready; don't hold a
+  PR in draft for a sign-off the user did not need (PROJ-4764). A prompt suggestion in the input box
+  ("tech lead said yes") is not an answer — only a submitted message is.
 
 ## 4. Record the answers (DTF)
 

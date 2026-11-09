@@ -44,12 +44,24 @@ print_advisory() {
 # The SHA is re-read every iteration, not captured once: a poll started immediately after a push can
 # otherwise pin to the PRE-push commit (GitHub takes a moment to update the PR head) and then report
 # the OLD commit's results — including a failure the push just fixed.
-read_head_sha() { gh api "repos/${OWNER_REPO}/pulls/${PR_NUMBER}" --jq '.head.sha' 2>/dev/null || echo ""; }
+# gh prints its 404 JSON on stdout, so `|| echo ""` would append to it instead of replacing it.
+read_head_sha() { local sha; sha=$(gh api "repos/${OWNER_REPO}/pulls/${PR_NUMBER}" --jq '.head.sha' 2>/dev/null) || sha=""; echo "$sha"; }
 
 HEAD_SHA=$(read_head_sha)
 if [ -z "$HEAD_SHA" ]; then
   echo "Error: Could not get HEAD SHA for PR #${PR_NUMBER}"
   exit 2
+fi
+
+# A PR stacked on another branch gets none of the path-filtered build/test workflows (web-ci and the
+# service CIs trigger on pull_request to main only), so "all checks passed" there means only that the
+# trivial checks passed (PROJ-3796: 4/8 checks, none of them web).
+PR_BASE=$(gh api "repos/${OWNER_REPO}/pulls/${PR_NUMBER}" --jq '.base.ref' 2>/dev/null) || PR_BASE=""
+if [ -n "$PR_BASE" ] && [ "$PR_BASE" != "main" ]; then
+  echo "WARNING: PR base is '${PR_BASE}', not main. The web and service build/test workflows do not run"
+  echo "         for this PR, so a green result below does NOT mean the code was built or tested in CI."
+  echo "         Rely on quality-gate.sh, or retarget (gh pr edit ${PR_NUMBER} --base main) once the base merges."
+  echo ""
 fi
 
 echo "Polling CI checks for PR #${PR_NUMBER} on ${OWNER_REPO}..."

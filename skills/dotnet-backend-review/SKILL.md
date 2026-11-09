@@ -68,8 +68,13 @@ Details and examples: `references/ef-core.md`.
 - **Concurrency token: `UpdatedAt` with `IsConcurrencyToken()`**, so the check is in the `UPDATE … WHERE`, not an `if` in C# (owl 2025-10-02). Never two tokens (ghost 2026-04-01). Not SQL Server `rowversion` and not `xmin` unless decided.
 - **Serialising a race:** `pg_advisory_xact_lock(hashtext(...))` inside the transaction (`ServiceA.Domain/Repository/UserRepository.cs:154`, `ServiceB…/TemplateRepository.cs:215`), or `PostgresDistributedLockService` across pods. Scope the lock to the smallest key ([CONCURRENCY-SCOPE]).
 - **"One wins, the other gets 409" rests on a unique index: list its columns against the identity being protected.** If the index includes a per-row column (a config id, a generated key), two writers for the same pair both insert and nothing conflicts; serialise with a lock or narrow the index (PROJ-4405).
+- **A dedup key that can see disagreeing writes takes its conflict rule from the domain rule, not the mechanism.** "First write wins" silently dropped a nurse's Answered; legacy's "any answered ⇒ Answered" became `ON CONFLICT … DO UPDATE … WHERE` (PROJ-4748).
+- **A value that a later write or upsert changes is state, not the row's type.** The same-call upsert rewrote `type` (Answered ↔ NoAnswer); review replaced it with one immutable `Call` type plus an `outcome` column. Ask of every enum column: does any write change it? (PROJ-4748; lead, ghost and owl reviews all missed it.)
+- **Postgres unique indexes treat NULLs as distinct**, so rows with a NULL key column never conflict. One table can hold keyed rows and NULL-keyed lifecycle rows without a partial index — and a "unique" guard on a nullable column guards nothing for NULLs (PROJ-4748).
 - **Child Guids set in C# need `ValueGeneratedNever()`**, or EF treats new rows as Modified and throws a concurrency error (ghost 2026-04-02).
 - **Schema changes:** generated migrations only ([MIGRATION-BY-HAND]). Renaming an entity keeps the table name so EF emits a rename (#backend 2024-09-10). Expand, then contract ([EXPAND-CONTRACT]), and the migration tooling must keep up ([MIGRATOR-PARITY]).
+
+- **Cookies: `ResponseCookies.Delete` removes any earlier `Set-Cookie` with the same name and path**, so two Deletes for two variants of one cookie leave one header. Spike the framework call on the raw header first, and assert raw `Set-Cookie` strings in tests rather than mocked `IResponseCookies` calls (PROJ-4764).
 
 ## 3. Async and cancellation
 

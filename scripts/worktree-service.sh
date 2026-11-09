@@ -8,7 +8,7 @@
 # Usage:
 #   bash ~/.claude/scripts/worktree-service.sh up <service>     Build & start a service
 #   bash ~/.claude/scripts/worktree-service.sh down              Stop all worktree services
-#   bash ~/.claude/scripts/worktree-service.sh logs <service>    Tail logs for a service
+#   bash ~/.claude/scripts/worktree-service.sh logs <service> [-f | --since 5m]   Last 200 log lines (-f follows)
 #   bash ~/.claude/scripts/worktree-service.sh ps               List running worktree services
 #   bash ~/.claude/scripts/worktree-service.sh status           Show port mappings and health
 #
@@ -454,7 +454,14 @@ case "${1:-help}" in
             exit 1
         fi
         COMPOSE_NAME=$(to_compose_name "$SERVICE")
-        compose logs -f "$COMPOSE_NAME"
+        # Default is a bounded read: following (-f) never returns, which hung a foreground tool
+        # call until its timeout (PROJ-4750). Pass -f to follow, or --since 5m to narrow.
+        shift 2
+        if [[ "${1:-}" == "-f" ]]; then
+            compose logs -f "$COMPOSE_NAME"
+        else
+            compose logs --tail 200 "$@" "$COMPOSE_NAME"
+        fi
         ;;
     ps)
         compose ps

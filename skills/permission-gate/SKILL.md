@@ -42,6 +42,17 @@ These already exist. Do not rebuild them, and do not summarise them into a new d
 | The short rules (no permission → platform action mapping, retailer-agnostic platform check, `UserCompany` never for company mutations, TranslationService key per permission) | `.claude/rules/service-c-permissions.md` in the repo |
 | Resolver method semantics (the 9-method table), how a **PlatformAction** grant is actually made (`TargetRetailer != null`, global admin holds all, Redis cache), TT vs Repo permission naming | [`references/service-c-resolver-and-platform-actions.md`](references/service-c-resolver-and-platform-actions.md): DTF's copy, since `services/ServiceC/AGENTS.md` dropped these sections in #4470 |
 
+**Read the role's actual grants before planning as that role.** Seed mappings
+(`DefaultPermissionsMappings.cs`) say what a new environment gets; the environment says what the role
+holds today (`role_user_permissions`, `role_customer_permissions`, `role_global_permissions`,
+read-only). Two investigations assumed nurse reads that did not exist (PROJ-4797, PROJ-4819).
+Known shapes: Nova nurse access is the customer permission `MedicalAdvisor`
+(`DefaultPermissionsMappings.cs:46-48`) on the company-owned role, assigned at retailer scope and
+ticked per environment. Advisory writes reuse the read action (`CallbackRead`) for legacy parity; any
+new `UserAction` reaches CustomerSupport through the loop in `DefaultPermissionsMappings.cs:69` unless
+excluded, so split out a write action only when the read action is mapped to managers (PROJ-4749,
+PROJ-4821).
+
 ## Step 2 — Locate the concept in the model
 
 The model has three layers. Grep the *concept*, not the name you were about to invent — a

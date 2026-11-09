@@ -16,7 +16,15 @@ DOWNLOADS="${TICKET_SPEC_ROOT:-$HOME/Downloads}"
 MAX_DEPTH=4
 VALID_TYPES="story subtask spike bug"
 
-spec_path() { echo "$DOWNLOADS/$1/spec.md"; }
+spec_path() {
+  local dir="$DOWNLOADS/$1"
+  # A folder without its execute bit (drw-------) makes every file in it read as missing, and `ls`
+  # only says "fts_read: Permission denied" (PROJ-4014: a spec unreadable for four weeks).
+  if [[ -d "$dir" && ! -x "$dir" ]]; then
+    echo "ticket-spec: $dir exists but cannot be opened (no execute bit) — fix with: chmod u+x '$dir'" >&2
+  fi
+  echo "$dir/spec.md"
+}
 
 # Read one frontmatter key from a spec file. Empty string if absent.
 fm() {

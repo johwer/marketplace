@@ -127,10 +127,28 @@ Check if the arguments contain `--lite`. If present:
   - **Phase 6.75**: Retrospective — write your own retro learnings using the same 4 categories with destination hints: instruction improvements (`dream-team`/`agent:<name>`/`skill:<name>`), convention discoveries (`project-claude`/`agents-md:<path>`/`repo-docs`), doc gaps (`repo-docs`/`agents-md:<path>`), process improvements (`dream-team`/`memory`). Tag each item with a suggested destination so [`/retro-proposals`](commands.md#team-review) can route it later.
   - **Phase 7**: Completion — runs the **Completion Gate** first (see `dev-workflow-checklist.md` Section 9): all PR comments resolved, visual-verification screenshots present in `~/Downloads/<TICKET_ID>/`, retro done, CI green, PR description complete. Then posts a **Jira completion comment** with PR link + summary, @mentioning the ticket creator if different from assignee. Then transitions ticket to Klart. **Stops there** — no worktree, branch or session teardown (that is `/workspace-cleanup` from the orchestrator; a session cannot remove the worktree it is running in).
 - **Visual verification applies in lite mode too.** The same Phase 4.75 gate (real-browser `playwright-cli` check + `~/Downloads/<TICKET_ID>/` screenshots) applies whether you're in full Dream Team or lite mode. Don't skip it just because you're working solo.
+  - **A raw i18n key in your own capture is a finding**, not "pre-existing": grep the page text for
+    `/[a-z]+_[a-zA-Z]+_[a-zA-Z]+/` and raise each hit with the user (PROJ-3796 found 18 keys never
+    created in TranslationService).
+  - **A deliberately forced failure (route → 503/403) reads as a broken flow.** Caption it
+    "Avsiktligt framtvingat fel" or put it under a collapsed error-handling heading, and list the
+    normal run's API calls up front (all 2xx, pre-existing failures named with their ticket) (PROJ-4752).
+  - **Names and personal numbers are masked before every capture:** `pw-mask-pii.sh <session> --h1
+    ["<full name>" ...]` — it refuses (exit 1) when a name is still visible. Never write a redaction
+    over its input image; write a new file (PROJ-4821 lost six originals).
 - **PR body assembly applies in lite mode too.** `pr-ready` + `pr-body-gate.sh` run before `gh pr ready` in **both** modes — full mode enforces it at the Phase 6 ready step and Completion Gate item 6b, lite mode at Phase 6.9 Marker 3. A solo session produces the same wall of text a full team does; the reader can't tell which mode wrote it.
 - **Lead independently re-verifies in the real browser.** Never trust a dev agent's "looks good" — the team lead (and lite-mode solo) MUST personally drive the live app via `playwright-cli` and see the rendered state (+ network/console clean) before push. A claimed pass without an independent real-browser check has shipped user-facing bugs (retro PROJ-3043).
 - **New shared `ui/` primitives with interactive/conditional logic ship a unit test in the SAME PR.** Consumer tests miss the primitive's own logic (e.g. a FormSection collapsible path). Hard gate for any new `ui/` component with behavior, not just static rendering.
 - **Spawn-time prompts are frozen.** A subagent only sees its prompt as it was at spawn — relay any decision made AFTER spawn via `SendMessage`, never by assuming the agent re-reads context. And an agent→lead message may surface only as an `idle_notification`: on idle, the lead verifies progress via files/git/journal rather than waiting for a delivered DONE (retro PROJ-2924).
+- **Investigation tickets (no code, `ticketType: investigation`)** take a short path; everything that
+  assumes a diff is skipped and SAID so (PROJ-4012, PROJ-4821): Jira → Pågående at start; Phase 1 with
+  the Investigation rules above; findings written to `~/Downloads/<TICKET_ID>/findings.md` with
+  file:line and trunk commits; proposed follow-up tickets shown to the user, and every Jira write
+  (create, comment, transition) only after approval; → Klart; Phase 6.75 learnings only. No draft PR,
+  no 4.75/5/5.5, and Phase 6.9 prints `SKIPPED — investigation, no diff` for each code marker.
+- **Lite Phase 1 reads the primitive table before copying a neighbour.** For every loading, error or
+  empty state the change adds, use what `docs/FRONTEND_COMPONENTS.md` names (`QueryStateWrapper`),
+  not the nearest file's `isLoading ? null` (PROJ-4817: a reviewer asked for the spinner).
 - **Phase 6.9 gate is mandatory in lite mode.** Before Phase 7, you MUST output completion markers for Phase 4 (review pass), Phase 4.75, Phase 6.75 and PR body assembly. No markers = Phase 7 blocked. See Phase 6.9 section.
 - The key principle: minimize agent overhead for small/medium tasks while keeping all quality gates, feedback loops, and process steps intact.
 - **Context management in lite mode**: Since you're doing all the work yourself (no subagents with separate context windows), context fills up faster. Follow the `strategic-compact` skill:
@@ -167,6 +185,14 @@ This phase runs instead of the normal Phase 1-7 workflow when `--resume` is dete
    bash ~/.claude/scripts/aws-check.sh
    ```
    Credentials are **shared across worktrees** (on disk in `~/.aws`, not per-tmux) — if the parent or another worktree already logged in and the token is valid, you already have access; don't re-prompt. If it fails, prefer the SSO refresh (nothing secret to copy): suggest `! aws sso login --sso-session repo`, then use `AWS_PROFILE=repo-sso` for aws/S3 commands. Only fall back to paste-temp-creds (in the user's own terminal) if SSO login genuinely fails. Treat a mid-session expiry as "refresh and continue," not a hard human blocker.
+
+1.7. **An orchestrator relay can arrive after its work is done.** Check state first (ancestry, PR
+   base, body text), then do only the delta (PROJ-4750).
+
+1.8. **Rebased onto a merged base that had migrations?** Compare `__EFMigrationsHistory` with the
+   migrations in code before starting a service: a base's pre-review migration left on the shared
+   local DB broke boot for the main stack too after the base was rewritten (PROJ-4749). Roll an
+   orphaned one back per its own `Down()`, after a dump.
 
 2. **Verify working directory** — confirm you are running from the worktree, not the main repo:
    ```bash
@@ -460,6 +486,24 @@ decision or a late finding in more than one session):
 - **Removal tickets:** sweep the originating PR's file list (`git show --stat <feature-commit>`) for
   helpers that become orphaned, and ask whether data created through the removed UI keeps acting
   (PROJ-4049).
+- **Read the legacy implementation before the domain-model gate.** For a port or parity ticket, open
+  the legacy repos (`~/Documents/Medhelp.*`, glob case-insensitively) with file:line BEFORE forming
+  options, and present "closest to legacy that works in Nova" with each deviation justified
+  (PROJ-4748: the user had to ask for it). Fetch first and cite the trunk commit
+  (`git -C <repo> fetch && git -C <repo> log origin/<trunk> -1 --oneline`): local clones were six
+  weeks stale (PROJ-4012). A recalled legacy rule is checked by its operands — a guard on a function
+  that is always truthy never gated anything (PROJ-4736).
+- **A role named in the plan is a claim about its grants.** Before planning "as the nurse" or "same
+  permission as X", list every role that holds the action (seed mappings, and the target environment's
+  `role_*_permissions` read-only). PROJ-4797/4819 assumed nurse reads that did not exist (every page
+  403); `ServiceAReportEventRead` was framed as manager-only and is also held by `EmployeeBase`
+  (PROJ-4750, PROJ-4821). Run `/permission-gate` for any access question.
+- **The ticket's "starting points" are claims too.** Verify each listed mechanism before writing it as
+  fact (PROJ-4868: "events over RabbitMQ and SQS"; SQS only carries SES feedback).
+- **Investigations that drive an environment:** list the pages that WRITE when opened (the Nova
+  callback page sends `PUT answered`) before driving them — a read-only DB role cannot undo them. For
+  form parity, pick the test company by template coverage (field count, sub-types, flags both ways),
+  not by who happens to have data: a thin template hid PROJ-4834 and PROJ-4835 (PROJ-4821).
 
 5a. **Wait for Amara's analysis** before proceeding (normal path — when no pre-hydrated context exists).
 
@@ -1229,7 +1273,7 @@ Then **commit, push, and generate the initial PR summary**:
    - If both backend and frontend were changed, create separate commits (e.g., `TICKET-ID: Add API endpoints for feature X` and `TICKET-ID: Add frontend components for feature X`)
    - If infra/migrations were involved, commit those first (e.g., `TICKET-ID: Add database migration for feature X`)
    - Each commit message should follow the `TICKET-ID: Description` pattern
-2. **Push the branch** with `git push` — only after `quality-gate.sh` passed, chained with `&&`. If HTTPS push is rejected for workflow files (`.github/workflows/`), use SSH instead: `git push git@github.com:<OWNER>/<REPO>.git HEAD:<branch-name>`. If SSH :22 hangs, use the fallback push command the Phase 1 preflight printed (`ssh://git@ssh.github.com:443/...` or HTTPS via `gh auth git-credential`) instead of waiting (PROJ-4049, PROJ-4294). After pushing to an explicit URL, `git update-ref refs/remotes/origin/<branch> HEAD` once `git ls-remote` confirms, so ahead/behind stays truthful. Fetching over an explicit HTTPS URL needs the leading `+` (`git fetch <url> +main:refs/remotes/origin/main`); without it a non-fast-forward update is silently refused and the tracking ref goes stale after a force-push (PROJ-4148).
+2. **Push the branch** with `git push` — only after `quality-gate.sh` passed, chained with `&&`. If HTTPS push is rejected for workflow files (`.github/workflows/`), use SSH instead: `git push git@github.com:<OWNER>/<REPO>.git HEAD:<branch-name>`. If SSH :22 hangs, use the fallback push command the Phase 1 preflight printed (`ssh://git@ssh.github.com:443/...` or HTTPS via `gh auth git-credential`). The preflight's dry-run push is not proof (PROJ-4817 hung on :22 after it passed): wrap the first push in `timeout 60 git push ...` and fall back on exit 124. **Stacked branch:** re-fetch the base and check ancestry (`git merge-base --is-ancestor origin/<base> HEAD`) before EVERY push — the base can be force-pushed mid-session (PROJ-4833); `quality-gate.sh` measures freshness against the PR's base and warns that CI will not build a non-main-based PR instead of waiting (PROJ-4049, PROJ-4294). After pushing to an explicit URL, `git update-ref refs/remotes/origin/<branch> HEAD` once `git ls-remote` confirms, so ahead/behind stays truthful. Fetching over an explicit HTTPS URL needs the leading `+` (`git fetch <url> +main:refs/remotes/origin/main`); without it a non-fast-forward update is silently refused and the tracking ref goes stale after a force-push (PROJ-4148).
 3. **Spawn Tane for initial summary** (see Tane's prompt below) — this summary helps GitHub AI reviewers and human reviewers understand the changes
 3b. **Invoke the `code-walkthrough` skill** to add a `## Walkthrough of the changes` section. It explains the diff file by file for a reviewer who has not read it, and — the part that matters — splits hand-written production code from tests and generated output, because a 1,890-line diff that is 75% tests is a small change wearing a big number and a reviewer who doesn't know that budgets their attention wrongly. It also forces the scope statement: anything in the diff that is NOT what the ticket asked for (an opportunistic fix, a pre-existing bug fixed in passing, endpoints that rode along in a regeneration) gets named with a line count. Unannounced extras read as scope creep; labelled ones read as diligence.
 
@@ -1270,7 +1314,11 @@ bash ~/.claude/scripts/poll-ai-reviews.sh <OWNER>/<REPO> <PR_NUMBER> 6 45
 If it times out, say **which** bots did and did not answer, then proceed. **Exit 3 = Copilot posted
 "wasn't able to review any files"** — that is no review (it was counted as one three times). Re-request
 with `gh pr edit <PR_NUMBER> --add-reviewer @copilot` and poll again; Copilot never appears in
-`requested_reviewers`, only in `.reviews`.
+`requested_reviewers`, only in `.reviews`. The script counts only reviews after the PR went ready or
+after the latest bot re-request, so a draft-time decline no longer reads as the answer (PROJ-4014).
+**A timeout is not "no findings":** Copilot has posted a real High finding ~25 min after ready, after
+two 6-minute polls timed out (PROJ-4752). Before asking the user to ship, re-read
+`pulls/<n>/comments` and `pulls/<n>/reviews` once more.
 
 **Step B: Handle AI bot feedback**
 
@@ -1298,8 +1346,9 @@ with `gh pr edit <PR_NUMBER> --add-reviewer @copilot` and poll again; Copilot ne
 
 **Round 1:**
 ```bash
-bash ~/.claude/scripts/poll-ci-checks.sh <OWNER>/<REPO> <PR_NUMBER> 10 30
+bash ~/.claude/scripts/poll-ci-checks.sh <OWNER>/<REPO> <PR_NUMBER> 20 30
 ```
+Never hand-roll the wait: a 55 × 10 s loop timed out under the 13-minute `Test apps/web` job (PROJ-4014).
 The script exits early on first failure — no waiting for remaining checks. If CI fails:
 - **CSharpier format check** → Kenji/Ravi run `dotnet csharpier .` and commit
 - **.NET build/test** → Kenji/Ravi fix compilation or test failures
@@ -1340,6 +1389,11 @@ After AI review and CI are clean, enter a feedback loop with the user:
 The decision is split into TWO user-confirmable steps (PROJ-3039 retro, user-mandated): **"Mark ready"** runs the publication work (PR ready + final summary + retro) while human review is still pending; **"Ship"** runs the closeout (Jira → Klart + shutdown) and is asked later, typically after human review/merge readiness.
 
 1. Present the current PR status to the user (AI review done, CI green, no human reviewers assigned yet)
+   - **An open stakeholder question is not a gate unless the user says so.** Ask "does this block
+     ready?" instead of holding the PR in draft for a sign-off nobody asked for (PROJ-4764).
+   - **Environment-data tickets (role grants, config rows) have two deliverables:** the PR and the
+     per-environment write. Say in the first status message, the PR body and the ready message:
+     "merging changes no environment; the grant is a separate write per environment" (PROJ-4766).
 2. Ask the user for feedback using AskUserQuestion:
    - **"How does the implementation look?"**
    - Options: "Mark ready — reviewers + handoff + summary + retro" / "I have feedback" / "Let me test first"
@@ -1725,6 +1779,10 @@ Only triggered when the user confirms they are done:
 
 **IMPORTANT:** Run Phase 6.75 (retrospective) BEFORE this phase.
 
+**Before Klart on an environment-data ticket:** every environment the change needs is written, or a
+subtask names the step and who can perform it — not an unassigned "someone with prod access"
+(PROJ-4766).
+
 **This phase does NOT remove the worktree, the branch, or the tmux session.** It ends at the Jira
 transition to Klart. Worktree/branch/session teardown is `/workspace-cleanup`, run from the
 ORCHESTRATOR session (or `/create-stories` Step 0.5 on the next batch) — never from here.
@@ -2086,7 +2144,21 @@ trivia item; it is the mechanism by which a green result reaches the user with r
   had to be rebased and force-pushed back). On a busy main where freshness refuses again after the
   rebase, use `bash ~/.claude/scripts/rebase-and-regate.sh <wt> && git push --force-with-lease
   origin HEAD`: it loops rebase + gate until fresh and green, stops on a real failure or a conflict,
-  and refuses a dirty tree rather than stashing (PROJ-4472).
+  and refuses a dirty tree rather than stashing (PROJ-4472). It rebases onto the PR's base (stacked
+  branches too), takes `OLD_BASE=<old base tip>` when the base PR was squash-merged (`--onto`,
+  PROJ-4736), carries skip-worktree files across a rebase that would fail with "could not detach
+  HEAD" (PROJ-4749, 4014, 3704), and explains the macOS `package-lock.json` drift. Before asking the
+  user to break a written rule over an error, grep `dream-team-learnings.md` for the error string —
+  the rule-preserving fix is usually there. `quality-gate.sh` now FAILS when its auto-formatters
+  changed a file after your commit ("Tree after gate"): commit that, then re-run.
+- **A pipe hides the gating command's exit.** `git rebase ... | tail -1 && gate` ran the gate on an
+  un-rebased tree (PROJ-4014); a background poll piped through `tail` reported exit 0 (PROJ-4750).
+  `zsh-trap-guard.sh` refuses these shapes, `git push ...; git update-ref` (PROJ-4749) and
+  `for path in` (zsh rebinds `$PATH`, PROJ-4821).
+- **Adding a hook or export to a shared module:** grep every `vi.mock` of that module and run those
+  test files too; a narrow `vitest` scope missed a sibling mock without the new hook (PROJ-4749).
+- **`dotnet test --no-build`** runs whatever assembly is on disk: build the project under test first,
+  or a deleted test is still counted (PROJ-4749).
 - **A removal or negative check must restore the whole old surface and still compile.** Revert to
   `origin/main`'s sources for every layer the guard spans, make the reverted code build
   (`currentData → data` everywhere), then read the failure REASON, not the count — a ReferenceError

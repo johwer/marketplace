@@ -35,16 +35,28 @@ BOT_PATTERNS="gemini-code-assist|copilot|github-actions|coderabbit|sourcery|swee
 DECLINE_PATTERN="(wasn.t|was not|were not|weren.t) able to review any files|unable to review any files|unable to review this pull request|reached (their|the) quota"
 QUOTA_PATTERN="quota"
 
+# Only reviews after the PR went ready, or after the latest bot re-request, count. Copilot posts a
+# "wasn't able to review" decline at draft creation (empty init commit), and matching that old body
+# exited 3 at once, even right after a re-request (PROJ-4014). SINCE=<ISO time> overrides.
+if [ -z "${SINCE:-}" ]; then
+  SINCE=$(gh api --paginate "repos/${OWNER_REPO}/issues/${PR_NUMBER}/timeline" 2>/dev/null \
+    | jq -rs --arg pat "$BOT_PATTERNS" '[.[][] | select(.event == "ready_for_review"
+        or (.event == "review_requested" and ((.requested_reviewer.login // "") | test($pat; "i"))))
+        | .created_at] | max // ""' 2>/dev/null) || SINCE=""
+fi
+SINCE="${SINCE:-1970-01-01T00:00:00Z}"
+
 echo "Polling PR #${PR_NUMBER} on ${OWNER_REPO} for AI bot reviews..."
+echo "Counting only reviews and comments after ${SINCE} (PR ready / latest bot re-request)"
 echo "Max wait: ${MAX_MINUTES} minutes, checking every ${INTERVAL} seconds"
 echo ""
 
 while [ "$ELAPSED" -lt "$MAX_SECONDS" ]; do
   # Check PR review comments (inline comments)
-  COMMENTS=$(gh api "repos/${OWNER_REPO}/pulls/${PR_NUMBER}/comments" 2>/dev/null || echo "[]")
+  COMMENTS=$(gh api --paginate "repos/${OWNER_REPO}/pulls/${PR_NUMBER}/comments" 2>/dev/null | jq -s --arg s "$SINCE" '[.[][] | select(.created_at > $s)]' 2>/dev/null) || COMMENTS="[]"
 
   # Check PR reviews (top-level reviews)
-  REVIEWS=$(gh api "repos/${OWNER_REPO}/pulls/${PR_NUMBER}/reviews" 2>/dev/null || echo "[]")
+  REVIEWS=$(gh api --paginate "repos/${OWNER_REPO}/pulls/${PR_NUMBER}/reviews" 2>/dev/null | jq -s --arg s "$SINCE" '[.[][] | select((.submitted_at // "") > $s)]' 2>/dev/null) || REVIEWS="[]"
 
   # Filter for bot authors in comments
   BOT_COMMENTS=$(echo "$COMMENTS" | jq -r --arg pat "$BOT_PATTERNS" \
@@ -106,5 +118,6 @@ echo "$(date +%Y-%m-%d_%H:%M),${OWNER_REPO},${PR_NUMBER},${ACTUAL},timeout,0" >>
 
 echo ""
 echo "Timeout: No AI bot reviews found after ${MAX_MINUTES} minutes."
-echo "The PR may not have AI review bots configured, or they may be slow."
+echo "A timeout is NOT 'no findings': Copilot has posted a real review ~25 min after ready (PROJ-4752)."
+echo "Before asking to ship, re-check: gh api repos/${OWNER_REPO}/pulls/${PR_NUMBER}/comments and .../reviews"
 exit 1

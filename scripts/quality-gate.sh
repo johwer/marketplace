@@ -41,10 +41,24 @@ done
 # deletes in the working tree (or deletes uncommitted) still shows as changed in
 # origin/main...HEAD, and ESLint then crashes on the missing path (PROJ-4647). So
 # keep only paths that exist on disk.
+# The base is the PR's base, not always main: on a stacked branch, measuring against main
+# blames the parent PR's commits on this one and prescribes the wrong rebase (PROJ-3796,
+# PROJ-4833). QG_BASE overrides; otherwise ask gh, and fall back to main.
+BASE_BRANCH="${QG_BASE:-}"
+if [[ -z "$BASE_BRANCH" ]] && command -v gh >/dev/null 2>&1; then
+  BASE_BRANCH=$(cd "$WORKTREE" && gh pr view --json baseRefName -q .baseRefName 2>/dev/null || true)
+fi
+BASE_BRANCH="${BASE_BRANCH:-main}"
+(cd "$WORKTREE" && git fetch origin "$BASE_BRANCH" --quiet) >/dev/null 2>&1 || true
 BASE_REF=""
-if (cd "$WORKTREE" && git rev-parse --verify --quiet origin/main >/dev/null 2>&1); then
+if (cd "$WORKTREE" && git rev-parse --verify --quiet "origin/$BASE_BRANCH" >/dev/null 2>&1); then
+  BASE_REF="origin/$BASE_BRANCH"
+elif (cd "$WORKTREE" && git rev-parse --verify --quiet origin/main >/dev/null 2>&1); then
   BASE_REF="origin/main"
 fi
+# Tracked files already modified before the gate runs. Anything modified AFTER that the gate did
+# itself (auto-format), and a push now would ship the unformatted commit (PROJ-4735, PROJ-4761).
+DIRTY_BEFORE=$(cd "$WORKTREE" && git diff --name-only HEAD 2>/dev/null | sort || true)
 collect_changed() {
   cd "$WORKTREE" || return
   if [[ -n "$BASE_REF" ]]; then
@@ -61,14 +75,21 @@ done)
 # extension — a frontend-only branch that touches config/docs (e.g. eslint.config.mjs,
 # *.md) has no .tsx/.jsx file but is still frontend-only and must not trigger backend.
 if [[ "$RUN_BACKEND" == "false" && "$RUN_FRONTEND" == "false" ]]; then
-  if echo "$CHANGED" | grep -qE '\.cs$|^services/|^shared/'; then
+  # Text, infrastructure and repo tooling (docs/, *.md, infra/, scripts/, .claude/) never decide an area: no .NET or web check can say
+  # anything about them, and running those checks needed an npm ci the branch had no use for
+  # (PROJ-3704, PROJ-4863, PROJ-4868). A services/X/AGENTS.md edit is not a backend change.
+  NON_TEXT=$(echo "$CHANGED" | grep -vE '^docs/|\.md$|^infra/|^scripts/|^\.claude/|^$' || true)
+  if echo "$NON_TEXT" | grep -qE '\.cs$|^services/|^shared/'; then
     RUN_BACKEND=true
   fi
-  if echo "$CHANGED" | grep -q '^apps/web/'; then
+  if echo "$NON_TEXT" | grep -q '^apps/web/'; then
     RUN_FRONTEND=true
   fi
+  if [[ -n "$CHANGED" && -z "$NON_TEXT" && "$RUN_BACKEND" == "false" && "$RUN_FRONTEND" == "false" ]]; then
+    TEXT_ONLY=true
+  fi
   # If still nothing detected (no recognizable area changed), run both.
-  if [[ "$RUN_BACKEND" == "false" && "$RUN_FRONTEND" == "false" ]]; then
+  if [[ "${TEXT_ONLY:-false}" == "false" && "$RUN_BACKEND" == "false" && "$RUN_FRONTEND" == "false" ]]; then
     RUN_BACKEND=true
     RUN_FRONTEND=true
   fi
@@ -105,6 +126,13 @@ echo " Worktree: $WORKTREE"
 echo "═══════════════════════════════════════════"
 echo ""
 
+if [[ "${TEXT_ONLY:-false}" == "true" ]]; then
+  add_result "Area: docs/infra/scripts-only diff — .NET and frontend checks skipped (docs: run build.py --strict; infra: terraform plan runs in CI; scripts: run what you changed)" "PASS" ""
+fi
+if [[ "$BASE_BRANCH" != "main" ]]; then
+  add_result "Stacked base" "WARN" "PR base is '$BASE_BRANCH', not main — web-ci and the service CI workflows only run on PRs to main, so CI will not build or test this branch until it is retargeted. These local checks are the only ones."
+fi
+
 # ── Branch freshness ────────────────────────────
 # tsc/dotnet here check the WORKING TREE. CI checks the branch MERGED WITH MAIN
 # (feedback_ci_tests_merge_result). When main moves under a long-running branch, this
@@ -114,20 +142,20 @@ echo ""
 # branch known to be behind FAILS. Not knowing (offline, no merge-base) warns instead of
 # failing: it must not be possible to work around the FAIL by pulling the plug, but it also
 # must not block a plane-mode push. A warning still says the tick below is unverified.
-echo "▸ Branch freshness (vs origin/main)..."
-if ! (cd "$WORKTREE" && git fetch origin main --quiet 2>&1) > /tmp/qg-fetch.log 2>&1; then
-  add_result "Branch freshness" "WARN" "could not fetch origin/main (offline?) — cannot tell whether this branch is behind; the checks below are the working tree, not the merge result CI builds (see /tmp/qg-fetch.log)"
+echo "▸ Branch freshness (vs origin/$BASE_BRANCH)..."
+if ! (cd "$WORKTREE" && git fetch origin "$BASE_BRANCH" --quiet 2>&1) > /tmp/qg-fetch.log 2>&1; then
+  add_result "Branch freshness" "WARN" "could not fetch origin/$BASE_BRANCH (offline, or the base branch was deleted after merge — then rebase with --onto origin/main <old-base-tip>) — cannot tell whether this branch is behind; the checks below are the working tree, not the merge result CI builds (see /tmp/qg-fetch.log)"
 else
-  MERGE_BASE=$(cd "$WORKTREE" && git merge-base HEAD origin/main 2>/dev/null || echo "")
-  ORIGIN_MAIN=$(cd "$WORKTREE" && git rev-parse origin/main 2>/dev/null || echo "")
+  MERGE_BASE=$(cd "$WORKTREE" && git merge-base HEAD "origin/$BASE_BRANCH" 2>/dev/null || echo "")
+  ORIGIN_MAIN=$(cd "$WORKTREE" && git rev-parse "origin/$BASE_BRANCH" 2>/dev/null || echo "")
   if [[ -z "$MERGE_BASE" || -z "$ORIGIN_MAIN" ]]; then
     add_result "Branch freshness" "WARN" "could not resolve merge-base with origin/main — cannot tell whether this branch is behind"
   elif [[ "$MERGE_BASE" == "$ORIGIN_MAIN" ]]; then
-    add_result "Branch freshness" "PASS" "origin/main not advanced since merge-base"
+    add_result "Branch freshness" "PASS" "origin/$BASE_BRANCH not advanced since merge-base"
   else
-    BEHIND=$(cd "$WORKTREE" && git rev-list --count "$MERGE_BASE..origin/main" 2>/dev/null || echo "?")
-    (cd "$WORKTREE" && git log --oneline -10 "$MERGE_BASE..origin/main") > /tmp/qg-behind.log 2>&1 || true
-    add_result "Branch freshness" "FAIL" "origin/main advanced $BEHIND commit(s) since merge-base — the checks below type-check the working tree, NOT the merge result CI builds. Rebase (git rebase origin/main) and re-run. Commits: $(tr '\n' '; ' < /tmp/qg-behind.log)"
+    BEHIND=$(cd "$WORKTREE" && git rev-list --count "$MERGE_BASE..origin/$BASE_BRANCH" 2>/dev/null || echo "?")
+    (cd "$WORKTREE" && git log --oneline -10 "$MERGE_BASE..origin/$BASE_BRANCH") > /tmp/qg-behind.log 2>&1 || true
+    add_result "Branch freshness" "FAIL" "origin/$BASE_BRANCH advanced $BEHIND commit(s) since merge-base — the checks below type-check the working tree, NOT the merge result CI builds. Rebase (git rebase origin/$BASE_BRANCH, or rebase-and-regate.sh) and re-run. Commits: $(tr '\n' '; ' < /tmp/qg-behind.log)"
   fi
 fi
 echo ""
@@ -217,8 +245,16 @@ if [[ "$RUN_BACKEND" == "true" ]]; then
     add_result "Hidden problems" "PASS" ""
   fi
 
-  # Find .sln files in services/
+  # Find .sln files in services/. Only the touched services' solutions, unless shared/ or a
+  # root build file changed: an unrelated broken solution on main (Billing NU1008, PROJ-4764) must
+  # not turn every branch red, and it is the touched ones CI builds for this PR.
   SLN_FILES=$(find "$WORKTREE/services" -maxdepth 3 -name "*.sln" 2>/dev/null || echo "")
+  if ! echo "$CHANGED" | grep -qE '^shared/|^Directory\.(Build|Packages)\.props$|^global\.json$|^nuget\.config$'; then
+    TOUCHED_SVCS=$(echo "$CHANGED" | grep -oE '^services/[^/]+/' | sort -u || true)
+    if [[ -n "$TOUCHED_SVCS" ]]; then
+      SLN_FILES=$(while IFS= read -r svc; do find "$WORKTREE/$svc" -maxdepth 2 -name "*.sln" 2>/dev/null; done <<< "$TOUCHED_SVCS")
+    fi
+  fi
 
   # ── Toolchain precheck: "cannot build" and "build is broken" are opposite findings ──
   # PROJ-3279: a resumed branch had a hard C# compile error AND a global.json SDK pin the host
@@ -274,7 +310,9 @@ if [[ "$RUN_BACKEND" == "true" ]]; then
         BUILD_OUTPUT="restore failed for $sln (not a code error — network/feed?): $(tail -3 /tmp/qg-restore.log)"
         continue
       fi
-      if ! (cd "$WORKTREE" && dotnet build "$sln" --no-restore 2>&1) > /tmp/qg-build.log 2>&1; then
+      # Release + /warnaserror is what the service CI workflows run. A Debug build passed while CI
+      # failed on test-project analyzers (xUnit2031, CS8631; PROJ-4764).
+      if ! (cd "$WORKTREE" && dotnet build "$sln" --no-restore --configuration Release /warnaserror 2>&1) > /tmp/qg-build.log 2>&1; then
         BUILD_PASS=false
         BUILD_OUTPUT="$sln: $(tail -5 /tmp/qg-build.log)"
       fi
@@ -433,6 +471,15 @@ elif echo "$CHANGED" | grep -qE '^apps/mobile/' && [[ -d "$MOBILE_DIR" ]]; then
   else
     add_result "Mobile TypeScript" "FAIL" "$(grep -E 'error TS' /tmp/qg-m-tsc.log | head -5)"
   fi
+fi
+
+# ── Files the gate changed ──────────────────────
+# Auto-formatters above write to the tree. If a file is modified now that was clean before the
+# gate ran, the commit about to be pushed is not the formatted one.
+DIRTY_AFTER=$(cd "$WORKTREE" && git diff --name-only HEAD 2>/dev/null | sort || true)
+GATE_DIRTIED=$(comm -13 <(echo "$DIRTY_BEFORE") <(echo "$DIRTY_AFTER") | grep -v '^$' | head -10 | tr '\n' ' ' || true)
+if [[ -n "$GATE_DIRTIED" ]]; then
+  add_result "Tree after gate" "FAIL" "the gate reformatted file(s) that were clean before it ran: ${GATE_DIRTIED}— review, commit (amend or fixup), and re-run before pushing"
 fi
 
 # ── Summary ─────────────────────────────────────

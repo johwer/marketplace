@@ -27,6 +27,13 @@ Reference material: `references/layers.md` (Repo layer map, wrong-place symptoms
 - `~/.claude/commands/ghost-review.md` — the current backend tech lead. Read: "Standing decisions" (dated rules from Slack/Jira, e.g. "the contract is the switch", "use services, not products", migration tooling must keep up), the `[NECESSITY]` check (what already provides this? constraint or convention? config or code? shared rule → prealign), and "Mode 2" Step 2 questions.
 - `~/.claude/commands/owl-review.md` — the former tech lead (left 2026-08; a fixed record). Read its "Standing decisions" and Mode 2 questions for events, concurrency and contracts. A later ghost decision overrides it.
 
+**For a port or parity question, read legacy first.** Open the legacy repos (`~/Documents/Medhelp.*`,
+fetched, trunk commit cited) with file:line before the first option, and frame options as "closest to
+legacy that works in Nova" plus each justified deviation (PROJ-4748).
+
+**"Same permission as X" is a list, not a role.** Before balling options, list every role that holds
+X; `ServiceAReportEventRead` is held by `EmployeeBase` too, not only managers (PROJ-4750).
+
 **Know which skill answers what.** Route instead of improvising:
 
 | Need | Skill |

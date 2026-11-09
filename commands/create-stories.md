@@ -315,6 +315,13 @@ VERIFIED vs UNVERIFIED — the one rule that matters more than coverage:
   (producer service, its data migrations, seeds) are grepped, not only the UI that reads it.
   PROJ-4696's report marked the submit half `[unverified]` and scoped the ticket as read-only; the
   submit half was broken too.
+- "The one place that does X" is a claim about every caller: map the backend WRITERS (e.g. every route
+  that calls SetRefreshCookie) instead of naming the nearest regex or helper. PROJ-4014's "one place"
+  missed three routes; PROJ-4752's prescribed preload was not what the legacy call site did.
+- Parity ticket ("same as legacy/SignedIn"): quote the legacy strings and behaviour verbatim with
+  file:line in context.md, so the ticket's own proposed wording is visibly a deviation (PROJ-3796).
+- Investigation ticket that will drive an environment: list the pages that WRITE when opened, and the
+  role grants the plan assumes, before anyone drives them (PROJ-4821).
 Half a report with honest [unverified] tags is worth more than a full one stated with equal confidence.
 
 Return your analysis as a structured report. If you haven't finished all 13 points by tool use 25, wrap up with what you have — partial is fine, Amara will fill gaps."

@@ -289,6 +289,8 @@ does — the reader cannot tell which mode wrote it, so neither can the gate.
    puts `## Architecture` in the body and the gate refuses it. Before writing it, offer the nearest
    allowed home: scope and key files go in `## Scope` (`template`: `## Considerations`), design detail in the notes comment. Say so
    in the reply to the reviewer up front rather than discovering it on the gate run (PROJ-4472).
+10. **`pr-body-gate.sh` run from the scratchpad** refuses with "cannot determine the repo" (same
+   family as 8). Run it from the worktree (PROJ-4752).
 
 ## Related
 

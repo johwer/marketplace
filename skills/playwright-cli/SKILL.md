@@ -296,7 +296,7 @@ playwright-cli close
 * **Tracing** [references/tracing.md](references/tracing.md)
 * **Video recording** [references/video-recording.md](references/video-recording.md)
 
-## HARD RULE — mask national IDs before EVERY screenshot (Repo)
+## HARD RULE — mask national IDs and names before EVERY screenshot (Repo)
 
 Every capture that can leave this machine (PR body, Jira, Slack) must be masked first. A shot with an
 unmasked personnummer reached a PR on 2026-10-15 because masking was a habit, not a step.
@@ -313,6 +313,14 @@ bash ~/.claude/scripts/pw-mask-pii.sh <session> && \
   restores the real text on its next render, so one mask per page is not enough.
 - `masked: 0` on a page that shows people is a reason to look at the screenshot before uploading it,
   not proof it is clean (an ID can be split across nodes or drawn on a canvas).
+- **Names too:** `pw-mask-pii.sh <session> --h1 ["<full name>" ...]`. `--h1` takes the page heading as
+  the person's name; each word is masked as well, in text, inputs, `title`/`aria-label`/`placeholder`
+  and open shadow roots. After masking it waits 300 ms and re-reads the page: if a name came back (a
+  re-render) it exits 1 — do not capture. Blanking the h1 alone left the name in the nurse form's
+  Samtalsguide (PROJ-4761, PROJ-4821). Names are arguments only, never written to a file.
+- **Never write an image transform over its input.** A browser-overlay redaction captured before the
+  `file://` image loaded overwrote six originals, then the scratch copies were deleted (PROJ-4821).
+  Write to a new file and compare before deleting anything.
 
 ## Gotchas found the hard way (Repo sessions)
 
@@ -392,6 +400,31 @@ FORCE_LOGOUT does, and loop anything racing a navigation 10x before calling it s
 Match the app's own boundary text ("An unexpected error occurred"), not only React Router's default
 error page — a detector with the wrong regex reported `errorPage=false` on the bug itself. Check every
 detector against one known-bad screenshot before trusting it (PROJ-4294).
+
+### New tabs and window.open
+
+A tab missing from `tab-list` after a click that calls `window.open` is not evidence the call never
+happened (popup handling, `noopener`). Record calls instead:
+`eval "() => { window.__opened = []; const o = window.open; window.open = (...a) => { window.__opened.push(a[0]); return o.apply(window, a); }; }"`
+before the click, then read `window.__opened` (PROJ-4752).
+
+### Writing on accept without a pasted token
+
+Open a headed session and let the user log in. The app keeps its token in `sessionStorage.mhToken`
+and does not use cookies (`credentials: 'include'` returned 401), so write with
+`fetch(url, { headers: { Authorization: 'Bearer ' + sessionStorage.mhToken } })` from `eval`.
+First confirm whose session it is: call `authorization/platform/action/<the action you need>` — that
+caught the user being logged in as the test nurse (PROJ-4766).
+
+### Verifying a branch bundle against accept (recipe, no script yet)
+
+Build the branch with the accept `VITE_*` values, then in the logged-in accept session route the
+app host to the local build: `context.route('https://<accept app host>/**', r => …)` fulfilling
+`/assets/*` with `route.fulfill({ path: dist + pathname })` and documents with `dist/index.html`
+(`fulfill({path})` reads from disk driver-side, so `run-code` needs no `require`). Take a gh/API value
+only on exit 0 and assert the baked value in `dist` before browsing: `$(gh api A || gh api B)`
+concatenated gh's 404 JSON with the fallback, and the flag-gated page silently redirected (PROJ-4648,
+PROJ-4761).
 
 ### Toasts and other self-dismissing UI
 

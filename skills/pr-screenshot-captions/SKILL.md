@@ -16,6 +16,9 @@ Turns a dump of `<img>` tags a user pasted into a GitHub PR body into a clean, c
 ## Why this exists / hard rules
 - **The PR body is one field — edits race.** The user editing in the browser while you `gh pr edit` means last-write-wins. ALWAYS **re-fetch the body immediately before writing** and diff it against what you last read; only write if unchanged (or reconcile first). When the user adds images, their save often **clobbers a previous description you wrote** — be ready to restore it.
 - **Caption from the real images, not filenames.** Open each local source file (Read tool) to confirm what it actually shows. Filenames/alt text lie (a shot named `after-…` may be a browser error page).
+- **Label deliberately forced failures.** A 503/403 forced through a playwright route reads as a
+  broken flow. Caption it "Avsiktligt framtvingat fel" (or "Deliberately forced error") and group it
+  under a collapsed error-handling heading (PROJ-4752).
 - **Be honest about non-evidence.** Drop pure error captures (e.g. "site can't be reached", dev-server error overlays) — they prove nothing and look bad. Collapse intermediate/superseded/exploration shots into a `<details>` block, labeled as such. Don't silently delete a user's images without saying which and why.
 
 ## Workflow

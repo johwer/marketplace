@@ -233,8 +233,11 @@ fi
 _wt_exclude="$(git -C "$WORKTREE_DIR" rev-parse --path-format=absolute --git-path info/exclude)"
 for _wt_local in apps/web/vite.config.worktree.mts apps/web/cosmos.worktree.config.json apps/web/cosmos.vite.config.worktree.mts AGENTS.md CLAUDE.md; do
     if git -C "$WORKTREE_DIR" ls-files --error-unmatch "$_wt_local" >/dev/null 2>&1; then
-        git -C "$WORKTREE_DIR" update-index --skip-worktree "$_wt_local" 2>/dev/null \
-            && echo "Marked $_wt_local skip-worktree (per-worktree local state — never committed)"
+        if git -C "$WORKTREE_DIR" update-index --skip-worktree "$_wt_local" 2>/dev/null; then
+            echo "Marked $_wt_local skip-worktree (per-worktree local state — never committed)"
+        else
+            echo "! could NOT mark $_wt_local skip-worktree — it will show as a change and may be committed" >&2
+        fi
     elif ! grep -qxF "/$_wt_local" "$_wt_exclude" 2>/dev/null; then
         mkdir -p "$(dirname "$_wt_exclude")"
         echo "/$_wt_local" >> "$_wt_exclude" \

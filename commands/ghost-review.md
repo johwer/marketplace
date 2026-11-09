@@ -989,6 +989,9 @@ acli jira workitem get <TICKET_ID>
 
 ### Step 2 — Ask the architecture questions the tech lead would ask
 
+- **Does any write change this row's type?** If an upsert or later write rewrites an enum column, it
+  is state: give it its own column and keep `type` immutable (PROJ-4748, caught only by a human).
+
 Before any implementation starts, surface the questions he would ask in review — so they're answered up front:
 
 **Authorization design:**
