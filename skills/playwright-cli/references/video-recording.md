@@ -5,17 +5,20 @@ Capture browser automation sessions as video for debugging, documentation, or ve
 ## Basic Recording
 
 ```bash
-# Start recording
-playwright-cli video-start
+# Fixed viewport, then start recording (filename goes on video-start in 0.1.22)
+playwright-cli resize 1440 900
+playwright-cli video-start ~/Downloads/<TICKET_ID>/walkthrough-<flow>.webm
+playwright-cli video-show-actions          # callout naming each action, highlights the target
 
-# Perform actions
+# Perform actions, one chapter per step
+playwright-cli video-chapter "Open the page"
 playwright-cli open https://example.com
 playwright-cli snapshot
 playwright-cli click e1
 playwright-cli fill e2 "test input"
 
 # Stop and save
-playwright-cli video-stop demo.webm
+playwright-cli video-stop
 ```
 
 ## Best Practices

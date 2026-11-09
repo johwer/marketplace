@@ -151,8 +151,9 @@ playwright-cli network
 playwright-cli run-code "async page => await page.context().grantPermissions(['geolocation'])"
 playwright-cli tracing-start
 playwright-cli tracing-stop
-playwright-cli video-start
-playwright-cli video-stop video.webm
+playwright-cli video-start walkthrough.webm
+playwright-cli video-chapter "Step 1"
+playwright-cli video-stop
 ```
 
 ## Open parameters

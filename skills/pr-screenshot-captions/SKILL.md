@@ -48,6 +48,21 @@ Turns a dump of `<img>` tags a user pasted into a GitHub PR body into a clean, c
 
 8. **Verify the result:** image count is sensible, dropped shots are gone, sections render.
 
+## Walkthrough video (flow changes)
+A flow change has a `walkthrough-<flow>.webm` in `~/Downloads/<TICKET_ID>/` next to the stills. The user drags it into the PR like the images; GitHub turns it into a bare `https://github.com/user-attachments/assets/<uuid>` line that plays inline (no `<img>`, no alt, so match it by order and by asking, not by filename).
+- Put it **first** inside `## Visual verification`, under `### Walkthrough`, above the captioned stills. One `### Walkthrough — <flow>` per video when there are several.
+- The URL stays on its own line with blank lines around it, or GitHub shows a link instead of a player.
+- Caption it like a still: one quote line with the scripted path, then what it **proves**. Caption from what the video shows, not from the filename. You can't watch it, so caption from the recorded script and its `video-chapter` steps, and ask the user to confirm the video matches.
+- Keep the key states as captioned stills below it: the video shows motion, the stills are what a reviewer scans.
+
+```markdown
+### Walkthrough
+
+https://github.com/user-attachments/assets/<uuid>
+
+> ↓ through every slide and on to "More insights", ↑ back up, then a click on a dimmed slide. Proves the focus follows the keys and the click, and that the keys let go at the last slide.
+```
+
 ## Caption shape (example)
 ```markdown
 ### Step 1 — Colors

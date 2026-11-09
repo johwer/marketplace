@@ -109,7 +109,7 @@ Anything inside `<details>` does not count.
 | `## Why`, `## What changes` | **keep** (`dtf`) — trim to budget if over · **fold into `## Summary`** (`template`) |
 | `## Summary`, `## Considerations`, `## Agent` | **keep** (`template`) — Agent must be filled in, never deleted |
 | `## Risk` / `## Risks` | `## Considerations` → `Look closely:` (`template`) · fold into `## Scope` (`dtf`) |
-| `## Visual verification` / `## Visual Verification Evidence` + all images | **keep**, byte-identical |
+| `## Visual verification` / `## Visual Verification Evidence` + all images and its `### Walkthrough` video | **keep**, byte-identical |
 | `## Scope` / `## Not in this PR` | **keep**, compressed to one line + follow-up ticket (`dtf`) · `## Considerations` → `Out of scope:` (`template`) |
 | `## Walkthrough of the changes`, `## Reading this diff`, per-file tables | **move** |
 | `## Decisions` (resolved) | **move** as one line each: `Chose X over Y because Z` (`template`: the 1–3 that matter go to `## Considerations` as `Decision:` bullets) |

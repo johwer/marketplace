@@ -26,13 +26,15 @@ Applies to all tickets with UI changes. Skip for backend-only/infra-only tickets
 - **Screenshots → `~/Downloads/<TICKET_ID>/`** (user-visible folder; on Swedish macOS shown as "Hämtade filer"). One per relevant state. **NEVER** the repo, **NEVER** `/tmp`. The user drag-drops them into the PR description; nothing is committed.
 - **New component → add a Cosmos fixture** (`*.fixture.tsx`, run via `npx cosmos --config cosmos.worktree.config.json`) for component states — preferred over an e2e spec. Add a unit test too if it has interactive/conditional logic.
 - **No committed screenshots or e2e baselines by default.** No `page.screenshot()` artifacts in `src/**/__screenshots__/`, no `toHaveScreenshot` baselines/specs unless the user explicitly requested a regression test.
-- **No GIF/video.** Only record video if the user explicitly requests it (and then `playwright-cli video`, never `gif_creator`).
+- **Walkthrough video for flows.** When the change is a flow (several steps, keyboard, scroll, focus, animation, anything a still can't show), also record one walkthrough per flow worth showing, next to the screenshots: `playwright-cli -s=<session> resize 1440 900 && playwright-cli -s=<session> video-start ~/Downloads/<TICKET_ID>/walkthrough-<flow>.webm`, then `video-show-actions`, drive the scripted path (a `video-chapter "<step>"` per step), then `video-stop`. Static UI stays screenshots-only. **Synthetic data only** (Cosmos fixture or local seed users): `pw-mask-pii.sh` masks one frame, not a recording, so never record against accept, prod or cloned data. Uploaded like the screenshots, it goes in the PR body under `### Walkthrough`, first inside `## Visual verification`, with a caption saying what it proves (`pr-screenshot-captions`). Never `gif_creator`.
 
 ### Verification
 
 ```bash
 # 1. Screenshots exist in the user-visible folder (lead has personally seen the rendered output):
 ls ~/Downloads/<TICKET_ID>/*.png 2>/dev/null
+# 1b. Flow change: its walkthrough exists too
+ls ~/Downloads/<TICKET_ID>/walkthrough-*.webm 2>/dev/null
 
 # 2. NO screenshots / e2e baselines committed to the repo — this must return NOTHING:
 git diff --name-only origin/main | grep -E 'src/.*__screenshots__/.*\.png|tests/e2e/.*-snapshots/.*\.png'
@@ -401,13 +403,14 @@ The user drag-drops these into the PR description. Nothing is committed to the r
 apps/web/src/.../<Component>.fixture.tsx
 ```
 
-**No committed screenshots / e2e baselines by default**, and **no GIF/video**. A committed `toHaveScreenshot` regression test (in `apps/web/tests/e2e/` with baselines in `__snapshots__/`) is the rare exception — only when the user explicitly asks for one.
+**No committed screenshots / e2e baselines by default.** A flow change also gets a walkthrough video (see Section 1). A committed `toHaveScreenshot` regression test (in `apps/web/tests/e2e/` with baselines in `__snapshots__/`) is the rare exception — only when the user explicitly asks for one.
 
 ### File Naming
 
 | File | Location | Pattern | Example |
 |------|----------|---------|---------|
 | Visual-verification screenshot | `~/Downloads/<TICKET_ID>/` | `<state>.png` | `changelog-external-receivers.png` |
+| Walkthrough video (flow changes) | `~/Downloads/<TICKET_ID>/` | `walkthrough-<flow>.webm` | `walkthrough-slide-focus.webm` |
 | Cosmos fixture (new component) | next to the component | `<Component>.fixture.tsx` | `Callout.fixture.tsx` |
 | Jira attachments | `~/Downloads/` | Original filename from Jira | `image-20260227-140735.png` |
 
