@@ -1,0 +1,2 @@
+Lens: authorisation.
+For every option, ask who can call it and with what. Can a caller reach it directly through the API, bypassing the frontend? Does a permission reach exactly the roles that need it, no more (broad permissions that many roles hold) and no fewer (a new permission no assignable role grants)? Is every id in the request bound to the resource the caller was authorised on, or can one customer act on another's rows? Can someone grant the permission to themselves? Do caller-settable fields widen what the call affects?

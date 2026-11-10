@@ -288,6 +288,8 @@ Compile a **conventions summary** — a condensed bullet list of the rules that 
 
 Split the changed files into two halves (by file count). Launch 4 agents **in parallel** using the Agent tool:
 
+**Shell rule for every agent in 6c and 6e** (put it verbatim in each prompt): "Run exactly ONE plain command per Bash call: `git show <sha>:<path>`, `git diff`, `git log`, `git blame`, `git grep`, or one `gh` call. No `cd`, `;`, `&&`, pipes or `git -C`; use Read/Grep/Glob for files in the worktree. A denied command means the form was wrong: retry in the allowed form, never give up on Bash." Without it, a headless or `dontAsk` run denies the first compound command and the agent stops reading the code, then reports from the diff alone.
+
 **Agent 1: Convention Reviewer A** (Sonnet)
 - Reviews first half of changed files
 - Prompt: "You are a convention reviewer. Check these diffs against the conventions summary below. Flag ONLY clear, unambiguous violations where you can quote the exact rule broken. Do NOT flag style preferences, subjective improvements, or things a formatter would catch. For each issue, return: `{file, line, category: 'MUST FIX'|'SUGGESTION', description, convention_violated}`."
@@ -364,18 +366,28 @@ Do not judge this from the diff hunk. Open the repository and establish the fact
   that would disprove it and paste what came back.
 - If the claim is about intent or a prior decision, run git log / git blame.
 
-TWO HARD GATES — a finding fails if either is unmet:
+VERDICT — confirm, refute, or leave open. Your job is to settle the claim, not to
+find a reason to drop it:
 
-1. EVIDENCE. You must name the artifact you read: a file:line you opened, a command
-   and its actual output, a git log line, or a dependency source path. Reasoning that
-   never left the diff is not evidence. Findings without evidence are DROPPED, not
-   downgraded — an unverified claim handed to the author as a question is work moved,
-   not work done.
+1. EVIDENCE. Name the artifact you read: a file:line you opened, a command and its
+   actual output, a git log line, or a dependency source path. Reasoning that never
+   left the diff is not evidence.
+   - confirmed: the code shows the claim holds.
+   - refuted: the code shows it is wrong. Quote what shows it. This is the ONLY
+     reason to drop a finding for being untrue; "I could not find evidence" is not.
+   - open: you searched and the code cannot settle it (product intent, rollout order,
+     whether a caller exists outside this repo). Say what you checked.
 
-2. PROPOSAL. The finding must carry replacement code that is correct against what you
-   just read. If the supplied proposal is wrong, fix it and say what you changed. If no
-   concrete replacement can be written, the finding is DROPPED. "Consider whether…",
-   "should this be…", and "was this intentional?" are not findings.
+2. PROPOSAL. Carry replacement code that is correct against what you just read. If
+   the supplied proposal is wrong, fix it and say what you changed.
+   - A confirmed bug a user or caller would hit is kept even when no clean
+     replacement exists: give the smallest fix sketch you can stand behind.
+   - Any other category (SUGGESTION, IMPROVEMENT) with no concrete replacement is
+     DROPPED. "Consider whether…" and "should this be…" are not findings.
+
+New or copied code that breaks a written rule (style guide, .claude/rules, AGENTS.md)
+is not "pre-existing", even when sibling files break it the same way. A narrow trigger
+lowers confidence in impact, never a confirmed rule break below SUGGESTION.
 
 HARD EXCLUSIONS — dismiss automatically if the finding is:
 1. Formatting or style covered by tooling (CSharpier, ESLint, Prettier)
@@ -397,7 +409,8 @@ REPLAY-SAFETY OVERRIDE (finding id starts with REPLAY-):
 
 Output: {
   "finding_id": "...",
-  "confidence": 1-10,      // 1-3 dismiss, 4-6 plausible but weak, 7-10 worth raising
+  "verdict": "confirmed" | "refuted" | "open",
+  "confidence": 1-10,      // how much it matters if true: 1-3 dismiss, 4-6 weak, 7-10 worth raising
   "evidence": "...",       // the artifact, quoted
   "proposal": "...",       // corrected replacement code
   "proposal_changed": bool,
@@ -409,15 +422,22 @@ Include in the validation prompt: the flagged issue with its proposal, the relev
 
 #### 6f. Filter
 
-Drop every finding with `confidence <= 6`, no `evidence`, or no `proposal`. Report the three reasons separately — they mean different things, and collapsing them hides which part of the pipeline is misfiring:
+- `refuted` → drop.
+- `open` → the **Needs an answer** list (6h) if the answer would change what gets merged; otherwise list it in the summary to the user as considered and set aside. Never posted as a finding.
+- `confirmed` → drop only if `confidence <= 6`, or if it is a SUGGESTION/IMPROVEMENT without a `proposal`.
+
+Report the reasons separately — they mean different things, and collapsing them hides which part of the pipeline is misfiring:
 
 ```
 Deep review: 7 agents found 19 findings
-  → 4 dropped: no evidence (claim never left the diff)
-  → 3 dropped: no concrete proposal
-  → 3 dropped: confidence <= 6
+  → 3 refuted (evidence quoted)
+  → 2 open → Needs an answer, 1 set aside
+  → 2 dropped: no concrete proposal
+  → 2 dropped: confidence <= 6
   → 9 survive, 2 with a corrected proposal
 ```
+
+Eval 2026-11-10: a validator allowed to drop on "no evidence found" dropped true findings (19 → 16 of 22 kept); confirm-or-question kept them.
 
 If `proposal_changed` is true for a finding, the validator rewrote the fix. Present the corrected version — never the agent's original.
 
@@ -433,7 +453,7 @@ Categorize all surviving issues. Every entry in the first three carries replacem
 - **IMPROVEMENT** — A better shape for code that already works: reuse of an existing helper or primitive, a simplification, a structural fix. Requires a stated trade-off. Cap at the top 5 by impact — an unbounded list of nudges gets skimmed and teaches the author to skim the next one too.
 - **PRAISE** — Good patterns noticed by any agent (pass-through, no validation needed)
 
-**There is no QUESTION category.** It used to absorb findings the validator couldn't resolve, which made uncertainty the author's problem instead of the reviewer's. Anything obtainable from the repository must be resolved in 6e or dropped.
+**There is no QUESTION category.** It used to absorb findings the validator couldn't resolve, which made uncertainty the author's problem instead of the reviewer's. Anything obtainable from the repository must be resolved in 6e (confirmed or refuted).
 
 The one exception, and it is narrow: information that genuinely lives only with the author or the product owner — "does a mid-edit refetch actually happen here?", "were these TranslationService keys created?", "was this endpoint meant to ship in this PR?". Those go in a short **Needs an answer** list, capped at three, and each one must state what you already checked so the author isn't asked to repeat your work. If you can answer it with a grep, grep it.
 

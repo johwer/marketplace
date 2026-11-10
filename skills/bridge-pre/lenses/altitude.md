@@ -1,0 +1,2 @@
+Lens: where the decision should live.
+Before choosing between implementations, ask whether the question disappears if the decision is made higher up: product scope, contract or configuration, a feature flag, a permission, the endpoint, and only then service or data layer. Prefer the highest level that covers every path (workers, events, exports, other services) and that the right person can change. Say who owns the decision and whether it is temporary or permanent.

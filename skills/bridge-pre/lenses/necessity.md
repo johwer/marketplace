@@ -1,0 +1,2 @@
+Lens: is it needed at all.
+Before judging how to build it, ask whether to build it. Does something already in place cover this: a check that already happens at read time, an existing route or admin screen, an existing mechanism for the same kind of thing? Does the scenario it handles actually happen, at the current scale and number of customers? Would a manual step or a one-off script do for now? Name what the team could delete or not write if the answer is no.

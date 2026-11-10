@@ -54,7 +54,7 @@ playwright-cli -s=<agent-name> snapshot
 playwright-cli -s=<agent-name> click e5
 
 # 3. Check what headless can't catch
-playwright-cli -s=<agent-name> network          # requests route correctly, no new non-2xx
+playwright-cli -s=<agent-name> requests         # requests route correctly, no new non-2xx (request <n> for one)
 playwright-cli -s=<agent-name> console error    # no JS/React errors
 
 # 4. Capture evidence to the user-visible folder (NEVER the repo)

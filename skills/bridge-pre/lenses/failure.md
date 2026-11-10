@@ -1,0 +1,2 @@
+Lens: what goes wrong in production.
+Assume the change ships today, because every merge deploys. Look for data already written that the change must handle, migrations and backfills, rollback, concurrency and retries, background jobs and events that bypass the happy path, permissions that can be bypassed by calling the API directly, and behaviour other services depend on. Prefer the option whose failure is visible and reversible.

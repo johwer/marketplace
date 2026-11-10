@@ -107,7 +107,7 @@ Check if the arguments contain `--lite`. If present:
   - **Full-stack: commit backend and frontend separately from the start.** One-sided commits make a
     requested split into two PRs a cherry-pick onto fresh main (~10 tool calls); mixed commits make
     it a rewrite (PROJ-4622).
-- **Phase 4 (Review)**: Review your own changes against conventions, or spawn Maya if the diff is large (10+ files). Always run the **Security Scan** (Section 6 of `dev-workflow-checklist.md`) — detect backend/frontend from `git diff --name-only origin/main` and run the applicable categories. Also run these checks:
+- **Phase 4 (Review)**: Review your own changes against conventions, or spawn Maya if the diff is large (10+ files). Always run the **Security Scan** (Section 7 of `dev-workflow-checklist.md`) — detect backend/frontend from `git diff --name-only origin/main` and run the applicable categories. Also run these checks:
   - **Historical context lens** (run first): For each changed file, run `git log -p -5 -- <file>` and `gh pr list --search "<file path>" --state merged --limit 5 --json number,title,url`. Spot-check prior PR review comments on the top 2–3 with `gh pr view <num> --comments`. Flag MUST FIX if this diff (a) reverts a deliberate prior fix without explanation, or (b) repeats a pattern that was already pushed back on (action-based REST routes, upsert misuse, exception-as-flow, cross-service responsibility, HTML encoding gaps, CompanyPermission vs UserPermission, multi-tenancy validation, SetValues() on immutable fields).
   - **RTK Query stale types**: If you modified backend DTOs, verify the generated RTK Query types include the new fields — grep for the field name in `src/store/rtk-apis/`. If missing, regenerate from the worktree Docker service: `VITE_<SERVICE>_API_PORT=<port> npm run generate:api:<service>`. Do NOT use `as Parameters<...>` assertions as a workaround.
   - **Dead redirect files**: If you moved types/classes between projects or namespaces, DELETE the old file entirely. Do not leave comment-only redirects like `// Moved to X`.
@@ -123,7 +123,7 @@ Check if the arguments contain `--lite`. If present:
   - **Phase 5.5**: Full GitHub review cycle — poll for AI bot reviews (Copilot is the bot that answers on this repo; Gemini has never responded), poll for AI feedback, fix any issues, poll CI checks, mark PR ready only after user confirms. Human reviewers are auto-assigned by `.github/CODEOWNERS` on ready — do NOT manually assign from `reviewers.json` (use the opt-in `/reviewers` command only if extra reviewers are explicitly wanted)
   - **Phase 6**: User review loop — ask user for feedback, route fixes, iterate until "ship it"
   - **Phase 6.5**: Summary (write it yourself instead of spawning Tane)
-  - **Phase 4.75 (Visual verification)**: **Drive the LIVE app in a real browser via `playwright-cli` and save screenshots to `~/Downloads/<TICKET_ID>/`** — that IS the verification. Navigate the worktree dev app (port 31xx), exercise the changed UI, and check network + console (not just the DOM). Save one screenshot per relevant state to `~/Downloads/<TICKET_ID>/` (user-visible folder; NEVER the repo, NEVER `/tmp`), each one taken as `bash ~/.claude/scripts/pw-mask-pii.sh <TICKET_ID>-lead && playwright-cli -s=<TICKET_ID>-lead screenshot ...` (HARD RULE, see Phase 5 gate item 3). **Do NOT** write committed Playwright e2e specs, `toHaveScreenshot` baselines, or `page.screenshot()` artifacts in the repo — that is the wrong default and contradicts how this team verifies (see memory `feedback_dtf_visual_verification_contradiction`, `feedback_real_browser_verification_mandatory`, `feedback_screenshots_user_visible_paths`). **New component → add a Cosmos fixture** (Vite/Cosmos for component states) instead of an e2e spec, plus a unit test if it has interactive logic. A committed `toHaveScreenshot` regression test is the rare EXCEPTION — only when the user explicitly asks for one. See `~/.claude/skills/playwright-cli/SKILL.md`. **Any `pages/loginV2` change: also verify in the mobile app.** The app's login IS Nova web in a WebView, so a reviewer's "test in web and mobile" is one more Phase 4.75 run, not an afterthought — Android dev client + raw CDP, memory `reference_mobile_app_webview_verification` (PROJ-4465). **Flow change → also a walkthrough video** (`~/Downloads/<TICKET_ID>/walkthrough-<flow>.webm`, synthetic data only, `### Walkthrough` in the PR body): the rule and commands are in `~/.claude/docs/dev-workflow-checklist.md` Section 1.
+  - **Phase 4.75 (Visual verification)**: **Drive the LIVE app in a real browser via `playwright-cli` and save screenshots to `~/Downloads/<TICKET_ID>/`** — that IS the verification. Navigate the worktree dev app (port 31xx), exercise the changed UI, and check network + console (not just the DOM). Save one screenshot per relevant state to `~/Downloads/<TICKET_ID>/` (user-visible folder; NEVER the repo, NEVER `/tmp`), each one taken as `bash ~/.claude/scripts/pw-mask-pii.sh <TICKET_ID>-lead && playwright-cli -s=<TICKET_ID>-lead screenshot ...` (HARD RULE, see Phase 5 gate item 3). **Do NOT** write committed Playwright e2e specs, `toHaveScreenshot` baselines, or `page.screenshot()` artifacts in the repo — that is the wrong default and contradicts how this team verifies (see memory `feedback_dtf_visual_verification_contradiction`, `feedback_real_browser_verification_mandatory`). **New component → add a Cosmos fixture** (Vite/Cosmos for component states) instead of an e2e spec, plus a unit test if it has interactive logic. A committed `toHaveScreenshot` regression test is the rare EXCEPTION — only when the user explicitly asks for one. See `~/.claude/skills/playwright-cli/SKILL.md`. **Any `pages/loginV2` change: also verify in the mobile app.** The app's login IS Nova web in a WebView, so a reviewer's "test in web and mobile" is one more Phase 4.75 run, not an afterthought — Android dev client + raw CDP, memory `reference_mobile_app_webview_verification` (PROJ-4465). **Flow change → also a walkthrough video** (`~/Downloads/<TICKET_ID>/walkthrough-<flow>.webm`, synthetic data only, `### Walkthrough` in the PR body): the rule and commands are in `~/.claude/docs/dev-workflow-checklist.md` Section 1.
   - **Phase 6.75**: Retrospective — write your own retro learnings using the same 4 categories with destination hints: instruction improvements (`dream-team`/`agent:<name>`/`skill:<name>`), convention discoveries (`project-claude`/`agents-md:<path>`/`repo-docs`), doc gaps (`repo-docs`/`agents-md:<path>`), process improvements (`dream-team`/`memory`). Tag each item with a suggested destination so [`/retro-proposals`](commands.md#team-review) can route it later.
   - **Phase 7**: Completion — runs the **Completion Gate** first (see `dev-workflow-checklist.md` Section 9): all PR comments resolved, visual-verification screenshots present in `~/Downloads/<TICKET_ID>/`, retro done, CI green, PR description complete. Then posts a **Jira completion comment** with PR link + summary, @mentioning the ticket creator if different from assignee. Then transitions ticket to Klart. **Stops there** — no worktree, branch or session teardown (that is `/workspace-cleanup` from the orchestrator; a session cannot remove the worktree it is running in).
 - **Visual verification applies in lite mode too.** The same Phase 4.75 gate (real-browser `playwright-cli` check + `~/Downloads/<TICKET_ID>/` screenshots) applies whether you're in full Dream Team or lite mode. Don't skip it just because you're working solo.
@@ -371,7 +371,7 @@ bash ~/.claude/scripts/phase-cost-tracker.sh log "<TICKET_ID>" "<phase-name>" "<
    ```bash
    cat .dream-team/context.md 2>/dev/null
    ```
-   If the file exists and contains a valid analysis, **use it instead of spawning Amara for exploration**. Skip to step 5b below. This saves significant startup time — the scope, key files, conventions, and team recommendations are already determined.
+   If the file exists and contains a valid analysis, **use it instead of spawning Amara for exploration**. Skip to step 7b below. This saves significant startup time — the scope, key files, conventions, and team recommendations are already determined.
 
 3. **Move ticket to Pågående** (In Progress) in Jira — and confirm it landed:
    ```bash
@@ -388,7 +388,7 @@ bash ~/.claude/scripts/phase-cost-tracker.sh log "<TICKET_ID>" "<phase-name>" "<
    - "Final summary report" (for Tane — blocked by all other tasks) — set `owner: tane` immediately
    - See **Task ownership rules** in Phase 2 for full details.
 
-4. **Spawn the Tech Architect agent** with these settings:
+6. **Spawn the Tech Architect agent** with these settings:
    - **Name:** `amara`
    - **Model:** `opus`
    - **Subagent type:** `general-purpose`
@@ -438,7 +438,7 @@ bash ~/.claude/scripts/phase-cost-tracker.sh log "<TICKET_ID>" "<phase-name>" "<
        - **Bias toward fewer agents.** Each extra agent costs coordination overhead and token budget. Only add one if the work is genuinely parallelizable (not just large). When in doubt, use one dev.
        - **Size on edit VOLUME as well as conceptual complexity — they are two counts and they disagree.** PROJ-3515 was sized as "one hook, two components in one folder", which was true. What shipped was that plus 15 consumer migrations, a folder move touching 45 import lines, and 5 test files. Both counts were available; only the concept count was used. State both in your report: *concepts* (how hard is the thinking) and *edits* (how many files and call sites move). A conceptually trivial change across 60 call sites is not a one-agent ticket.
        - **Declining a specialist is a correctness decision, not a cost saving.** When `context.md` or the ticket recommends a specialist (ui-designer, ux-researcher, security-auditor) and you decline, say what you are giving up, not just what you are saving. PROJ-3515 declined the recommended ui-designer — and the retro's own conclusion was that a ui-designer asked for a loading affordance would likely have designed a *skeleton*, which mounts MORE, deepening the exact defect that shipped. The specialist would have changed the answer, not just polished it.
-       - **Check team sizing history**: Read `your project memory directory (see Config Resolution above) for `dream-team-history.json`` (if it exists). If past sessions with similar ticket types used extra devs, check whether it helped (fewer review rounds) or hurt (coordination issues in journal highlights). Calibrate accordingly.
+       - **Check team sizing history**: Read `dream-team-history.json` in your project memory directory (see Config Resolution above), if it exists. If past sessions with similar ticket types used extra devs, check whether it helped (fewer review rounds) or hurt (coordination issues in journal highlights). Calibrate accordingly.
        - **Tiny scope (<30 lines, 1-2 files)**: Recommend `--lite` mode — spawning 3+ agents for a 1-file change wastes coordination overhead. Flag this in your report: "Recommend --lite for this scope."
        - **Full-stack tickets with 15+ files**: Consider recommending `--lite` mode to the team lead — coordination overhead from multiple agents can exceed the parallelism benefit on large tickets, and context exhaustion mid-session is a known risk.
      - **Model tier decision**: For each dev agent, recommend a model tier based on task complexity:
@@ -480,9 +480,9 @@ decision or a late finding in more than one session):
   defaults to 500, no clamp). State the cap and what happens past it in the plan.
 - **Dependency-bump tickets: build a main baseline before the first gate.** A second worktree from
   `origin/main` in the scratchpad, its own `npm ci` and Vite port; judge every red e2e/browser result
-  as a diff against it. 48 e2e failures reduced to 2 real questions (PROJ-4479). PRs run only
-  `vitest --changed` (`web-ci.yml` runs the full sharded suite post-merge only, PROJ-3201), so a
-  dependency-only PR needs the full suite run locally, reported with count + duration.
+  as a diff against it. 48 e2e failures reduced to 2 real questions (PROJ-4479). On a PR,
+  `vitest --changed` selects every test when a dependency or config changes (`web-ci.yml` test-pr,
+  PROJ-3201), so CI runs the full suite; run it locally against the baseline first and report count + duration.
 - **Removal tickets:** sweep the originating PR's file list (`git show --stat <feature-commit>`) for
   helpers that become orphaned, and ask whether data created through the removed UI keeps acting
   (PROJ-4049).
@@ -505,9 +505,9 @@ decision or a late finding in more than one session):
   form parity, pick the test company by template coverage (field count, sub-types, flags both ways),
   not by who happens to have data: a thin template hid PROJ-4834 and PROJ-4835 (PROJ-4821).
 
-5a. **Wait for Amara's analysis** before proceeding (normal path — when no pre-hydrated context exists).
+7a. **Wait for Amara's analysis** before proceeding (normal path — when no pre-hydrated context exists).
 
-5b. **Pre-hydrated fast path** (when `.dream-team/context.md` exists from Step 2):
+7b. **Pre-hydrated fast path** (when `.dream-team/context.md` exists from Step 2):
    - Read the context file — it contains: scope, complexity, key files, conventions summary, API contract, team recommendations, and flags.
    - **Validate pre-hydrated context against the full Jira description.** If scope differs between the pre-hydrated context and the Jira ticket description, trust the description — it may have been updated after pre-hydration.
    - **Treat `context.md` as a hypothesis, not fact.** Every "reuse X" / "file Y already does Z" claim must be re-checked against disk (`git diff`/Read the actual file) before you build on it — the pre-hydration may be stale or wrong. If the ticket was split from or shares a parent with sibling tickets, `grep` for the merged/sibling work on `main` before assuming a component or endpoint still needs creating (it may already exist). Recurring miss across sessions 3062/3235/3278/3245.
@@ -581,16 +581,6 @@ After the plan is agreed (Phase 1.4), create a **draft PR** so the user and coll
 [2-5 bullets, each a thing that is now TRUE that was not before. Outcomes, not activities.
  On the initial draft this may be provisional — rewrite it properly before marking ready.]
 
-> **Before marking the PR ready:** run the `pr-description` skill to rewrite `## Why` and
-> `## What changes` properly — the draft version is a placeholder, and a description that
-> restates the ticket is the default failure. Then run **`pr-ready`**, which cuts the body to
-> the reader-facing sections of the repo's shape and moves everything else into the `Implementation notes`
-> comment. Pair with `pr-screenshot-captions` for the images (before `pr-ready`), and note that
-> `code-walkthrough` writes to the notes comment, not here.
->
-> **Sections below marked `[session-only]` are working scaffolding.** They are useful while
-> agents are running and are **deleted at the ready transition** by `pr-ready` — do not invest
-> effort polishing them, and do not put anything reader-facing in them.
 
 ## Architecture  <!-- [session-only] stripped at ready by pr-ready -->
 - **Scope:** [backend-only / frontend-only / full-stack]
@@ -629,6 +619,17 @@ _No open questions yet._
 ╚═════╝ ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝       ╚═╝   ╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝
 </pre>
 ```
+
+**Before marking the PR ready:** run the `pr-description` skill to rewrite `## Why` and
+`## What changes` properly — the draft version is a placeholder, and a description that
+restates the ticket is the default failure. Then run **`pr-ready`**, which cuts the body to
+the reader-facing sections of the repo's shape and moves everything else into the `Implementation notes`
+comment. Pair with `pr-screenshot-captions` for the images (before `pr-ready`), and note that
+`code-walkthrough` writes to the notes comment, not here.
+
+**Sections below marked `[session-only]` are working scaffolding.** They are useful while
+agents are running and are **deleted at the ready transition** by `pr-ready` — do not invest
+effort polishing them, and do not put anything reader-facing in them.
 
 4. **Save the PR number** — you'll need it to update the description later with `gh pr edit <PR_NUMBER> --body "..."`.
 5. **Share the draft PR URL** with the user.
@@ -753,7 +754,7 @@ Based on the tech-architect's scope assessment, spawn the needed agents. **Use t
   - **Use Amara's conventions summary** as your primary reference. Only read the full docs (`docs/CODING_STYLE_FRONTEND.md`, `docs/FRONTEND_COMPONENTS.md`, etc.) if something in the summary is unclear or you need more detail on a specific pattern.
   - Follow existing component patterns — check similar pages/components for reference
   - For RTK Query API generation: use `npm run generate:api:<service>` (requires backend service running), NOT `npx @rtk-query/codegen-openapi` directly
-  - **i18n — HARD GATE**: See `~/.claude/docs/dev-workflow-checklist.md` Section 2. You MUST create all new keys in TranslationService via the API before reporting completion. Use bare `t("key")` only — never `defaultValue`. Before using `common_*` keys, grep the codebase to verify exact key name and casing (e.g., `common_logout` not `common_logOut`). The TranslationService API key is in `apps/web/.env.local` under `TRANSLATION_SERVICE_API_KEY`. See `docs/INTERNATIONALIZATION.md` for the full API workflow. Do NOT attempt to sync translations to S3 — that is handled automatically by CI/CD. Completion is blocked until all TranslationService API calls succeed. **Verify translation text against Jira attachment specs** before creating TranslationService keys — don't invent copy, use the exact text from the ticket's design/spec attachments. **Confirm keys actually landed in live S3 before claiming i18n verified** — a successful TranslationService API call is not proof the key is served yet; `curl` the live translation file (e.g. `curl -s https://your-translations-bucket.s3.eu-west-1.amazonaws.com/<lang>/<lang>.json | grep <key>`) and confirm the key is present. A green TranslationService response with the key missing from S3 renders as a raw key in the browser (PROJ-3277).
+  - **i18n — HARD GATE**: See `~/.claude/docs/dev-workflow-checklist.md` Section 2. You MUST create all new keys in TranslationService via the API before reporting completion. Use bare `t("key")` only — never `defaultValue`. Before using `common_*` keys, grep the codebase to verify exact key name and casing (e.g., `common_logout` not `common_logOut`). The TranslationService API key is in `apps/web/.env.local` under `TRANSLATION_SERVICE_API_KEY`. See `docs/INTERNATIONALIZATION.md` for the full API workflow. No CI workflow syncs TranslationService to S3: new keys render as raw keys locally until synced (checklist Section 2 says how to verify them). Completion is blocked until all TranslationService API calls succeed. **Verify translation text against Jira attachment specs** before creating TranslationService keys — don't invent copy, use the exact text from the ticket's design/spec attachments. **Confirm keys actually landed in live S3 before claiming i18n verified** — a successful TranslationService API call is not proof the key is served yet; `curl` the live translation file (e.g. `curl -s https://your-translations-bucket.s3.eu-west-1.amazonaws.com/<lang>/<lang>.json | grep <key>`) and confirm the key is present. A green TranslationService response with the key missing from S3 renders as a raw key in the browser (PROJ-3277).
   - **i18n for editedValues / change log patterns**: When implementing `formatEditedValue` or similar change-tracking displays, create i18n keys for ALL property name labels (e.g., `edited_value_firstName`, `edited_value_startDate`). These are easy to miss because they're dynamic keys built from enum/property names. Checklist: (1) enumerate all possible property names from the enum/type, (2) create a TranslationService key for each, (3) verify the `t()` call uses the correct dynamic key pattern (e.g., `t(\`edited_value_\${propertyName}\`)`).
   - **Testing**: Invoke `/writing-tests` before adding or changing what any test asserts or sets up (root `AGENTS.md`); it gates whether the test should exist. Don't create test files for new components by default.
   - **React skills**: You have access to these skills — use them when relevant:
@@ -764,68 +765,13 @@ Based on the tech-architect's scope assessment, spawn the needed agents. **Use t
     - `npx eslint --fix .` on your changed files
     - `npx tsc --noEmit` to verify no type errors
     Fix any issues — these will fail the GitHub build if left unfixed.
-  - **Visual verification = drive the LIVE app in a real browser (MANDATORY for UI changes)**: If the ticket involves UI changes, verify by driving the real running app with **Playwright CLI** and saving screenshots to `~/Downloads/<TICKET_ID>/` before reporting completion. **Do NOT write committed Playwright e2e specs, `toHaveScreenshot` baselines, or `page.screenshot()` artifacts in the repo** — that contradicts how this team verifies (memory `feedback_dtf_visual_verification_contradiction`, `feedback_real_browser_verification_mandatory`, `feedback_screenshots_user_visible_paths`). A committed visual-regression test is the rare EXCEPTION, only when the user explicitly asks for one.
+  - **Visual verification = drive the LIVE app in a real browser (MANDATORY for UI changes)**: If the ticket involves UI changes, verify by driving the real running app with **Playwright CLI** and saving screenshots to `~/Downloads/<TICKET_ID>/` before reporting completion. **Do NOT write committed Playwright e2e specs, `toHaveScreenshot` baselines, or `page.screenshot()` artifacts in the repo** — that contradicts how this team verifies (memory `feedback_dtf_visual_verification_contradiction`, `feedback_real_browser_verification_mandatory`). A committed visual-regression test is the rare EXCEPTION, only when the user explicitly asks for one.
     0. **Pre-check**: Check if the target page has permission gates and verify seed data supports the test user. Missing permissions = blank page and wasted time.
     1. **Start the Vite dev server**: Check if one is already running for this worktree with `lsof -i -P | grep node | grep LISTEN`. If not, start it: `bash ~/.claude/scripts/worktree-dev.sh --no-cosmos` (never a backgrounded `npx vite &` — it dies silently). Worktree port (31xx), APIs proxy to the main stack (500x) by default.
     1b. **Verify you're on the right dev server**: Run `lsof -i :<port> | grep node` and confirm the process path contains your worktree directory, not another open worktree — testing the wrong server means testing old code silently.
     2. **Figure out the path**: Use the verified route paths from Amara's architecture report, or the router config (`apps/web/src/routes/`).
     3. **Drive the real app** with `playwright-cli -s=<TICKET_ID>-ingrid`: open headed, log in, navigate to the page (use seed data IDs from `scripts/database-init/` for deterministic navigation), and exercise the actual interaction (click, select, type). Scroll the changed element into view before capturing.
-    4. **Check what headless can't catch** — `playwright-cli -s=<TICKET_ID>-ingrid console error` (no JS/React errors). ⚠️ **There is NO `playwright-cli network` subcommand** — it errors with "Unknown command". To check requests, either (a) assert statically that no caller of the old endpoint/hook remains (`grep` the src), which is stronger than a sampled request log, or (b) use `playwright-cli -s=<TICKET_ID>-ingrid eval "() => performance.getEntriesByType('resource').map(e=>e.name).filter(n=>n.includes('/api/'))"` — but note the resource-timing buffer caps at **250 entries** and Vite dev module requests evict your API calls, so `performance.clearResourceTimings()` + `setResourceTimingBufferSize(2000)` first, and beware that Vite serves `/src/**` module paths that match your endpoint names and look like API calls. The browser is still the step that catches stale companyId, failed requests, and ErrorBoundary crashes.
-    5. **Capture screenshots to `~/Downloads/<TICKET_ID>/`** (one per relevant state): `mkdir -p ~/Downloads/<TICKET_ID> && bash ~/.claude/scripts/pw-mask-pii.sh <TICKET_ID>-ingrid && playwright-cli -s=<TICKET_ID>-ingrid screenshot --filename=~/Downloads/<TICKET_ID>/<state>.png`. NEVER the repo, NEVER `/tmp`. Confirm the rendered text/labels are correct (translations live in S3), not raw i18n keys.
-    6. **New component? Add a Cosmos fixture** (`*.fixture.tsx`) showing its states, run via `npx cosmos --config cosmos.worktree.config.json` — preferred over an e2e spec for component states. If it has interactive/conditional logic, also add a unit test in the same PR.
-    7. **Compare against the design**: If the ticket has a Figma link or Jira image attachment, compare layout, colors, spacing, typography.
-    8. **Check acceptance criteria** against the ticket; if the result doesn't match, fix and re-verify.
-    9. **Close session**: `playwright-cli -s=<TICKET_ID>-ingrid close`.
-    10. **Report visual status**: reference the `~/Downloads/<TICKET_ID>/` screenshot paths (and any Cosmos fixture), confirm network/console were clean, and note any deviations from the design.
-  - **Context management**: Follow the Context Management Protocol (see below). Create your notes file at `.dream-team/notes/ingrid.md`.
-  - **Communication**: Follow the Communication Protocol (see below). Your contacts: `kenji` (backend), `diego` (infra), `amara` (architect). Be proactive — if you find API contract issues, message `kenji` immediately.
-  - If the architect provided an API contract, build your RTK Query types and components against it. You don't need to wait for backend — work in parallel.
-  - **API code generation (CRITICAL — stale types cause review churn)**: Don't run `npm run generate:api:<service>` until Kenji messages you that the Docker service is up and gives you the port. The codegen config points at the main stack (port 500x) by default — you MUST use the worktree port via env var: `VITE_<SERVICE>_API_PORT=<port> npm run generate:api:<service>`. After regeneration, **verify the generated types include the new fields** Kenji added (grep for the field name in the generated file). If they don't, the swagger is stale — ask Kenji to rebuild. Do NOT use `as Parameters<...>` or `as unknown as` type assertions as a workaround for missing generated types — these hide real type mismatches and will be flagged as MUST FIX in review. If you need types before Kenji rebuilds, use manual interface types, then swap to generated types once available. **Current limitation**: Docker services run on static ports, so only one workspace can run a given service at a time — don't try to start your own Docker service.
-  - **Ambiguous requirements**: If the ticket doesn't clearly specify UI behavior, message the team lead. Do NOT guess — wrong guesses waste more context than asking.
-  - **Empty-state / first-visit checkpoint**: Before reporting completion, verify what renders when there's no data (empty lists, null values, new users with no history). If Amara's report flagged empty-state scenarios, test each one.
-  - **Completion protocol**: When done, use the **Completion → Team Lead** template from the Communication Protocol. If testing is needed, also send a **Dev → Tester handoff** to Suki with what to test and edge cases. Always include `git diff --name-only` output in your `files_touched`.
-  - **Stale doc comments**: When changing component behavior (e.g., changing from NotFound to a dialog, swapping data source), delete an existing JSDoc/TSDoc that describes the old behavior instead of rewriting it (`AGENTS.md#comments`). Don't leave stale docs, and don't write new ones.
-  - **Auto-lint hook mitigation for manual types**: Auto-lint hooks may strip 'unused' types. When adding manual RTK types before the consumer is saved, either add types and consumers in the same commit, or use `// eslint-disable-next-line` to prevent removal.
-  - **API regeneration timing**: Do NOT run `npm run generate:api:<service>` mid-session if manual types exist — regeneration may remove enum values other code depends on. Keep manual types until backend Docker is confirmed stable.
-  - **Journal gate**: Before sending your completion message, you MUST have written at least one entry in your journal at `.dream-team/journal/ingrid.md`. If the file is empty or missing, write at least one entry now — use one of these categories: `instruction-gap`, `tool-failure`, `convention-gap`, `codebase-surprise`, `assumption-wrong`, or `positive`. Your completion will not be accepted without at least one journal entry.
-  - **Permission vs mode gating**: When removing UI gating (e.g., making a button always visible), distinguish between (a) mode-based gating (edit vs view mode) and (b) permission-based gating (user authorization via `useActionAuthorization`). Always preserve permission checks (`can({ userActions: [...] })`) unless explicitly told to remove them. Only remove mode-based conditions.
-  - **No comments, no TSDoc** (`AGENTS.md#comments`): comments are a smell. Make the intent readable from names, small functions and types; put an invariant in a test and the reasoning in the PR body. The only exceptions are tooling directives, `// Arrange/Act/Assert` in tests and an external gotcha (a browser or library bug) the code can't state, preferably pinned by a verbosely named test instead. `comment-gate.sh` refuses added JSDoc/TSDoc in TS/JS.
-  - **Commit as you go — after EVERY file, not every milestone**: Finish a file, commit it. Use `<TICKET_ID>: <what you did>` format. This keeps changes small, reduces conflict risk, and — critically — is your **yield point**: you only receive messages between tool calls, so a long burst of writes makes you unreachable when the team lead needs you (see "Yield points" in the Communication Protocol). Pause and handle pending messages at every task boundary.
-  - **Scope**: Only work on what the architect assigned you. Do not refactor unrelated code.
-  - Include the specific backend tasks from the architect's analysis and key files to modify
-  - Include the architect's conventions summary relevant to your work
-
-**If frontend work is needed**, spawn:
-- **Name:** `ingrid`
-- **Model:** Amara's recommendation (default: `sonnet`)
-- **Subagent type:** `general-purpose`
-- **Team:** `dream-team-<TICKET_ID>`
-- **Prompt:** Tell the agent:
-  - You are **Ingrid**, the Frontend Developer for Repo. Your teammates know you by name.
-  - Tech stack: React, TypeScript, Vite, Tailwind CSS, RTK Query, React Router
-  - **First read `.dream-team/jira-ticket.md`** — this is the full Jira ticket and the source of truth for scope and acceptance criteria. Do NOT rely solely on your task description.
-  - **Then read the agent instructions**: `AGENTS.md` (root) and `apps/web/AGENTS.md` for repo-specific conventions and commands
-  - **Use Amara's conventions summary** as your primary reference. Only read the full docs (`docs/CODING_STYLE_FRONTEND.md`, `docs/FRONTEND_COMPONENTS.md`, etc.) if something in the summary is unclear or you need more detail on a specific pattern.
-  - Follow existing component patterns — check similar pages/components for reference
-  - For RTK Query API generation: use `npm run generate:api:<service>` (requires backend service running), NOT `npx @rtk-query/codegen-openapi` directly
-  - **i18n — HARD GATE**: See `~/.claude/docs/dev-workflow-checklist.md` Section 2. You MUST create all new keys in TranslationService via the API before reporting completion. Use bare `t("key")` only — never `defaultValue`. Before using `common_*` keys, grep the codebase to verify exact key name and casing (e.g., `common_logout` not `common_logOut`). The TranslationService API key is in `apps/web/.env.local` under `TRANSLATION_SERVICE_API_KEY`. See `docs/INTERNATIONALIZATION.md` for the full API workflow. Do NOT attempt to sync translations to S3 — that is handled automatically by CI/CD. Completion is blocked until all TranslationService API calls succeed. **Verify translation text against Jira attachment specs** before creating TranslationService keys — don't invent copy, use the exact text from the ticket's design/spec attachments. **Confirm keys actually landed in live S3 before claiming i18n verified** — a successful TranslationService API call is not proof the key is served yet; `curl` the live translation file (e.g. `curl -s https://your-translations-bucket.s3.eu-west-1.amazonaws.com/<lang>/<lang>.json | grep <key>`) and confirm the key is present. A green TranslationService response with the key missing from S3 renders as a raw key in the browser (PROJ-3277).
-  - **i18n for editedValues / change log patterns**: When implementing `formatEditedValue` or similar change-tracking displays, create i18n keys for ALL property name labels (e.g., `edited_value_firstName`, `edited_value_startDate`). These are easy to miss because they're dynamic keys built from enum/property names. Checklist: (1) enumerate all possible property names from the enum/type, (2) create a TranslationService key for each, (3) verify the `t()` call uses the correct dynamic key pattern (e.g., `t(\`edited_value_\${propertyName}\`)`).
-  - **Testing**: Invoke `/writing-tests` before adding or changing what any test asserts or sets up (root `AGENTS.md`); it gates whether the test should exist. Don't create test files for new components by default.
-  - **React skills**: You have access to these skills — use them when relevant:
-    - `reactjs/react.dev:react-expert` — Look up React API usage, caveats, and best practices when unsure about a React feature
-    - `saleor/storefront:react-patterns` — Reference for idiomatic hooks, render purity, and where to put logic (render vs effect vs handler)
-  - **Linting & type checks**: Before reporting completion, run the `facebook/react:fix` skill to catch lint errors and formatting issues, then verify from `apps/web/`:
-    - `npx prettier --write .` on your changed files
-    - `npx eslint --fix .` on your changed files
-    - `npx tsc --noEmit` to verify no type errors
-    Fix any issues — these will fail the GitHub build if left unfixed.
-  - **Visual verification = drive the LIVE app in a real browser (MANDATORY for UI changes)**: If the ticket involves UI changes, verify by driving the real running app with **Playwright CLI** and saving screenshots to `~/Downloads/<TICKET_ID>/` before reporting completion. **Do NOT write committed Playwright e2e specs, `toHaveScreenshot` baselines, or `page.screenshot()` artifacts in the repo** — that contradicts how this team verifies (memory `feedback_dtf_visual_verification_contradiction`, `feedback_real_browser_verification_mandatory`, `feedback_screenshots_user_visible_paths`). A committed visual-regression test is the rare EXCEPTION, only when the user explicitly asks for one.
-    0. **Pre-check**: Check if the target page has permission gates and verify seed data supports the test user. Missing permissions = blank page and wasted time.
-    1. **Start the Vite dev server**: Check if one is already running for this worktree with `lsof -i -P | grep node | grep LISTEN`. If not, start it: `bash ~/.claude/scripts/worktree-dev.sh --no-cosmos` (never a backgrounded `npx vite &` — it dies silently). Worktree port (31xx), APIs proxy to the main stack (500x) by default.
-    1b. **Verify you're on the right dev server**: Run `lsof -i :<port> | grep node` and confirm the process path contains your worktree directory, not another open worktree — testing the wrong server means testing old code silently.
-    2. **Figure out the path**: Use the verified route paths from Amara's architecture report, or the router config (`apps/web/src/routes/`).
-    3. **Drive the real app** with `playwright-cli -s=<TICKET_ID>-ingrid`: open headed, log in, navigate to the page (use seed data IDs from `scripts/database-init/` for deterministic navigation), and exercise the actual interaction (click, select, type). Scroll the changed element into view before capturing.
-    4. **Check what headless can't catch** — `playwright-cli -s=<TICKET_ID>-ingrid console error` (no JS/React errors). ⚠️ **There is NO `playwright-cli network` subcommand** — it errors with "Unknown command". To check requests, either (a) assert statically that no caller of the old endpoint/hook remains (`grep` the src), which is stronger than a sampled request log, or (b) use `playwright-cli -s=<TICKET_ID>-ingrid eval "() => performance.getEntriesByType('resource').map(e=>e.name).filter(n=>n.includes('/api/'))"` — but note the resource-timing buffer caps at **250 entries** and Vite dev module requests evict your API calls, so `performance.clearResourceTimings()` + `setResourceTimingBufferSize(2000)` first, and beware that Vite serves `/src/**` module paths that match your endpoint names and look like API calls. The browser is still the step that catches stale companyId, failed requests, and ErrorBoundary crashes.
+    4. **Check what headless can't catch** — `playwright-cli -s=<TICKET_ID>-ingrid console error` (no JS/React errors). Check requests with `playwright-cli -s=<TICKET_ID>-ingrid requests` (then `request <n>` for one request's headers, body and response): the right ids in the URL, no new non-2xx. A static `grep` that no caller of the old endpoint/hook remains is still stronger than a request log. The browser is still the step that catches stale companyId, failed requests, and ErrorBoundary crashes.
     5. **Capture screenshots to `~/Downloads/<TICKET_ID>/`** (one per relevant state): `mkdir -p ~/Downloads/<TICKET_ID> && bash ~/.claude/scripts/pw-mask-pii.sh <TICKET_ID>-ingrid && playwright-cli -s=<TICKET_ID>-ingrid screenshot --filename=~/Downloads/<TICKET_ID>/<state>.png`. NEVER the repo, NEVER `/tmp`. Confirm the rendered text/labels are correct (translations live in S3), not raw i18n keys.
     6. **New component? Add a Cosmos fixture** (`*.fixture.tsx`) showing its states, run via `npx cosmos --config cosmos.worktree.config.json` — preferred over an e2e spec for component states. If it has interactive/conditional logic, also add a unit test in the same PR.
     7. **Compare against the design**: If the ticket has a Figma link or Jira image attachment, compare layout, colors, spacing, typography.
@@ -892,7 +838,7 @@ Based on the tech-architect's scope assessment, spawn the needed agents. **Use t
 - **Prompt:** Tell the agent:
   - You are **Mei**, the Data Engineer for Repo. Your teammates know you by name.
   - You specialize in **data mapping, database queries, report generation, and data pipelines** — the heavy data work that powers features like Reports & ServiceE and Analytics Dashboard.
-  - Tech stack: .NET, Entity Framework Core, SQL Server, C#, LINQ, Python (for data scripts, ETL, analysis)
+  - Tech stack: .NET, Entity Framework Core, PostgreSQL, C#, LINQ, Python (for data scripts, ETL, analysis)
   - **First read `.dream-team/jira-ticket.md`** — this is the full Jira ticket and the source of truth for scope and acceptance criteria. Do NOT rely solely on your task description.
   - **Then read the agent instructions**: `AGENTS.md` (root) and `services/AGENTS.md` for repo-specific conventions
   - **Use Amara's conventions summary** as your primary reference. Only read full docs if something is unclear.
@@ -915,7 +861,7 @@ Based on the tech-architect's scope assessment, spawn the needed agents. **Use t
     - For complex aggregations that stay in EF Core, consider `.GroupBy()` with projections rather than loading all records into memory
     - Always paginate large result sets
   - **Formatting**: Run `dotnet csharpier .` on your changed files before reporting completion
-  - **Commit as you go**: Commit after each logical piece (e.g., after data mapper, after query service, after report generator). Use `<TICKET_ID>: <what you did>` format.
+  - **Commit as you go**: commit after every file you finish (see Yield points). Use `<TICKET_ID>: <what you did>` format.
   - **Context management**: Follow the Context Management Protocol (see below). Create your notes file at `.dream-team/notes/mei.md`.
   - **Communication**: Follow the Communication Protocol (see below). Your contacts: `kenji` (backend API), `ingrid` (frontend), `amara` (architect). Be proactive — when you complete a data service or change a DTO shape, message `kenji` and `ingrid` immediately.
   - **Completion protocol**: When done, use the **Completion → Team Lead** template. Also send a **Dev → Dev handoff** to Kenji with the data service interfaces he should call from his endpoints. Always include `git diff --name-only` in your `files_touched`.
@@ -1124,7 +1070,7 @@ After Maya's code review is approved (all MUST FIX items resolved), spawn:
   - **Reproduction / verification steps**: [Include the ticket's steps]
   - **Verify in the real browser**:
     1. Navigate to the page and exercise the actual interaction (click, select, type). Scroll the changed element into view.
-    2. Confirm requests route correctly — **but note there is NO `playwright-cli network` subcommand.** Prefer a static check (`grep` that no caller of the old endpoint remains) plus `console error`; see the note in Ingrid's prompt for the `performance.getEntriesByType('resource')` approach and its 250-entry buffer trap.
+    2. Confirm requests route correctly — `playwright-cli -s=<TICKET_ID>-lena requests` (and `request <n>`), plus a static `grep` that no caller of the old endpoint remains.
     3. `playwright-cli -s=<TICKET_ID>-lena console error` — confirm no JS/React errors.
     4. Confirm rendered text/labels are correct (translations live in S3), not raw i18n keys; check both positive and negative cases where relevant.
     4a. **`pages/loginV2` changes: repeat the check in the mobile app's WebView** (Android dev client + raw CDP, memory `reference_mobile_app_webview_verification`, PROJ-4465).
@@ -1194,7 +1140,7 @@ In this codebase **feature-flagging is frontend-only** (the backend does not eva
 **HARD GATE — Visual verification (UI tickets only):**
 Before proceeding with ANY push, confirm visual verification was done **in the real browser** and that **no screenshots were committed to the repo**.
 
-**The rule** (see `feedback_dtf_visual_verification_contradiction`, `feedback_real_browser_verification_mandatory`, `feedback_screenshots_user_visible_paths`):
+**The rule** (see `feedback_dtf_visual_verification_contradiction`, `feedback_real_browser_verification_mandatory`):
 - ✅ **Visual verification = the lead/dev drove the LIVE app via `playwright-cli`** (exercised the change, checked network + console) and saved screenshots to **`~/Downloads/<TICKET_ID>/`**.
 - 🚫 **NEVER commit any screenshot to the repo** — no `page.screenshot()` / `playwright-cli screenshot` captures in `src/**/__screenshots__/`, and no `toHaveScreenshot` baselines/e2e specs by default. Those go to `~/Downloads/<TICKET_ID>/`; the user drag-drops them into the PR description. (A committed `toHaveScreenshot` regression test is the rare exception, only when the user explicitly asked for one.)
 
@@ -1525,7 +1471,7 @@ _Step-by-step instructions for manually verifying this change._
   - Be thorough but concise — every bullet should add information
   - **IMPORTANT**: The "How to Test" section must include the exact URL path to navigate to, specific user actions, and concrete expected results. Read the router config to determine the correct URL. This section is what the PO and team use to verify the fix — make it clear enough that anyone can follow it.
 
-After receiving Tane's summary, **update the PR description using the read-then-edit approach** (see Important Rules). Merge Tane's content into the existing PR body — update the purpose section (`## Why` / `## What changes`, or `## Summary` in `template` shape), `## Agent`, `## How to Test`, etc. but **preserve** any user-added images and screenshots. If the purpose section still contains the draft placeholder text, run the `pr-description` skill now — shipping the placeholder is a completion-gate failure.
+After receiving Tane's summary, **update the PR description using the read-then-edit approach** (see Important Rules). Merge Tane's content into the existing PR body — update the purpose section (`## Why` / `## What changes`, or `## Summary` in `template` shape), `## Agent`, etc. Leave Tane's `## How to Test` out of the body (`pr-body-gate.sh` bans that heading after ready): show it to the user in the summary instead. but **preserve** any user-added images and screenshots. If the purpose section still contains the draft placeholder text, run the `pr-description` skill now — shipping the placeholder is a completion-gate failure.
 
 ### Phase 6.75: Agent Retrospectives & Self-Improvement
 
@@ -1556,7 +1502,7 @@ Before shutting down the team, run a retrospective to capture learnings that imp
 
    Tally votes. Improvements with majority 👍 are promoted to "team-endorsed." Include vote counts when presenting to the user. Disagreements with reasons are especially valuable — surface those.
 
-4. **Collect all responses** and synthesize them into four categories, each with a **destination hint** for where the learning should eventually be applied (via [`/retro-proposals`](commands.md#team-review)):
+4. **Collect all responses** and synthesize them into four categories, each with a **destination hint** for where the learning should eventually be applied (via [`/retro-proposals`](commands.md#retro-proposals)):
 
    - **Instruction improvements** — Concrete changes to agent prompts or workflow steps → destination: `dream-team`, `agent:<name>`, or `skill:<name>`
    - **Convention discoveries** — Coding patterns, tech stack rules, or architectural decisions learned during the session → destination: `project-claude`, `agents-md:<path>`, or `repo-docs`
@@ -1625,7 +1571,7 @@ Before shutting down the team, run a retrospective to capture learnings that imp
 
 9. **Collect session metrics** before recording history:
    - **firstPassCompile**: Did `dotnet build` and `npx tsc --noEmit` pass on the first try before any fixes? (true/false)
-   - **filesChangedByAgent**: Run `git log --author-like` or check task completions to count files each agent touched
+   - **filesChangedByAgent**: count the files each agent touched from its task completions and its commits (`git log --name-only --format='%s' origin/main..HEAD`)
    - **journalEntryCount**: Count entries in each agent's `.dream-team/journal/<name>.md`
    - **journalBreakdown**: Tally journal entries by category (instruction-gap, tool-failure, etc.) across all agents
 
@@ -1837,28 +1783,12 @@ and the branch is the only copy of anything not yet pushed. It costs nothing to 
 5. **Shut down all agents** gracefully using shutdown_request messages
 6. **Delete the team** (`dream-team-<TICKET_ID>`) with TeamDelete
 7. **Determine the ticket ID** from the current working directory (the folder name under `~/Documents/`, e.g., `PROJ-1657`)
-8. **Self-cleanup** — clean up dream-team working files, then tell the user the session is complete. Do NOT merge the PR or delete branches — the user handles merging manually.
-
-```bash
-# Get ticket ID from current directory
-TICKET_ID=$(basename "$PWD")
-
-# NOTE: Do NOT delete .dream-team/ here — it's needed for resume and is cleaned up
-# by /workspace-cleanup when the worktree is removed. Keep notes/journals intact.
-```
+8. **Keep `.dream-team/`** (notes, journals): resume needs it, and `/workspace-cleanup` removes it with the worktree. Do NOT merge the PR or delete branches — the user merges manually.
 
 9. **Tell the user** the implementation is done and the PR is ready for their manual review and merge. When the PR is merged, clean up the worktree by running `/workspace-cleanup <TICKET_ID>` or saying "clean up <TICKET_ID>" in a `/create-stories` orchestrator session.
 
 **IMPORTANT:** Do NOT run [`/workspace-cleanup`](commands.md#workspace-cleanup) or remove the worktree/branch from here. The workspace cannot clean itself up because it's running inside its own worktree.
 
-<!-- DISABLED: Worktree/branch cleanup is now manual. User merges PRs themselves.
-# cd ~/Documents/Repo
-# git worktree remove ~/Documents/$TICKET_ID --force 2>/dev/null || true
-# rm -rf ~/Documents/$TICKET_ID
-# git branch -D $TICKET_ID 2>/dev/null || true
-# git worktree prune
-# tmux kill-session -t $TICKET_ID 2>/dev/null || true
--->
 
 ## Domain Model Changes
 
@@ -1896,7 +1826,6 @@ When any agent (Kenji, Diego, or others) needs to change the domain model (entit
 - Use **erDiagram** for entity relationships + **classDiagram** for .NET entity field detail (show both)
 - Use **sequenceDiagram** for data flow (e.g., create → link → view)
 - Use **flowchart** for decision overviews and comparison charts
-- See `docs/PROJ-1600-domain-model-diagrams.md` as a reference example
 
 **Example output format for domain model proposals:**
 
@@ -1980,7 +1909,7 @@ The script auto-detects the worktree from CWD. Or pass explicitly: `bash ~/.clau
 
 ### How it works
 - The worktree service builds from **this worktree's code** and runs on a **unique high port** (10000+ range, from `.env`)
-- It joins the main stack's Docker network, so it can reach postgres, redis, rabbitmq, service-c-api, etc. If the service starts on the wrong network, manually connect it: `docker network connect repo_default <container-name>`
+- It joins the main stack's Docker network, so it can reach postgres, redis, rabbitmq, service-c-api, etc. If the service starts on the wrong network, manually connect it: `docker network connect repo_repo-network <container-name>` (or `MAIN_NETWORK` from the worktree `.env`)
 - The main stack continues running untouched on default ports (500x)
 - Multiple worktrees can run simultaneously without port conflicts
 - The docker-compose template lives at `~/.claude/templates/docker-compose.worktree.yml`
@@ -1994,8 +1923,6 @@ grep _API_PORT .env
 ```
 
 ### Pointing the frontend to the worktree API
-
-After rebuilding a service, update the commented-out line in `apps/web/.env.local` to proxy the frontend to the worktree port:
 
 **`worktree-service.sh up` now auto-updates `vite.config.worktree.mts`** — it switches the rebuilt service's proxy from 500x to the worktree port (10xxx). No manual `.env.local` editing needed. On `worktree-service.sh down`, all proxies revert to 500x.
 
@@ -2040,7 +1967,7 @@ Multiple worktrees can each run their own frontend and backend independently.
 This means **multiple worktrees can run Playwright verification simultaneously**, each on its own port with working translations. Agents in different worktrees can open separate Playwright sessions and test independently — no coordination or queuing needed.
 
 **Vite lifecycle rules — agents MUST follow:**
-- **Before starting Vite**: Check if one is already running in this worktree: `lsof -i -P | grep node | grep LISTEN`. If a Vite dev server is already on the worktree's port, reuse it — do NOT start a second one.
+- **Before starting Vite**: `worktree-dev.sh` kills whatever runs on the worktree's ports before it starts, so running it again restarts the server. Never start a second Vite by hand next to it.
 - **Only one Vite per worktree**: Never spawn multiple Vite instances. If you need to restart, kill the old one first: `kill <PID>` then start fresh.
 - **Don't leave Vite running after you're done**: When your work is complete (Phase 7 cleanup or agent completion), stop Vite if you started it: `kill $(lsof -t -i:<VITE_DEV_PORT>) 2>/dev/null || true`. Exception: if the user is actively testing on that port, leave it running.
 
@@ -2070,9 +1997,7 @@ If the **team lead itself** is running low on context, use Phase 6.75 (retrospec
 - If any agent encounters a critical error, pause and consult the user
 - Keep the user informed of progress at each phase transition
 - **Domain model changes require user approval** — never auto-approve schema changes
-- **`// Arrange` / `// Act` / `// Assert` are function-body comments too.** The comment gate flags
-  them even when every sibling test in the file uses them; matching local style is not a defence when
-  the local style is what the rule was written against (PROJ-3890). Separate the phases with blank lines.
+- **`// Arrange` / `// Act` / `// Assert` are allowed in tests** (AGENTS.md: Comments; `comment-gate.sh` allows them). Every other function-body comment is flagged.
 - **A reviewer verifying a count prints the raw list first**, then checks the arithmetic reconciles
   before writing "matches" (PROJ-4036: 6+1 was reported as matching 7).
 - **PR description updates — NEVER overwrite blindly.** The user may have manually added images, screenshots, or comments to the PR body. When updating the PR description:

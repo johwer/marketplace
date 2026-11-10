@@ -1,0 +1,2 @@
+Lens: events between services.
+Follow every message on the bus. Is an event published only after the write it announces has committed, and never for a write that can still fail? Is the handler idempotent when the same event arrives twice or out of order? Does it decide from the event type alone, or from state it already has? What happens on an expected, permanent condition: does it throw forever into a dead-letter queue, or treat it as normal? Is the bus being used as a remote call that needs an answer?

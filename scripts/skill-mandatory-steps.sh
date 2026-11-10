@@ -73,10 +73,9 @@ Before this skill can run, re-invoke it with args: --lite --ack
 By passing --ack you commit to ALL mandatory phases — same as full mode:
 
 Phase 4.75 — Visual verification (required if ticket has UI changes):
-  • Write Playwright e2e tests in apps/web/tests/e2e/<feature-area>/
-  • Tests must take screenshots → <component-dir>/__screenshots__/<Name>-<state>.png
-  • Run: npx playwright test
-  • Do NOT push without screenshots committed
+  • Drive the LIVE app with playwright-cli (worktree dev server), check requests + console
+  • Save one screenshot per state → ~/Downloads/<TICKET_ID>/<state>.png (pw-mask-pii.sh first)
+  • Do NOT write new e2e specs or commit screenshots (e2e moves off the PR path later)
   • If no UI changes: output explicit statement "No UI changes — 4.75 skipped"
 
 Phase 6.75 — Retrospective (required every session):
@@ -87,7 +86,7 @@ Phase 6.75 — Retrospective (required every session):
 
 Phase 7 — Completion Gate (ALL items in Section 9 of dev-workflow-checklist.md):
   • PR comments resolved
-  • Screenshots committed (if UI changes)
+  • Screenshots in ~/Downloads/<TICKET_ID>/ (if UI changes)
   • Retro done
   • CI green
   • PR description complete
@@ -106,10 +105,9 @@ EOF
 SKILL GATE: my-dream-team — HARD GATES (DO NOT SKIP)
 
 Phase 4.75 — Visual verification (required if UI changes):
-  • Write Playwright e2e tests in apps/web/tests/e2e/<feature-area>/
-  • Tests must take screenshots → <component-dir>/__screenshots__/<Name>-<state>.png
-  • Run: npx playwright test
-  • Do NOT push without screenshots committed
+  • Drive the LIVE app with playwright-cli (worktree dev server), check requests + console
+  • Save one screenshot per state → ~/Downloads/<TICKET_ID>/<state>.png (pw-mask-pii.sh first)
+  • Do NOT write new e2e specs or commit screenshots (e2e moves off the PR path later)
 
 Phase 6.75 — Retrospective (required every session):
   • Write journal entries to .dream-team/journal/<agent>.md
@@ -118,7 +116,7 @@ Phase 6.75 — Retrospective (required every session):
 
 Phase 7 — Completion Gate (ALL items in Section 9 of dev-workflow-checklist.md):
   • PR comments resolved
-  • Screenshots committed (if UI changes)
+  • Screenshots in ~/Downloads/<TICKET_ID>/ (if UI changes)
   • Retro done
   • CI green
   • PR description complete

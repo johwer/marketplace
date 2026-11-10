@@ -130,6 +130,14 @@ cd ~/Documents/<TICKET_ID> && git status --porcelain
 
 If there are uncommitted changes, **STOP** and tell the user. Only proceed if they confirm.
 
+### Step 5.5: Archive the bridge session
+
+Run before anything is deleted. It copies `.dream-team/bridge/` to `~/.claude/bridge-eval/live/<TICKET_ID>/` so the brief written before implementation survives as an eval case; it is a no-op when the ticket never ran bridge.
+
+```bash
+bash ~/.claude/skills/bridge-pre/bin/archive-live.sh <TICKET_ID>
+```
+
 ### Step 6: Remove Git Worktree
 
 ```bash

@@ -1,0 +1,2 @@
+Lens: data and migrations.
+Look at the data that already exists, not only new rows. What does a backfill write into rows that do not fit the assumption, and can a wrong value be repaired later? Is a new column carrying a fact that is already implied elsewhere, so two sources can disagree? What is the real unique key, and does the design resolve rows by it or by a generated id? Can it be rolled back, and what happens to data written in between? Does a migration bypass the code path that would publish changes to other services?

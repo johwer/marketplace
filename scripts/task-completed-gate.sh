@@ -130,13 +130,15 @@ case "$TEAMMATE_NAME" in
       fi
     fi
 
-    # Check visual verification — if .tsx files changed, e2e tests + screenshots must exist
+    # Check visual verification — if .tsx files changed, live-browser screenshots must exist in
+    # ~/Downloads/<TICKET_ID>/ (Phase 4.75). No new e2e specs until e2e runs off the PR path
+    # (Mac mini); a spec the user explicitly asked for also counts.
     TSX_CHANGES=$(git diff --name-only origin/main -- '*.tsx' 2>/dev/null | wc -l | tr -d ' ')
     if [ "$TSX_CHANGES" -gt 0 ]; then
-      SCREENSHOT_COUNT=$(find "$WORKTREE/apps/web/src" -path '*/__screenshots__/*.png' -newer "$WORKTREE/.git/refs/heads/main" 2>/dev/null | wc -l | tr -d ' ')
-      E2E_COUNT=$(find "$WORKTREE/apps/web/tests/e2e" -name '*.spec.ts' -newer "$WORKTREE/.git/refs/heads/main" 2>/dev/null | wc -l | tr -d ' ')
-      if [ "$SCREENSHOT_COUNT" -eq 0 ] && [ "$E2E_COUNT" -eq 0 ]; then
-        ERRORS="${ERRORS}Visual verification missing (Phase 4.75): $TSX_CHANGES .tsx file(s) changed but no new Playwright e2e tests or __screenshots__ found.\nWrite e2e tests in apps/web/tests/e2e/<feature>/ that take screenshots, then run: npx playwright test\nDo not skip this — it is a hard gate.\n"
+      EVIDENCE_COUNT=$( { find "$HOME/Downloads/$TICKET_ID" -maxdepth 2 \( -name '*.png' -o -name '*.webm' \) 2>/dev/null || true; } | wc -l | tr -d ' ')
+      E2E_COUNT=$( { find "$WORKTREE/apps/web/tests/e2e" -name '*.spec.ts' -newer "$WORKTREE/.git/refs/heads/main" 2>/dev/null || true; } | wc -l | tr -d ' ')
+      if [ "$EVIDENCE_COUNT" -eq 0 ] && [ "$E2E_COUNT" -eq 0 ]; then
+        ERRORS="${ERRORS}Visual verification missing (Phase 4.75): $TSX_CHANGES .tsx file(s) changed but no screenshots in ~/Downloads/$TICKET_ID/.\nDrive the live app with playwright-cli and save one screenshot per state there (pw-mask-pii.sh first). Do not write new e2e specs or commit screenshots.\nDo not skip this — it is a hard gate.\n"
       fi
     fi
 

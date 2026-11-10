@@ -104,6 +104,7 @@ Before creating new workspaces, check if any existing worktrees have merged/clos
 
 3. **For each confirmed cleanup**, run from the main repo (NOT from inside the worktree):
    ```bash
+   bash ~/.claude/skills/bridge-pre/bin/archive-live.sh <TICKET_ID>
    cd ~/Documents/Repo && git worktree remove ~/Documents/<TICKET_ID> --force
    rm -rf ~/Documents/<TICKET_ID>
    git branch -D <TICKET_ID>
@@ -654,6 +655,9 @@ When the user indicates a story is done or merged (e.g., "PROJ-1234 is merged", 
    # (`pgrep -f "<TICKET_ID>" | xargs kill` once took down the whole tmux server, killing
    #  in-progress sessions too. pause-workspace.sh scopes the kill to this session/port.)
    bash ~/.claude/scripts/pause-workspace.sh <TICKET_ID>
+
+   # Archive the bridge session (brief + advisor answers) before the worktree goes
+   bash ~/.claude/skills/bridge-pre/bin/archive-live.sh <TICKET_ID>
 
    # Remove worktree (we're in Repo, not inside the worktree)
    cd ~/Documents/Repo && git worktree remove ~/Documents/<TICKET_ID> --force
