@@ -152,6 +152,17 @@ Three separate things, all of which he has flagged:
   method. Move it to the top so the method fails fast.
 - **Nested `if`** where an early-return guard clause is flatter.
 
+**[MATCH-ON-UNNORMALISED-COLUMN] An equality lookup that assumes one stored format**
+Check the format against how the column is WRITTEN, not what the seed holds: grep every assignment
+and every other reader. If nothing normalises on write, derive the candidate shapes from the input
+and match with `IN` (never strip-and-compare the last N digits). Ask for one test row per shape
+against a real database; green tests on seed data prove agreement with the seed, not production.
+
+**[CROSS-QUERY-INFERENCE] One field inferred from another loaded by a different query**
+Two facts on one object from different loaders are a cross product, not a chain. Before accepting
+"A implies B, so this condition is dead", compare both loaders' parameters: if one is scoped (per
+customer) and the other is not, construct the case where they disagree and test it.
+
 **[N+1] Per-item database call inside a loop**
 Repository reads or permission checks executed once per element. Must-fix when the collection is
 unbounded. He asks for a batched call.

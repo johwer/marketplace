@@ -104,6 +104,8 @@ Download and review any attachments (screenshots, mockups, PDFs):
 bash ~/.claude/scripts/jira-download-attachments.sh <TICKET_ID>
 ```
 
+If the ticket automates something done manually today, search both projects (MEDH and NOVA) for the runbook's and the feature's names. A ticket at IDLE/BLOCKED or Att göra is a decision made and parked: read why it stopped (that reason usually still holds) and cite it in the pushback.
+
 ### Step 1a — Check ticket author profile (ALL depths)
 
 Read `~/.claude/team-profiles.json` to look up the reporter. This file contains per-author pushback calibration learned from historical ticket analysis.

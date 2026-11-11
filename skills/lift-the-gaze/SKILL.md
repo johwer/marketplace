@@ -112,7 +112,7 @@ Run this when the input is a PR, not a ticket. The author rarely asks a question
 
 Then continue with Step 1 for what the PR decides (is the flag the right rung?), Step 2 only where a finding has real alternatives, and Step 3 for where the new code landed.
 
-**Writing the review:** suggestions, not questions; addressed to the author ("you", and check whose PR it is); no praise; say up front whether anything blocks. Show the user the text first; it goes out through `review-pr`.
+**Writing the review:** suggestions, not questions; addressed to the author ("you", and check whose PR it is); no praise; say up front whether anything blocks. Show the user the text first; it goes out through `review-pr`. When lifting the gaze lands on the placement the PR already implemented, explain that only to the user; it never goes in the posted review. Post a point only when it asks the author to change or know something (a better placement, a decision checked too low, a duplicated concept, a boundary leak).
 
 **Tested 2026-10-27 on PR #4205 (PROJ-4548, PKCE login),** blind at the pre-fix commit, against the human review. Without this step the skill found the missing ServiceC log, the analytics flow tag and the WebView reason, but only noted the loosened docstring. With it, point 2 traced the docstring to PROJ-4622's "never in storage" decision, and point 3 proposed the fix the author shipped: carry the attempt id in `state` like the implicit flow, with one shared encoder. The blind run also misjudged one trade-off the PR body already stated, which is why the body comes first.
 

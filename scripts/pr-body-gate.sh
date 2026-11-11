@@ -228,7 +228,7 @@ fi
 # Only a warning: a genuinely tiny PR has nothing to move.
 notes=$(gh pr view "$PR" --json comments --jq '[.comments[]?.body | select(test("pr-ready:notes"))] | length' 2>/dev/null)
 if printf '%s' "$notes" | grep -qE '^[0-9]+$' && [ "$notes" -eq 0 ]; then
-  warn+=("no 'Implementation notes — reviewer detail' comment found (fine if there was no detail to move)")
+  warn+=("no PR comment containing the marker '<!-- pr-ready:notes -->' (a heading alone does not count; fine if there was no detail to move)")
 fi
 
 # --- 8b. Size: past 500 production lines the body says why it can't split --------------
@@ -282,6 +282,15 @@ print(sum(int(a) for f, a in rows if f not in gen and not EXCL.search(f)))
   fi
   if [ "$prod_lines" -gt "$SIZE_LIMIT" ] && ! grep -qE '^[-*] \*\*Size:\*\* *[^ ]' "$tmp"; then
     fail+=("$prod_lines added production lines (over $SIZE_LIMIT) and no '- **Size:** <why it can't split>' line in the body (AGENTS.md: Slice)")
+  fi
+fi
+
+# --- 8c. Existing screenshots go in the body ------------------------------------------
+shot_ticket=$(printf '%s' "${head_ref:-}" | grep -oE '^[A-Z]+-[0-9]+' || true)
+if [ -n "$shot_ticket" ] && grep -qiE 'no screenshots attached' "$tmp"; then
+  shots=$(find "$HOME/Downloads/$shot_ticket" -maxdepth 1 -type f \( -iname '*.png' -o -iname '*.webm' \) 2>/dev/null | wc -l | tr -d ' ')
+  if [ "${shots:-0}" -gt 0 ]; then
+    fail+=("body says 'No screenshots attached' but ~/Downloads/$shot_ticket/ has $shots png/webm file(s): ask the user to drag them into ## Visual verification, then caption with pr-screenshot-captions")
   fi
 fi
 

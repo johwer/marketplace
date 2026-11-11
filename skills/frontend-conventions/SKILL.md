@@ -41,6 +41,22 @@ These patterns come from team experience and are not in the project-level skills
 - Follow the nearest sibling as a template (e.g. a new `DocumentationNoteRow` mirrors the existing `EmployeeDocumentRow.fixture.tsx`). If an analogous component is already fixtured, the new one should be too.
 - Fixtures give an isolated render, so they're also the cheapest way to produce visual proof when the full flow can't run locally (no backend, blocked click-through).
 
+### Shared Primitives & Types
+- Changing a `ui/` primitive's emitted class or token: grep every consumer test for the OLD value (`grep -rn "<old-class>" --include=*.test.tsx apps/web/src`) or run the full vitest suite. `vitest --changed` skips unedited consumer tests, and CI's full run catches them.
+- Needing a field a shared type no longer has: try widening the shared type and count the errors. If they reach files another ticket owns, extend inside your own layer instead (`LegacyX extends X`, computed from the wire DTO before the shared mapper drops it).
+
+### Figma Alignment
+- The newest design wins; flag a conflict between two designers' files rather than picking silently. On a genuine 50/50, prefer rounded corners.
+- RetailerB is Nova-native: its 14px radius and colours are correct, not drift. The migration target is the Repo-family brands.
+- A card that looks off is usually elevation/shadow, not radius.
+
+### Dependency Bumps (within a major)
+- `apps/web` pins exact versions, so `npm update` is a no-op. Resolve each target with `npm view "<pkg>@>=<cur> <<nextMajor>.0.0" version`, never `npm outdated`'s `latest` column (it crosses majors).
+- Capture every gate green (type-check, lint, prettier, build, unit, e2e, `npm audit`) before the first edit, so a later red is attributable. If one package breaks a gate, drop that package with the reason; don't paper over it with `overrides`, and keep `overrides` in lockstep with what they pin.
+- After the bump, assert every package in the scope has ONE version in the resolved lockfile: optional peers escape overrides and float to a newer minor. Diff the lock against the committed one and prefer an incremental `npm install` over regenerating it.
+- An override indirection (`"$@scope/pkg"`) can itself fail to resolve at a specific version. Bisect versions before blaming the registry or the lockfile.
+- Local e2e/visual runs rewrite committed `__screenshots__` baselines; restore them before staging.
+
 ### Visual Verification
 - `__screenshots__/` captures are for **e2e tests and your own local verification** — they are **not** a hard PR gate. Don't block a PR on a missing `__screenshots__/` folder.
 - **The PR gate is a screenshot in the PR description.** When reviewing, if the description has no screenshot, **ask the author to add one** rather than flagging a missing local screenshot dir.

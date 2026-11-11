@@ -18,7 +18,7 @@ Every section marked **HARD GATE** is a blocking requirement — do NOT proceed 
 
 Applies to all tickets with UI changes. Skip for backend-only/infra-only tickets.
 
-**The rule (canonical — keep in sync with memory `feedback_dtf_visual_verification_contradiction`, `feedback_real_browser_verification_mandatory`, `feedback_screenshots_user_visible_paths`):** visual verification means **driving the LIVE app in a real browser via `playwright-cli`** and saving screenshots to **`~/Downloads/<TICKET_ID>/`**. It does NOT mean writing committed Playwright e2e specs or `toHaveScreenshot` baselines — those are the rare exception, only when the user explicitly asks for a visual-regression test.
+**The rule (canonical):** visual verification means **driving the LIVE app in a real browser via `playwright-cli`** and saving screenshots to **`~/Downloads/<TICKET_ID>/`**. It does NOT mean writing committed Playwright e2e specs or `toHaveScreenshot` baselines — those are the rare exception, only when the user explicitly asks for a visual-regression test.
 
 ### Requirements
 
@@ -108,7 +108,7 @@ Applies to all tickets that add or modify user-facing text.
 
 **Completion is blocked** until TranslationService API calls succeed for every new key. If the API is unavailable, note it in the completion message and flag for the team lead.
 
-**Verifying new keys locally (before screenshots):** the running app fetches translations live from S3, so newly-created TranslationService keys render as RAW KEYS until synced to S3. Do not assume CI syncs them on merge: no workflow in the monorepo's `.github/workflows` runs a TranslationService→S3 sync (checked 2026-10-23, PROJ-4406), and `docs/INTERNATIONALIZATION.md:295` saying "handled by CI/CD" is unverified. Sync manually for local verification, and after merge curl the environment's `{lang}.json` before calling a key live. If a sync needs AWS and the session expired, don't hard-block: AWS creds are **shared across worktrees** (`~/.aws`), so first re-check; if truly expired, refresh via `aws sso login --sso-session repo` and run the sync with `AWS_PROFILE=repo-sso` — only paste temp creds (in your own terminal) as a fallback. Then **curl the live S3 `{lang}.json`** to confirm the key landed before screenshotting. See `aws-setup` skill + memory `reference_aws_creds_shared_sso_refresh`, `feedback_aws_s3_translations_bootstrap_from_start`.
+**Verifying new keys locally (before screenshots):** the running app fetches translations live from S3, so newly-created TranslationService keys render as RAW KEYS until synced to S3. Do not assume CI syncs them on merge: no workflow in the monorepo's `.github/workflows` runs a TranslationService→S3 sync (checked 2026-10-23, PROJ-4406), and `docs/INTERNATIONALIZATION.md:295` saying "handled by CI/CD" is unverified. Sync manually for local verification, and after merge curl the environment's `{lang}.json` before calling a key live. If a sync needs AWS and the session expired, don't hard-block: AWS creds are **shared across worktrees** (`~/.aws`), so first re-check; if truly expired, refresh via `aws sso login --sso-session repo` and run the sync with `AWS_PROFILE=repo-sso` — only paste temp creds (in your own terminal) as a fallback. Then **curl the live S3 `{lang}.json`** to confirm the key landed before screenshotting. See `aws-setup` skill.
 
 Reference: `docs/INTERNATIONALIZATION.md`
 

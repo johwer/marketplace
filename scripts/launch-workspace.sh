@@ -29,8 +29,27 @@ tmux send-keys -t "$TICKET_ID" "claude --dangerously-skip-permissions" Enter
 echo "Waiting for Claude to start..."
 sleep 8
 
+submit_prompt() {
+  local session="$1" text="$2" buf="dtf-prompt-$1" tries
+  tmux set-buffer -b "$buf" -- "$text"
+  tmux paste-buffer -p -b "$buf" -d -t "$session"
+  for tries in 1 2 3; do
+    sleep 2
+    tmux send-keys -t "$session" C-m
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+      sleep 1
+      if tmux capture-pane -p -t "$session" | grep -q '⏺'; then
+        echo "Prompt submitted in $session."
+        return 0
+      fi
+    done
+  done
+  echo "WARNING: no ⏺ in $session after 3 Enter attempts: the prompt may still sit unsent. Check with: tmux attach -t $session" >&2
+  return 1
+}
+
 if [ -n "$DREAM_TEAM_PROMPT" ]; then
-  tmux send-keys -t "$TICKET_ID" "$DREAM_TEAM_PROMPT" Enter
+  submit_prompt "$TICKET_ID" "$DREAM_TEAM_PROMPT"
 fi
 
 tmux attach -t "$TICKET_ID"

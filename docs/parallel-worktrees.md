@@ -191,6 +191,9 @@ By default, API proxies point to the **main stack** (500x ports). Only services 
 - You only rebuild what you changed
 - Everything else uses the shared running services
 - Zero overhead for services you don't touch
+- A frontend-only ticket starts no worktree service; take `down` any you started and stopped using (a worktree container that crashes on start can stay Up at ~100% CPU)
+- Use the scripts for ports, proxy, `.env.local` and codegen; never hand-edit them. After `up`, prove the path with one authenticated request through the Vite proxy (200, not 404).
+- The local dev token file is shared by every worktree: to see which user a token belongs to, decode the JWT `sub`; never delete the file between logins.
 
 ## Adding an API service to the worktree compose
 

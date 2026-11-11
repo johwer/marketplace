@@ -48,6 +48,7 @@ Reading the test is not proof.
 2. The mutation must compile. If the build fails, adjust it (a `!` under nullable-as-errors) or drop it; a build error proves nothing.
 3. Run the **whole** area project plus the same-gate suites from step 1, not a `--filter`. One mutation can break tests in several classes, and the cost is the build, not the run. Script it: mutate, build once, run, record red tests, revert.
 4. Revert. Before committing, `git diff --stat` must show no production files.
+5. Before reading "stayed green" as a tautology, prove the mutation took effect (a throw or log in the mutated branch). An inert mutation looks exactly like a test that guards nothing; jsdom's `Storage`, for one, does not enumerate via `Object.keys`. And the verdict is about **this** test going red, not something going red.
 
 | Result | Verdict |
 |---|---|

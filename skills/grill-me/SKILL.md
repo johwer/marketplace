@@ -57,6 +57,10 @@ After the initial exploration, explicitly challenge the hidden assumptions:
 - "Is there an existing pattern we should reuse or extend?"
 - "Have we considered [alternative approach]? Why is this approach better?"
 
+Before putting options in front of the user, read the definition (enum member, class summary, the map that consumes it) of every domain term the trade-off turns on. If reading it would change the recommendation, the question was premature. "Smallest diff" is never grounds for recommending a domain-semantics option.
+
+When two requirements contradict, name the shared noun and test each granularity of it against both before recommending a tiebreak; a reading that satisfies both usually exists. After a scope change, re-run the earlier judgment calls, not only the file list.
+
 ### Phase 4 — Confirm shared understanding
 
 Summarize the decisions reached and any open questions that remain. Ask the user to confirm:

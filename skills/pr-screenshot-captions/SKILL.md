@@ -1,6 +1,6 @@
 ---
 name: pr-screenshot-captions
-description: Caption screenshots that have been uploaded to a GitHub PR description — group them into before/after pairs by step/feature, add a short caption under each explaining what it shows and what it proves, add spacing between them, drop broken/error captures, and collapse intermediate/exploration shots. Verifies each image against the local source files (never captions from filenames alone) and uses a re-fetch-before-write flow to avoid clobbering concurrent edits. Use when a PR has raw uploaded screenshots that need before/after captions, a "Visual Verification Evidence" section, or descriptions added.
+description: Caption screenshots that have been uploaded to a GitHub PR description — group them into before/after pairs by step/feature, add a short caption under each explaining what it shows and what it proves, add spacing between them, drop broken/error captures, and collapse intermediate/exploration shots. Verifies each image against the local source files (never captions from filenames alone) and uses a re-fetch-before-write flow to avoid clobbering concurrent edits. Use when a PR has raw uploaded screenshots that need before/after captions, a "Visual Verification Evidence" section, or descriptions added. Also holds the capture rules (market locale, scroll to the change, mobile only for employee flows, save to ~/Downloads, check each shot) for when PR screenshots are being taken.
 autoTrigger:
   - when the user says they added pictures/screenshots to a PR and wants captions / before-after / descriptions / spacing
   - when asked to add a visual verification section to a PR from uploaded images
@@ -21,6 +21,14 @@ Turns a dump of `<img>` tags a user pasted into a GitHub PR body into a clean, c
   under a collapsed error-handling heading (PROJ-4752).
 - **Be honest about non-evidence.** Drop pure error captures (e.g. "site can't be reached", dev-server error overlays) — they prove nothing and look bad. Collapse intermediate/superseded/exploration shots into a `<details>` block, labeled as such. Don't silently delete a user's images without saying which and why.
 
+## Capturing the shots (before they reach the PR)
+- **Market locale.** Render in the feature's market language (`localStorage.setItem("mh_lang", "sv")` in an init script for a Swedish feature) so labels and dates read right to the PO.
+- **Scroll to the change.** `scrollIntoView({block:'center'})`, then a viewport shot for context plus an element shot for detail.
+- **Mobile (390px) only where the Employee role is the audience** (own service-a, own profile, self-service); HR/admin flows get desktop only.
+- **Save to `~/Downloads/<TICKET>/`**, never `/tmp` or the repo. Only `toHaveScreenshot()` baselines that a test references are ever committed.
+- **Look at each shot right after taking it.** If it doesn't visibly show what its filename claims, flag it and re-capture; never hand over unchecked shots or drop screenshots instead. For a URL/redirect/query-param change, make the URL visible in the capture (a stand-in page that renders what it received, or an on-page `location.href` banner).
+- **Never overwrite a shot already handed to someone.** Re-takes get a new name (`04-outcome-v2.png`). On a publish conflict for a shared artifact, diff against the live version: identical means skip, different means merge, never force.
+
 ## Workflow
 
 1. **Fetch the current body**
@@ -29,7 +37,7 @@ Turns a dump of `<img>` tags a user pasted into a GitHub PR body into a clean, c
    grep -nE '<img|!\[' /tmp/pr-body.md      # inventory images in order
    ```
 
-2. **Match each image to its local source.** GitHub rewrites uploads to `user-attachments/assets/<uuid>` but keeps the original filename in `alt=`. Map `alt` → the local screenshot (e.g. `~/Downloads/<TICKET>-screenshots/<alt>.png`).
+2. **Match each image to its local source.** GitHub rewrites uploads to `user-attachments/assets/<uuid>` but keeps the original filename in `alt=`. Map `alt` → the local screenshot (e.g. `~/Downloads/<TICKET>/<alt>.png`).
 
 3. **Verify by opening the files.** Read each local image. Classify it:
    - **evidence** (a real before or after of a step/feature) → keep + caption
@@ -81,4 +89,4 @@ https://github.com/user-attachments/assets/<uuid>
 
 ## Notes
 - This pairs with DTF's `my-dream-team` Phase 6 "screenshot-caption check" (mark-ready step) — same intent, reusable on demand.
-- Local screenshots for DTF visual work usually live in `~/Downloads/<TICKET>-screenshots/` (see `.dream-team/context.md`).
+- Local screenshots for DTF visual work live in `~/Downloads/<TICKET>/` (see `.dream-team/context.md`).

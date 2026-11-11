@@ -95,3 +95,7 @@ At the PR-ready step, post the `goal` line plus any `## Decisions` added during
 implementation as a Jira comment on the ticket. That is the write-back — without it, the
 things worked out in a session stay in a file on one laptop, which is the gap this whole
 pattern exists to close.
+
+Jira here uses the new editor (ADF), so `acli` descriptions and comments are plain text: a header
+is a line on its own, bullets are `- `, numbered lists `1.`, blank lines between sections. Wiki
+markup (`h2.`, `*bold*`, `{code}`, `||table||`) renders as raw text.

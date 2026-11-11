@@ -222,6 +222,8 @@ python3 scripts/sync_lokalise_translations.py \
 
 **Important:** The AWS env vars don't persist between shell invocations. If using temporary credentials, prepend them to the command or export them in the same `&&` chain.
 
+**The script exits 0 when the upload failed.** With an expired SSO session it prints `✗ Error: Error when retrieving token from sso` as its FIRST line, then carries on and uploads nothing. Run `aws sts get-caller-identity` before syncing, and count the per-language `uploaded to s3://` lines (one per language; fewer means it failed). When verifying a changed value, assert on the changed phrase (`'<new phrase>' in value`), never on a prefix or a length.
+
 > **The sync script's success output is not proof the consumer artifact changed.** "Synced N keys"
 > describes what the script sent, not what any app can now fetch. The two come apart for real
 > reasons: a prefix mismatch (the app requests `no/no.json` while the sync writes `nb/nb.json` —

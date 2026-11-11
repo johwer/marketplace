@@ -49,7 +49,7 @@ Recurrence alone says nothing about whether the team should read it. A reviewer 
 | **3. Agent friction** | Found by self, consequence annoyance or wrong-result caught before merge, not repo-wide | Personal config: `dream-team`, scripts, skills, memory. Never shared docs |
 | **Drop** | Seen once, cheap, or obvious from the code | Nowhere: strike it with the reason |
 
-Write the rule general: name the mechanism, not the ticket. A ticket number may stay as evidence, but a line that only makes sense for one ticket is level 3 or drop. Every shared-repo PR body says where its learnings came from (production bug or found while building) and invites reviewers to name anything they don't want in the docs. The level is the first filter, and the reviewer still has a veto.
+Write the rule general: name the mechanism, not the ticket. A ticket number may stay as evidence, but a line that only makes sense for one ticket is level 3 or drop. Every shared-repo PR body says where its learnings came from (production bug or found while building) and invites reviewers to name anything they don't want in the docs. The level is the first filter, and the reviewer still has a veto. Within a level, prefer an on-demand skill over always-loaded files (`AGENTS.md`, `CLAUDE.md`), drop what the model already knows, and turn a finding that is really a code smell into a fix ticket rather than a documented quirk.
 
 Classify each item's destination file with the Repo File Decision Tree (see Learning Router section below), within the level's allowed destinations. Then output:
 

@@ -116,6 +116,8 @@ kill $PORT_PID 2>/dev/null || true
 
 **If no port is found or nothing is listening**, skip silently.
 
+Cosmos uses fixed global ports (3999/3998), so a stale one blocks every other worktree. Kill it only if this worktree owns it: `lsof -a -p <pid> -d cwd` must show `~/Documents/<TICKET_ID>`.
+
 Then kill the tmux session regardless:
 
 ```bash

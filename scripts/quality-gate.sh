@@ -364,7 +364,7 @@ if [[ "$RUN_FRONTEND" == "true" ]]; then
     if [[ ${#PRETTIER_TARGETS[@]} -eq 0 ]]; then
       echo "skipped — no changed web files" > /tmp/qg-prettier.log
       add_result "Prettier formatting" "PASS" "no changed web files"
-    elif (cd "$WEB_DIR" && npx prettier --write --ignore-unknown "${PRETTIER_TARGETS[@]}" 2>&1) > /tmp/qg-prettier.log 2>&1; then
+    elif (cd "$WEB_DIR" && npx prettier --write --no-editorconfig --ignore-unknown "${PRETTIER_TARGETS[@]}" 2>&1) > /tmp/qg-prettier.log 2>&1; then
       add_result "Prettier formatting" "PASS" "${#PRETTIER_TARGETS[@]} changed file(s)"
     else
       add_result "Prettier formatting" "FAIL" "$(tail -3 /tmp/qg-prettier.log)"

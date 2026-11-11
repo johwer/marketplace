@@ -301,6 +301,12 @@ The real case is a row stored as ten digits: it carries no century, so it is a c
 `19…` and `20…` and comes back for each. Two rounds of review to notice that the fixture, not the
 assertion, was doing the lying.
 
+**[SCHEMA-VS-RECORDED] Validation added on a response field never seen populated**
+A swagger `required` list is a claim about the contract; a recorded response (fixture, MSW handler,
+capture) is evidence. Before asking for a check on a response field, find a recorded instance. If
+none exists, do not raise it as MUST FIX: record it as a known unknown and ask for a test pinning the
+recorded shape. Rejecting on a field never observed turns a rare false negative into a total outage.
+
 **[REDUNDANT-RESPONSE-FIELD] A field constant across every row**
 A response field set from the request is the caller's own input echoed back. Flag it. Do not accept
 "take it from the row instead" without checking what the row holds — if storage is unnormalised,

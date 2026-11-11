@@ -183,3 +183,10 @@ to reverse-engineer the choice.
 - a new Permission is placed under a `ServiceContractType` without checking which product carries
   that contract — name resemblance is not a trust boundary
 - the thing being protected is a field and nobody has grepped how that field is gated today
+- a UI gate names an action without tracing the page's real calls (component → mutation hook →
+  generated endpoint → controller auth). If `grep <Action>` across the owning service hits only
+  the line you wrote, the backend does not enforce it. Shared words ("migration", "sync",
+  "import") collide across services.
+- the seeded personas cannot falsify the gate: some seeded user must fail if the check is deleted,
+  and that refusal persona's grant must be assignable for its retailer (`ServicePermissionMap`).
+  If no legitimate refusal persona can exist, say so in the PR and let unit tests carry it.

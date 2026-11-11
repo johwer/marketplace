@@ -3,14 +3,17 @@
 # Usage: bash ~/.claude/scripts/memory-health.sh [project-path]
 set -eo pipefail
 
+INDEX_BUDGET_BYTES="${MEMORY_INDEX_BUDGET:-6000}"
+est_tokens() { echo $(( $(wc -c < "$1") / 4 )); }
+
 # Find memory directory
 PROJECT_PATH="${1:-}"
-if [[ -z "$PROJECT_PATH" ]]; then
-  # Auto-detect from dtf-config
-  MONOREPO=$(jq -r '.paths.monorepo // empty' ~/.claude/dtf-config.json 2>/dev/null)
+if [[ -n "$PROJECT_PATH" && -f "$PROJECT_PATH/MEMORY.md" ]]; then
+  MEMORY_DIR="$PROJECT_PATH"
+else
+  MONOREPO="${PROJECT_PATH:-$(jq -r '.paths.monorepo // empty' ~/.claude/dtf-config.json 2>/dev/null)}"
   if [[ -n "$MONOREPO" ]]; then
-    # Convert path to Claude project format (replace / with -)
-    SAFE_PATH=$(echo "$MONOREPO" | sed 's|^/||' | sed 's|/|-|g')
+    SAFE_PATH=$(echo "$MONOREPO" | sed 's|^/||' | sed 's|[/.]|-|g')
     MEMORY_DIR="$HOME/.claude/projects/-$SAFE_PATH/memory"
     # Fallback: try without leading dash
     [[ ! -d "$MEMORY_DIR" ]] && MEMORY_DIR="$HOME/.claude/projects/$SAFE_PATH/memory"
@@ -36,8 +39,8 @@ echo ""
 MEMORY_FILE="$MEMORY_DIR/MEMORY.md"
 if [[ -f "$MEMORY_FILE" ]]; then
   LINES=$(wc -l < "$MEMORY_FILE")
-  WORDS=$(wc -w < "$MEMORY_FILE")
-  TOKENS=$(echo "$WORDS * 1.3" | bc | cut -d. -f1)
+  BYTES=$(wc -c < "$MEMORY_FILE" | tr -d ' ')
+  TOKENS=$((BYTES / 4))
 
   STATUS="✓"
   NOTE=""
@@ -47,12 +50,12 @@ if [[ -f "$MEMORY_FILE" ]]; then
   elif [[ $LINES -gt 150 ]]; then
     STATUS="⚠️ "
     NOTE=" — getting close to truncation limit"
-  elif [[ $TOKENS -gt 1500 ]]; then
-    STATUS="⚠️ "
-    NOTE=" — over 1,500 token budget"
+  elif [[ $BYTES -gt $INDEX_BUDGET_BYTES ]]; then
+    STATUS="🔴"
+    NOTE=" — over the ${INDEX_BUDGET_BYTES}-byte budget (memory-write-guard.py blocks growth)"
   fi
 
-  printf "  %s MEMORY.md:            %d lines / %d tokens%s\n" "$STATUS" "$LINES" "$TOKENS" "$NOTE"
+  printf "  %s MEMORY.md:            %d lines / %d bytes / ~%d tokens%s\n" "$STATUS" "$LINES" "$BYTES" "$TOKENS" "$NOTE"
 else
   echo "  ✗ MEMORY.md not found"
 fi
@@ -65,12 +68,11 @@ for f in "$MEMORY_DIR"/*.md; do
   [[ ! -f "$f" ]] && continue
   [[ "$(basename "$f")" == "MEMORY.md" ]] && continue
   FILE_COUNT=$((FILE_COUNT + 1))
-  WORDS=$(wc -w < "$f")
-  TOKENS=$(echo "$WORDS * 1.3" | bc | cut -d. -f1)
-  TOTAL_TOKENS=$((TOTAL_TOKENS + TOKENS))
+  F_TOKENS=$(est_tokens "$f")
+  TOTAL_TOKENS=$((TOTAL_TOKENS + F_TOKENS))
   LINES=$(wc -l < "$f")
   if [[ $LINES -gt 200 ]]; then
-    LARGE_FILES="$LARGE_FILES\n    ⚠️  $(basename "$f"): $LINES lines ($TOKENS tokens)"
+    LARGE_FILES="$LARGE_FILES\n    ⚠️  $(basename "$f"): $LINES lines ($F_TOKENS tokens)"
   fi
 done
 
@@ -80,8 +82,7 @@ printf "  Memory files:          %d files / %d tokens total\n" "$FILE_COUNT" "$T
 LEARNINGS="$MEMORY_DIR/dream-team-learnings.md"
 if [[ -f "$LEARNINGS" ]]; then
   L_LINES=$(wc -l < "$LEARNINGS")
-  L_WORDS=$(wc -w < "$LEARNINGS")
-  L_TOKENS=$(echo "$L_WORDS * 1.3" | bc | cut -d. -f1)
+  L_TOKENS=$(est_tokens "$LEARNINGS")
   L_STATUS="✓"
   L_NOTE=""
   if [[ $L_LINES -gt 500 ]]; then
@@ -109,9 +110,9 @@ printf "  Monthly estimate:      ~%dk tokens (at 100 prompts/day)\n" $(( PROMPT_
 echo ""
 SUGGESTIONS=0
 
-if [[ ${TOKENS:-0} -gt 1500 ]]; then
+if [[ ${BYTES:-0} -gt $INDEX_BUDGET_BYTES ]]; then
   SUGGESTIONS=$((SUGGESTIONS + 1))
-  echo "  💡 $SUGGESTIONS. Trim MEMORY.md — move detailed content to individual files"
+  echo "  💡 $SUGGESTIONS. Trim MEMORY.md to ${INDEX_BUDGET_BYTES} bytes — route learnings to hooks/skills/docs, merge or drop entries"
 fi
 
 if [[ -n "$LARGE_FILES" ]]; then

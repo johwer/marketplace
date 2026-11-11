@@ -63,6 +63,15 @@ Three verdicts, no fourth. State the line count for each.
 
 Anything you cannot put in one of the three has not been understood yet.
 
+- **A fallback is never DELETE on grep evidence.** A catch-all route, `default` branch or `else`
+  arm handles what nothing names, so zero references is what a working one looks like. DELETE it
+  only after requesting an input it used to catch and seeing what renders.
+- **A REUSE across two copies needs history first.** `git log` both copies and read the review
+  threads of the PR that made the second one: divergence may be deliberate (ServiceA.Sync.API is
+  looser than ServiceA.API on purpose), and a shared helper may already have been declined.
+- **Run the suite before unifying, not only after.** A quirk one copy has may be pinned by a named
+  test. Then share the rule and keep the differing reaction (throw vs deny) at each call site.
+
 ## Step 4 — Report a number
 
 A verdict without a number is an opinion. End with exactly this:

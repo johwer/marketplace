@@ -163,3 +163,7 @@ Tokens saved: ~200-500 per prompt
 ```
 
 This is the natural lifecycle: learn → remember → formalize → forget.
+
+When formalizing a prohibition ("never X") into a doc, grep that doc and its siblings for places that mandate X first; each hit is a carve-out to state or an edit to make. Scope the rule in its opening sentence, not in a trailing exceptions list.
+
+`MEMORY.md` is written by concurrent agents: insert targeted lines rather than rewriting the file, then re-read it and confirm both your entry and other writers' recent entries survived.

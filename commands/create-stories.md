@@ -121,7 +121,7 @@ Before creating new workspaces, check if any existing worktrees have merged/clos
    If it reports warnings (MEMORY.md over budget, dream-team-learnings > 500 lines, stale files), show the output and ask:
    > Memory health check found [N] suggestion(s). Want me to clean up now, or skip and continue?
 
-   If they say yes, use the `memory-hygiene` skill to handle it. If no, proceed — don't nag.
+   If they say yes, use the `memory-hygiene` skill to handle it. If no, proceed — don't nag. Run `/retro-proposals` before the cleanup when unrouted learnings exist: cleanup archives entries that look routed but have not reached their destination yet.
 
 6. **Also kill any orphan tmux sessions** that don't have a matching worktree:
    ```bash
@@ -293,7 +293,7 @@ Analyze the codebase to determine:
 9. **Seed data**: Quick check if seed data exists for the entities involved
 10. **Needs testing**: yes/no with one-line reason
 11. **Needs Docker rebuild**: Which service(s), if any
-12. **Recommended mode**: Dream Team / Lite / Just worktree — with one-line justification
+12. **Recommended mode**: Dream Team / Lite / Just worktree — with one-line justification. Lite only when both the investigation and the edits are small: a ticket whose premises are unverified is not small, whatever the diff
 13. **Recommended team**: Which agents at what model tier
 
 VERIFIED vs UNVERIFIED — the one rule that matters more than coverage:

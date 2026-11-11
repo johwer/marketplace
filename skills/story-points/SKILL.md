@@ -17,7 +17,13 @@ from someone is a 2.
 | **4** | Does not exist. Something this big is an **epic**, not a ticket. | Never set a 4. If the work looks like one, it is an epic and needs stories under it. |
 
 **A 3 is a finding.** Do not quietly point something a 3 and move on — say what would have to be
-answered or split for it to become 1s and 2s, and offer the breakdown.
+answered or split for it to become 1s and 2s, and offer the breakdown. For a 3 the user owns, the
+breakdown is itself a 1-point "Investigation: break down …" ticket that goes in the current sprint
+even if the 3 waits. A parent that already has children doesn't need one.
+
+**The user's capacity is focus slots, not a points sum.** 1s run in parallel across several AI
+sessions, so pull them in freely; 2s and 3s need the user's own attention, so cap the active ones
+at about three. Items already in review don't count against the cap.
 
 ## How to estimate
 

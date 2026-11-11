@@ -27,6 +27,10 @@ These patterns come from team experience and are not in the project-level skills
 - Always add a data migration when removing or renaming a persisted enum value.
 - Without it, existing rows with the old value will cause deserialization failures.
 
+### Backfill Tickets — count the intersection
+- "Backfill the N existing X into Y": N usually counts the source. Open the target entity first, list its non-nullable columns and name the source field for each; a required column with no source is the real blocker.
+- A row whose required key is created by another process is a byproduct of that process, not a separate backfill. Say which population every number counts.
+
 ### Inter-Service Messaging (Rebus + RabbitMQ)
 - Events inherit from `BaseEvent`. Shared types in `Repo.Shared.Messaging.Messages`.
 - **Handlers MUST be idempotent** — use upserts, not create.

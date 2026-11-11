@@ -13,6 +13,7 @@ Regenerates frontend RTK Query API types from backend Swagger specs after backen
 - After changing request/response DTOs in a backend service
 - When frontend types are out of sync with the backend
 - **Never manually edit `*Api.ts` files** — always regenerate
+- **Before calling a "backend added fields" ticket blocked:** regenerate and read the diff first; the generated file is often just stale. Check every DTO in the feature area (the field may sit on a sibling response type) and `git log -S <field> origin/main` for a merged sibling ticket. Escalate only if the field is absent from live swagger, origin/main and open PRs.
 
 ## Service Map
 

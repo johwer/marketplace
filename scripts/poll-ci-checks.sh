@@ -27,7 +27,7 @@ fi
 
 # Checks that register instantly on every PR and tell you nothing about the build. If ONLY these are
 # present, CI has not really started — treating that as "all checks complete" is a false green.
-TRIVIAL_CHECKS="${TRIVIAL_CHECKS:-label|validate-title|title|semantic}"
+TRIVIAL_CHECKS="${TRIVIAL_CHECKS:-label|validate-title|title|semantic|GitGuardian Security Checks|Check sandbox-only change|Approve or withdraw approval}"
 
 # Advisory checks run on every push (drafts included) and fail for reasons unrelated to the code,
 # e.g. the Copilot reviewer job failing with 402 when the requester's quota is spent. They must not
@@ -64,7 +64,24 @@ if [ -n "$PR_BASE" ] && [ "$PR_BASE" != "main" ]; then
   echo ""
 fi
 
+# Named checks that must be PRESENT (not just non-pending) before green is reported. Pipe-separated.
+# Default: the four web checks when the PR touches apps/web and targets main.
+if [ -z "${REQUIRED_CHECKS+x}" ]; then
+  REQUIRED_CHECKS=""
+  if [ "$PR_BASE" = "main" ] && gh api --paginate "repos/${OWNER_REPO}/pulls/${PR_NUMBER}/files?per_page=100" --jq '.[].filename' 2>/dev/null | grep -q '^apps/web/'; then
+    REQUIRED_CHECKS="Build apps/web|Lint apps/web|Test apps/web|Type check apps/web"
+  fi
+fi
+missing_required() {
+  [ -n "$REQUIRED_CHECKS" ] || return 0
+  local names; names=$(echo "$CHECKS" | jq -r '.check_runs[].name')
+  echo "$REQUIRED_CHECKS" | tr '|' '\n' | while IFS= read -r req; do
+    grep -qxF -- "$req" <<<"$names" || echo "$req"
+  done
+}
+
 echo "Polling CI checks for PR #${PR_NUMBER} on ${OWNER_REPO}..."
+[ -n "$REQUIRED_CHECKS" ] && echo "Required checks (must be present): ${REQUIRED_CHECKS}"
 echo "HEAD SHA: ${HEAD_SHA:0:8}"
 echo "Max wait: ${MAX_MINUTES} minutes, checking every ${INTERVAL} seconds"
 echo "Ignoring trivial checks when deciding whether CI has started: ${TRIVIAL_CHECKS}"
@@ -132,6 +149,16 @@ while [ "$ELAPSED" -lt "$MAX_SECONDS" ]; do
   if [ "$PENDING" -eq 0 ] && [ "$NAMES" != "$PREV_NAMES" ]; then
     MINS=$((ELAPSED / 60))
     echo "  ${COMPLETED}/${TOTAL} done and none pending, but the check set just changed — confirming it is settled... (${MINS}m elapsed)"
+    PREV_NAMES="$NAMES"
+    sleep "$INTERVAL"
+    ELAPSED=$((ELAPSED + INTERVAL))
+    continue
+  fi
+
+  MISSING=$(missing_required)
+  if [ "$PENDING" -eq 0 ] && [ -n "$MISSING" ]; then
+    MINS=$((ELAPSED / 60))
+    echo "  none pending, but required check(s) not registered yet: $(echo "$MISSING" | paste -sd, -)... (${MINS}m elapsed)"
     PREV_NAMES="$NAMES"
     sleep "$INTERVAL"
     ELAPSED=$((ELAPSED + INTERVAL))

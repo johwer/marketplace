@@ -79,7 +79,7 @@ Before starting Phase 1, check the ticket type and suggest the right skill if ap
     over its input image; write a new file.
 - **New shared `ui/` primitives with interactive/conditional logic ship a unit test in the SAME PR.** Consumer tests miss the primitive's own logic (e.g. a FormSection collapsible path). Hard gate for any new `ui/` component with behavior, not just static rendering.
 - **PR body assembly:** `pr-ready` + `pr-body-gate.sh` run before `gh pr ready` in both modes (full: Phase 6 ready step and Completion Gate item 6b; lite: Phase 6.9 Marker 3).
-- **Spawn-time prompts are frozen.** A subagent only sees its prompt as it was at spawn — relay any decision made AFTER spawn via `SendMessage`, never by assuming the agent re-reads context. And an agent→lead message may surface only as an `idle_notification`: on idle, the lead verifies progress via files/git/journal rather than waiting for a delivered DONE.
+- **Spawn-time prompts are frozen.** A subagent only sees its prompt as it was at spawn — relay any decision made AFTER spawn via `SendMessage`, never by assuming the agent re-reads context. And an agent→lead message may surface only as an `idle_notification`: on idle, the lead verifies progress via files/git/journal rather than waiting for a delivered DONE. Every constraint in a brief carries its source: a quoted user message, a ticket comment id, or "assumed, unconfirmed — challenge this". A point the ticket lists as open stays open until someone closes it in writing. A peer session's decision is relayed as information to go confirm, never as clearance to proceed.
 - **Shared quality gates**: Before reporting completion or pushing, follow ALL sections in `~/.claude/docs/dev-workflow-checklist.md`. These gates apply in both Dream Team and lite mode.
 
 Check if the arguments contain `--resume`. If present, **skip to Phase Resume** below instead of running the normal workflow.
@@ -146,6 +146,10 @@ bash ~/.claude/scripts/phase-cost-tracker.sh log "<TICKET_ID>" "<phase-name>" "<
    text. A non-zero exit means the spec's frontmatter is malformed — fix it before spawning
    agents. See the `ticket-spec` skill.
 
+   **Check for sub-tasks before architecture:** `acli jira workitem search --jql "parent = <TICKET_ID>"`.
+   If any exist, the parent is an integration ticket: confirm with the user which sub-task is being
+   worked and scope the architecture to it. The parent branch stays clean from main as the integration target.
+
    **Also check for pre-hydrated context**: Look for `.dream-team/context.md`. If it exists, this ticket was pre-analyzed by `/create-stories` during parallel pre-hydration.
    ```bash
    cat .dream-team/context.md 2>/dev/null
@@ -195,7 +199,7 @@ bash ~/.claude/scripts/phase-cost-tracker.sh log "<TICKET_ID>" "<phase-name>" "<
      - Report back with: (a) scope assessment, (b) which agents are needed, (c) **verified key files to modify** (see below), (d) any architectural concerns, (e) whether functional testing is needed (flag `needs_testing: true/false` — say yes for: API behavior changes, migrations, complex frontend interactions, multi-service flows; say no for: simple CRUD, styling-only changes, copy/i18n updates), (f) whether Docker service rebuild is needed (flag `needs_docker_rebuild: true/false` with which service(s) — e.g., `service-b-api`). If true, note that Kenji must rebuild and notify Ingrid before she can run API code generation. (g) whether a **PostHog feature flag** is needed to gate this feature (flag `needs_feature_flag: true/false`) — say yes for net-new user-facing features that should roll out gradually. If yes, propose a key in the standard shape `<ticket-lowercased>-<kebab-slug>` (e.g. `proj-2831-legacy-user-redirect`) — always containing the ticket number — and list the FE fetch/render sites to gate. Feature flags are **frontend-only** here: gate the frontend fetch. Only flag a backend need if data must not be *served* at all until GA (rare; raise with the team lead). (h) whether the UI change is a **flow** that needs a walkthrough video (flag `needs_walkthrough: true/false` with a one-clause reason). Say true for several steps, a gate that opens, keyboard, focus, scroll or animation: anything a still can't show. Say false for static UI. `walkthrough-required.sh` reads this line, `task-completed-gate.sh` refuses a dev's completion without `walkthrough-*.webm` when it is true, and `pr-body-gate.sh` refuses ready without `### Walkthrough`, and also when a PR with .tsx changes never declared it. In lite mode the lead writes the line in `.dream-team/notes/team-lead.md`.
      - **Verified file paths**: For every key file you reference in your report, verify the path exists using Read or Glob. Include the full resolved path (e.g., `apps/web/src/pages/employees/pages/employeecard/pages/medicalcertificate/components/CertificateAttachments.tsx`), not just the filename. Downstream agents will use these paths directly — wrong paths cause silent Read failures and wasted round-trips.
      - **If both backend and frontend are needed**, define the API contract upfront: endpoint paths, HTTP methods, request/response DTOs with field names and types, **and sample JSON payloads** (not just field lists — exact shapes including nested objects and arrays). This allows frontend and backend to work in parallel — Ingrid builds components against the contract while Kenji implements the API. When `needs_docker_rebuild: true`, Ingrid should use manual types from the contract first, then swap to generated types after Kenji's Docker service is ready.
-     - **Response contract completeness**: For every endpoint in the API contract, explicitly include: (a) **pagination metadata** if the response is a list (`offset`, `limit`, `totalCount`, `hasMore`), (b) **display name resolution targets** — any ID field that the frontend will need to resolve to a human-readable name (e.g., "userId resolves to user.displayName via /api/service-c/users/{id}"). Missing pagination metadata forces frontend to guess, and missing resolution targets cause extra API calls or blank labels.
+     - **Response contract completeness**: For every endpoint in the API contract, explicitly include: (a) **pagination metadata** if the response is a list (`offset`, `limit`, `totalCount`, `hasMore`), (b) **display name resolution targets** — any ID field that the frontend will need to resolve to a human-readable name (e.g., "userId resolves to user.displayName via /api/service-c/users/{id}"). Missing pagination metadata forces frontend to guess, and missing resolution targets cause extra API calls or blank labels. When the lookup lives in another service, state that the id stored here is in the id space that lookup expects, and prove it in verification with one live row whose name renders and whose lookup returns 200: a mocked lookup cannot catch an id-space mismatch, and a 404 there is a backend fix, never a frontend workaround.
      - **Endpoint precedent — name the neighbour, state COPY or DEVIATE**: For every endpoint you design, name the nearest same-shape endpoint **in the same controller**, quote its auth and status-code line verbatim, and state whether you COPY or DEVIATE — a decision the implementer must not re-derive.
      - **Authorization changes get their review at the PLAN stage, not the diff stage**: If the ticket touches a Permission, Action, Role, RoleType, scope, `[Authorize]`, `CanUserDo*`, `ServicePermissionMap`, or a frontend feature gate, invoke the **`permission-gate`** skill and run `/ghost-review` + `/owl-review` **on your architecture report** before anyone implements. Also verify that the action you propose gating on actually guards the endpoints the page calls: finding an action name near other endpoints is not the same as it guarding *this* page's endpoint.
      - **Boundary and contract changes get `lift-the-gaze` at the PLAN stage**: If the ticket changes an API contract, an integration or outgoing name, a mapping between systems, or anything gated per retailer or behind a flag, run the **`lift-the-gaze`** skill on the plan: find the highest place the decision can live and lay out 2-3 options with their consequences. The architect writes the options into the report. The team lead presents them to the user and records the user's choice before anyone implements. Parity choices (for example "keep legacy's values as they are") count as an option here, not something to settle quietly.
@@ -217,7 +221,7 @@ bash ~/.claude/scripts/phase-cost-tracker.sh log "<TICKET_ID>" "<phase-name>" "<
        - **Size on edit VOLUME as well as conceptual complexity.** State two counts in your report: *concepts* (how hard is the thinking) and *edits* (how many files and call sites move). A conceptually trivial change across 60 call sites is not a one-agent ticket.
        - **Declining a specialist is a correctness decision, not a cost saving.** When `context.md` or the ticket recommends a specialist (ui-designer, ux-researcher, security-auditor) and you decline, say what answer you are giving up, not just what you are saving.
        - **Check team sizing history**: Read `dream-team-history.json` in your project memory directory (see Config Resolution above), if it exists. If past sessions with similar ticket types used extra devs, check whether it helped (fewer review rounds) or hurt (coordination issues in journal highlights). Calibrate accordingly.
-       - **Tiny scope (<30 lines, 1-2 files)**: Recommend `--lite` mode — spawning 3+ agents for a 1-file change wastes coordination overhead. If the lead takes the recommendation, it reads `~/.claude/docs/dtf-flags/lite.md` first. Flag this in your report: "Recommend --lite for this scope."
+       - **Tiny scope (<30 lines, 1-2 files)**: Recommend `--lite` mode — spawning 3+ agents for a 1-file change wastes coordination overhead. If the lead takes the recommendation, it reads `~/.claude/docs/dtf-flags/lite.md` first. Flag this in your report: "Recommend --lite for this scope." Only when the investigation is small too: a ticket whose premises are unverified (it asserts a mechanism, came from someone else's review, or cites symptoms rather than a reproduction) is not tiny, whatever the diff.
        - **Full-stack tickets with 15+ files**: Consider recommending `--lite` mode to the team lead — coordination overhead from multiple agents can exceed the parallelism benefit on large tickets, and context exhaustion mid-session is a known risk.
      - **Model tier decision**: For each dev agent, recommend a model tier based on task complexity:
        - **`opus`** — Complex architectural work, multi-service coordination, tricky edge cases, domain model changes. Use for: Amara (always), Diego.
@@ -268,6 +272,10 @@ bash ~/.claude/scripts/phase-cost-tracker.sh log "<TICKET_ID>" "<phase-name>" "<
   `role_*_permissions` read-only). Run `/permission-gate` for any access question.
 - **The ticket's "starting points" are claims too.** Verify each listed mechanism before writing it as
   fact.
+- **A dependency's Jira state is a claim about process, not code.** Before treating another ticket's
+  work as available, check its newest commit is on trunk (`git merge-base --is-ancestor <sha> origin/<trunk>`).
+  To check whether base X already contains PR #N, diff the contents (`git fetch origin <merge-sha>`, then
+  `git diff <base> <merge-sha> -- <paths>`): after a squash-merge, ancestry says missing while the content is there.
 - **Investigations that drive an environment:** list the pages that WRITE when opened (the Nova
   callback page sends `PUT answered`) before driving them — a read-only DB role cannot undo them. For
   form parity, pick the test company by template coverage (field count, sub-types, flags both ways),
@@ -521,7 +529,7 @@ The lead also includes, per agent: its tasks from the architect's analysis, the 
   - **i18n for editedValues / change log patterns**: When implementing `formatEditedValue` or similar change-tracking displays, create i18n keys for ALL property name labels (e.g., `edited_value_firstName`, `edited_value_startDate`). These are easy to miss because they're dynamic keys built from enum/property names. Checklist: (1) enumerate all possible property names from the enum/type, (2) create a TranslationService key for each, (3) verify the `t()` call uses the correct dynamic key pattern (e.g., `t(\`edited_value_\${propertyName}\`)`).
   - **Testing**: Invoke `/writing-tests` before adding or changing what any test asserts or sets up (root `AGENTS.md`); it gates whether the test should exist. Don't create test files for new components by default.
   - **Lint, format, types**: the PostToolUse hook runs Prettier and `eslint --fix` on every saved file; `task-completed-gate.sh` refuses completion on `tsc` errors and `quality-gate.sh` re-checks all three before push.
-  - **Visual verification = drive the LIVE app in a real browser (MANDATORY for UI changes)**: If the ticket involves UI changes, verify by driving the real running app with **Playwright CLI** and saving screenshots to `~/Downloads/<TICKET_ID>/` before reporting completion. **Do NOT write committed Playwright e2e specs, `toHaveScreenshot` baselines, or `page.screenshot()` artifacts in the repo** — that contradicts how this team verifies (memory `feedback_dtf_visual_verification_contradiction`, `feedback_real_browser_verification_mandatory`). A committed visual-regression test is the rare EXCEPTION, only when the user explicitly asks for one.
+  - **Visual verification = drive the LIVE app in a real browser (MANDATORY for UI changes)**: If the ticket involves UI changes, verify by driving the real running app with **Playwright CLI** and saving screenshots to `~/Downloads/<TICKET_ID>/` before reporting completion. **Do NOT write committed Playwright e2e specs, `toHaveScreenshot` baselines, or `page.screenshot()` artifacts in the repo** — that contradicts how this team verifies. A committed visual-regression test is the rare EXCEPTION, only when the user explicitly asks for one.
     0. **Pre-check**: Check if the target page has permission gates and verify seed data supports the test user. Missing permissions = blank page and wasted time.
     1. **Start the Vite dev server**: Check if one is already running for this worktree with `lsof -i -P | grep node | grep LISTEN`. If not, start it: `bash ~/.claude/scripts/worktree-dev.sh --no-cosmos` (never a backgrounded `npx vite &` — it dies silently). Worktree port (31xx), APIs proxy to the main stack (500x) by default.
     1b. **Verify you're on the right dev server**: Run `lsof -i :<port> | grep node` and confirm the process path contains your worktree directory, not another open worktree — testing the wrong server means testing old code silently.
@@ -634,8 +642,8 @@ Assign all tasks to the agent with `owner` set immediately. Use `addBlockedBy` t
 - Agents must ONLY work on tasks owned by them. Do not claim another agent's implementation task.
 - If the user explicitly requests an agent (e.g., "use Suki for testing"), that agent MUST be spawned — do not skip them even if another agent could do the work.
 - Suki's testing tasks must be `blockedBy` all dev agent tasks (Kenji, Ingrid, etc.). Suki cannot start until devs report done.
-- **Hooks enforce** notes file, journal entry, "For Next Phase", code changes on disk and passing type checks (`task-completed-gate.sh` on task completion, `teammate-idle-gate.sh` on idle).
-- **File-path ownership (idle-gate carve-out)**: Every dev agent's spawn prompt MUST list the exact paths they own. Agents check/stage/format/commit ONLY their own paths, never another agent's files, even when a gate complains; a teammate's dirty files = note it to the team lead and go idle. The team lead treats gate warnings about non-owned files as known false positives.
+- **Hooks enforce** notes file, journal entry, "For Next Phase", code changes on disk and passing type checks (`task-completed-gate.sh` on task completion, `teammate-idle-gate.sh` on idle). They do not check that the completing agent owns the task: a completed task counts only if `.dream-team/notes/<owner>.md` exists.
+- **File-path ownership (idle-gate carve-out)**: Every dev agent's spawn prompt MUST list the exact paths they own. Agents check/stage/format/commit ONLY their own paths, never another agent's files, even when a gate complains; a teammate's dirty files = note it to the team lead and go idle. The team lead treats gate warnings about non-owned files as known false positives. The lead does not edit a delegated file either: on an idle notification, check `git status --short` and the file itself, and commit the agent's done-but-uncommitted work by path instead of re-editing it. A brief that names a shared-ownership file (lint baseline, generated config, lockfile) says: do not edit, move, copy, delete or point any tool at it, even reversibly; for a reading of its live effect, message the owner, who runs it and replies.
 - **Idle agents can help**: If an agent finishes early and is free, they can assist with shared coordination or other lightweight support. They should message the team lead to ask what they can help with.
 
 ### Phase 3: Monitor & Coordinate
@@ -715,7 +723,7 @@ Then spawn:
 - Maya sends the review to the team lead (you) directly
 - You route MUST FIX items to the relevant dev agent(s) with specific fix instructions
 - Only consult Amara if a review finding raises an architectural question (e.g., "this pattern is wrong" vs "this variable name is wrong")
-- Re-review after fixes if there were MUST FIX items
+- Re-review after fixes if there were MUST FIX items. The request names every file changed since the reviewer's approval (with the approved sha), not only the change that prompted it.
 
 ### Phase 4.5: Functional Testing (Optional)
 
@@ -788,7 +796,7 @@ After Maya's code review is approved (all MUST FIX items resolved), spawn:
 - **Team:** `dream-team-<TICKET_ID>`
 - **Prompt:** Tell the agent:
   - You are **Lena**, the Visual Verifier for Repo. Your teammates know you by name.
-  - Your job is to **drive the LIVE app in a real browser via `playwright-cli` and save screenshots to `~/Downloads/<TICKET_ID>/`**. Do NOT write committed Playwright e2e specs, `toHaveScreenshot` baselines, or repo `page.screenshot()` artifacts — that contradicts how this team verifies (memory `feedback_dtf_visual_verification_contradiction`).
+  - Your job is to **drive the LIVE app in a real browser via `playwright-cli` and save screenshots to `~/Downloads/<TICKET_ID>/`**. Do NOT write committed Playwright e2e specs, `toHaveScreenshot` baselines, or repo `page.screenshot()` artifacts — that contradicts how this team verifies.
   - **Dev server**: should already be running. Check with `lsof -i -P | grep node | grep LISTEN` to find the worktree port. If not running, message the team lead.
   - **Login**: `playwright-cli -s=<TICKET_ID>-lena open http://localhost:<port> --headed`. If you see a login page, use `playwright-cli snapshot` for refs, then `click`/`fill`. If you can't enter a password, message the team lead to ask the user to log in.
   - **Page path**: [Include the specific page path from the ticket]. Get the customerId from the URL after login (or seed data IDs in `scripts/database-init/`).
@@ -839,6 +847,9 @@ Before proceeding with ANY push, confirm visual verification was done **in the r
 4. **A rendered derived value matches the raw API row.** For any column, badge or flag the UI derives from
    data, compare the screenshot with the raw API response for at least one row of each kind. A screenshot
    proves rendering, not derivation.
+5. **The lead re-runs any test gate a dev reported green.** A DONE without the pasted `vitest run` /
+   `npx playwright test` output (pass count + duration) is not done. Playwright specs never use
+   `waitUntil: "networkidle"` on app pages (the shell retries backend calls); wait for the concrete element.
 
 Once PR review is approved (or all MUST FIX items are resolved):
 
@@ -848,7 +859,7 @@ Once PR review is approved (or all MUST FIX items are resolved):
 
 **A conflict resolution is new code.** Justify each side taken by a mechanism, never by consistency, symmetry or tidiness. Where a resolution removes a fallback (catch-all/splat route, default branch, `else` arm), grep cannot prove it dead: request an input it used to catch and look at what renders. State the mechanism for each non-trivial resolution in the PR body.
 
-**Deleting a file another ticket just merged is the owner's call.** Flag it to the owner and keep your diff additive (see [[feedback_cross_branch_rename_has_no_safe_unilateral_move]]).
+**Deleting a file another ticket just merged is the owner's call.** Flag it to the owner and keep your diff additive.
 
 **Run the deterministic quality gate** before committing. This script handles formatting, linting, type checks, and builds — no LLM reasoning needed:
 
@@ -902,6 +913,7 @@ If it times out, say **which** bots did and did not answer, then proceed. **Exit
 2. **If AI bots found issues:**
    - Categorize as MUST FIX (security, bugs, broken patterns) vs SUGGESTION (style, nice-to-have)
    - **When bots contradict each other**, evaluate each suggestion on merit against the codebase conventions — don't auto-apply all suggestions. One bot may be wrong.
+   - **A duplication flag is not dismissed as "predates this PR" before `git log --oneline -- <file>`.** If a recent session of ours introduced it and the shared logic is under ~50 lines, extract it in this PR.
    - Route MUST FIX items to the relevant dev agents
    - Wait for fixes, commit, and push
 3. **Resolve all review conversations** — After addressing each comment (reply + code fix), resolve the conversation thread via the GraphQL API. Replying without resolving leaves conversations visibly open on GitHub:
@@ -911,7 +923,7 @@ If it times out, say **which** bots did and did not answer, then proceed. **Exit
    # Resolve each unresolved thread
    gh api graphql -f query='mutation { resolveReviewThread(input: {threadId: "<THREAD_ID>"}) { thread { isResolved } } }'
    ```
-4. **HARD GATE**: Before proceeding to Step C, verify zero unresolved threads remain. Re-run the GraphQL query and confirm the count is 0. See `~/.claude/docs/dev-workflow-checklist.md` Section 3.
+4. **HARD GATE**: Before proceeding to Step C, verify zero unresolved threads remain. Re-run the GraphQL query and confirm the count is 0. See `~/.claude/docs/dev-workflow-checklist.md` Section 3. Zero unresolved is not enough: list ALL threads, resolved included, with each one's last comment author (`comments(last: 1)`), and reply to every thread whose last comment is not ours; reviewers answer inside resolved threads. An approval covers only what its text names.
 
 **Step C: Poll CI checks** (after all code changes are done)
 
@@ -979,6 +991,7 @@ The decision is split into TWO user-confirmable steps (user-mandated): **"Mark r
      spec's `## Out of scope` and any struck-through (`~~...~~`) decision: code still doing
      what those say it should not is a leftover from an earlier shape of the ticket — remove
      it before going ready.
+   - **Re-read the Jira comments** (here, and again before the Phase 7 completion comment): `acli jira workitem comment list --key <TICKET_ID>`, and act on every comment posted after `.dream-team/jira-ticket.md` was hydrated; sibling sessions post heads-ups there. Fix it, or record the decision and a follow-up, before ready.
    - **Mark the PR as ready**: `gh pr ready <PR_NUMBER>`
    - **Do NOT manually assign reviewers.** The repo's `.github/CODEOWNERS` auto-requests the right reviewers the moment the PR goes ready — manual assignment from `reviewers.json` is redundant and risks over-pinging. After `gh pr ready`, confirm who CODEOWNERS picked:
      ```bash
@@ -1159,12 +1172,15 @@ Before shutting down the team, run a retrospective to capture learnings that imp
    - Journal entries: [count] ([breakdown by category])
    ```
 
+   **A ticket session's retro ends at recording learnings.** Report deferred items as "logged for a later `/retro-proposals` pass"; never run `/retro-proposals` or change `~/.claude/scripts` here, even when the user calls a tooling defect "retro" next to "fix X" (log it with root cause and proposed fix). Unclear? Ask in one line.
+
 7. **Ask the user for approval** using AskUserQuestion:
-   - "Which retrospective changes should I apply?"
-   - Options: "Apply all command file changes" / "Let me pick which ones" / "Save learnings only, don't change the command" / "Skip entirely"
+   - "How should the retro learnings be handled?"
+   - Options: "Save learnings for `/retro-proposals` (Recommended)" / "Save learnings and apply one change directly (exception)" / "Skip entirely"
+   - Learnings go through `/retro-proposals` so changes from parallel sessions don't collide. Applying directly is the exception: only on the user's explicit pick, for one named change, and only when no other session is editing the same file.
 
 8. **Based on user choice:**
-   - If applying changes: Edit `my-dream-team.md` with the approved improvements
+   - If the user picked the exception: Edit only the one approved change
    - Always append a session entry to `dream-team-learnings.md` in your project memory directory, with destination hints so [`/retro-proposals`](commands.md#retro-proposals) can route them later:
      ```
      ## Session: [date] — [ticket ID]
@@ -1298,7 +1314,7 @@ When any agent (Kenji, Diego, or others) needs to change the domain model (entit
    ```
 9. Only after the user approves a domain model approach should implementation proceed
 
-This rule applies to: new entities, modified entities, new relationships, changed cardinality, new database columns/tables, and migration changes.
+This rule applies to: new entities, modified entities, new relationships, changed cardinality, new database columns/tables, and migration changes, new DTOs, and a new or re-scoped permission/action concept (User vs Company, contract-gated vs always-on). It applies even when one option is obviously better: the user decides, not the architect. The ticket's proposed mechanism is a suggestion; the options start from the closest existing precedent in the codebase.
 
 ## Worktree Docker Workflow — Rebuilding API Services
 
@@ -1340,7 +1356,7 @@ Start the service first with `worktree-service.sh up <service>`: an unset port i
 
 ### When agents should rebuild
 
-- **Kenji / Diego**: After making API changes that need testing, run `bash ~/.claude/scripts/worktree-service.sh up <service>`. This builds the container AND updates the Vite proxy automatically. Share the port with Ingrid so she can regenerate types.
+- **Kenji / Diego**: After making API changes that need testing, run `bash ~/.claude/scripts/worktree-service.sh up <service>`. This builds the container AND updates the Vite proxy automatically. Share the port with Ingrid so she can regenerate types. Only for a service you changed: a frontend-only ticket never runs `worktree-service.sh up`, and a service started then abandoned goes `down` at once (a worktree container that crashes on start can stay Up at ~100% CPU for days).
 - **Ingrid**: After Kenji rebuilds, restart Vite (`npx vite --config vite.config.worktree.mts --host`) to pick up the proxy change. For API generation: `cd apps/web && npm run generate:api:service-b`
 - **Amara**: When verifying API contracts or debugging, use the worktree service to test changes in isolation
 
@@ -1387,6 +1403,8 @@ If the **team lead itself** is running low on context, use Phase 6.75 (retrospec
 - Keep the user informed of progress at each phase transition
 - **`// Arrange` / `// Act` / `// Assert` are allowed in tests** (AGENTS.md: Comments; `comment-gate.sh` allows them). Every other function-body comment is flagged.
 - **A reviewer verifying a count prints the raw list first**, then checks the arithmetic reconciles before writing "matches".
+- **Work split to a new branch is pushed as a draft PR in the same step** while GitHub is up (degraded counts; retry), never left local-only until a parent merges. A stacked branch says so in its body.
+- **Before creating a follow-up or found-not-fixed ticket**, search the epic's children, the parent and linked tickets (`parent = <EPIC> AND text ~ "<keyword>"`) and read open siblings' descriptions; if one covers it, add the finding there. New work under a story is a real Subtask (`--parent <STORY>`): `acli jira workitem edit` cannot reparent, and a Relates link is not a hierarchy.
 - **PR description updates — never overwrite blindly; update in place:** `gh pr view <PR_NUMBER> --json body --jq '.body' > /tmp/pr-body.md`, edit only your sections (keep images and anything a person wrote), then `gh pr edit <PR_NUMBER> --body-file /tmp/pr-body.md`.
 
 ## Changing Shared Code — the failure moves, it does not leave

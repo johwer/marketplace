@@ -68,6 +68,7 @@ Equally: if the alternative was genuinely close, say so. "Both were defensible; 
 - **Present tense, plain language.** Same readability bar as `pr-description`: short sentences, active voice, no unexpanded acronyms.
 - **One decision per heading.** Two entangled choices under one heading cannot be challenged separately.
 - **Link, do not relitigate.** If it was settled in a ticket comment or a domain-model gate, link there and summarise in two lines.
+- **No attribution.** Date the decision and link its source ticket ("Decision 2026-10-14: …"), never "the tech lead said" or a person's name, in the body or in PR comments. Reasoning stays out of code comments. On a PR that is already ready, the same text goes in the "Implementation notes" comment.
 - **Never invent a rationale after the fact.** If the real reason was "this was simplest and it works", write that. Retrofitted architectural justification is worse than honesty.
 
 ## Worked example
