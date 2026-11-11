@@ -140,6 +140,16 @@ case "$TEAMMATE_NAME" in
       if [ "$EVIDENCE_COUNT" -eq 0 ] && [ "$E2E_COUNT" -eq 0 ]; then
         ERRORS="${ERRORS}Visual verification missing (Phase 4.75): $TSX_CHANGES .tsx file(s) changed but no screenshots in ~/Downloads/$TICKET_ID/.\nDrive the live app with playwright-cli and save one screenshot per state there (pw-mask-pii.sh first). Do not write new e2e specs or commit screenshots.\nDo not skip this — it is a hard gate.\n"
       fi
+
+      # A flow decided at plan time (needs_walkthrough: true) also needs its walkthrough video.
+      # A PNG does not stand in for it (PROJ-4818 shipped a flow with screenshots only).
+      WALKTHROUGH=$(bash "$HOME/.claude/scripts/walkthrough-required.sh" "$WORKTREE" 2>/dev/null)
+      if [ "$WALKTHROUGH" = "true" ]; then
+        WEBM_COUNT=$( { find "$HOME/Downloads/$TICKET_ID" -maxdepth 1 -name 'walkthrough-*.webm' 2>/dev/null || true; } | wc -l | tr -d ' ')
+        if [ "$WEBM_COUNT" -eq 0 ]; then
+          ERRORS="${ERRORS}Walkthrough video missing: the plan sets needs_walkthrough: true, but ~/Downloads/$TICKET_ID/ has no walkthrough-*.webm.\nRecord it (dev-workflow-checklist Section 1): playwright-cli -s=<session> resize 1440 900, video-start ~/Downloads/$TICKET_ID/walkthrough-<flow>.webm, video-show-actions, one video-chapter per step, video-stop. Local seed data only.\n"
+        fi
+      fi
     fi
 
     # Comments added by this change follow AGENTS.md#comments (only the listed exceptions).

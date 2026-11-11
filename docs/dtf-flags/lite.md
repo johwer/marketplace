@@ -13,6 +13,7 @@ The key principle: minimize agent overhead for small/medium tasks while keeping 
   - **Complex** (8+ files, multiple disciplines): Spawn agents as needed — use your judgement
 - **Phase 4 (Review)**: Review your own changes against conventions, or spawn Maya if the diff is large (10+ files). Always run the **Security Scan** (Section 7 of `dev-workflow-checklist.md`) — detect backend/frontend from `git diff --name-only origin/main` and run the applicable categories. Also run the Phase 4 reviewer checks yourself — Historical context lens (first), Stale RTK Query types (regenerate per "RTK Query API generation from worktree service", never an `as Parameters<...>` workaround), Dead redirect files, Business defaults at wrong layer — and fix what they find.
 - **All other phases run as written:** 1.4, 1.5, 4.5 (if flagged), 4.75, 4.9, 4.95 (if `needs_feature_flag: true`), 5, 5.5, 6, 6.5 (write the summary yourself instead of spawning Tane), 6.75, 7.
+- **Lite Phase 1 decides `needs_walkthrough: true/false`** (with a one-clause reason) in `.dream-team/notes/team-lead.md`, next to `needs_testing`. Set it true for a flow (several steps, a gate that opens, keyboard, focus, scroll) and false for static UI. `pr-body-gate.sh` refuses ready when a PR with .tsx changes never declared it.
 - **Phase 4.75 (Visual verification)**: you drive the LIVE worktree app (port 31xx) with `playwright-cli`, check network + console, and save one screenshot per relevant state to `~/Downloads/<TICKET_ID>/` (never the repo, never `/tmp`), each taken as `bash ~/.claude/scripts/pw-mask-pii.sh <TICKET_ID>-lead && playwright-cli -s=<TICKET_ID>-lead screenshot ...`. No committed e2e specs or `toHaveScreenshot` baselines unless the user explicitly asks; a new component gets a Cosmos fixture (plus a unit test if it has interactive logic). Flow change → walkthrough video: `dev-workflow-checklist.md` Section 1.
   **If `pages/loginV2` changed:** read `~/.claude/docs/dtf-flags/mobile.md`.
 - **Phase 6.75**: write your own retro learnings (same 4 categories and destination tags as Phase 6.75).
@@ -64,6 +65,7 @@ If the ticket involved ANY `.tsx` / frontend changes, output exactly:
   verification: lead drove the LIVE app via playwright-cli — network/console clean — PASSED
   evidence:     ~/Downloads/<TICKET_ID>/*.png  (real-browser shots — NOT committed)
   cosmos:       <fixture path if a new component, else "n/a">
+  walkthrough:  <~/Downloads/<TICKET_ID>/walkthrough-<flow>.webm | "n/a — needs_walkthrough: false (<reason>)">  (walkthrough-required.sh must not print unset)
   committed:    none (git diff shows no repo screenshots / e2e baselines)
 ```
 
