@@ -1,6 +1,6 @@
 ---
 name: code-insights
-description: Opt-in code review on your changed files — refactoring nudges with pros/cons, DTO insights with mermaid diagrams for PR descriptions
+description: Opt-in code review on your changed files — refactoring nudges with pros/cons, DTO insights with mermaid diagrams for the PR's reviewer notes. Use when the user asks for code insights, refactoring nudges, or a DTO/data-flow analysis of a branch.
 user_invocable: true
 ---
 
@@ -13,7 +13,7 @@ Trigger: user says "check my changes", "run code insights", `/code-insights`, or
 Ask:
 > I can check your changed files. What would you like?
 > 1. **Quick nudges** — small improvements on your diff (2 min)
-> 2. **Deep insights** — DTO analysis + mermaid diagrams for PR description (5 min)
+> 2. **Deep insights** — DTO analysis + mermaid diagrams for the reviewer notes comment (5 min)
 > 3. **Both**
 
 ---
@@ -32,9 +32,9 @@ Split into frontend (.ts/.tsx) and backend (.cs) files.
 
 **Frontend (.tsx/.ts) — React 19 aware**
 
-NOTE: **React Compiler is NOT enabled in this repo.** There is no `babel-plugin-react-compiler` in `apps/web/vite.config.*` or `package.json`, and `docs/CODING_STYLE_FRONTEND.md:230` reads "React Compiler (when re-enabled) will handle memoization automatically. Until then, `useMemo` is fine for expensive computations." It was trialled and backed out.
+NOTE: **React Compiler is NOT enabled in this repo** (no `babel-plugin-react-compiler`). Follow `docs/CODING_STYLE_FRONTEND.md` "React Compiler (Forward-Looking)": `useMemo` is fine for expensive computations, but new code avoids `useMemo`/`useCallback` where it can.
 
-So memoization is **manual and load-bearing**: `useMemo` / `useCallback` / `React.memo` are legitimate suggestions, and *removing* them is a regression, not a cleanup. Do not tell anyone the compiler will cover it.
+So existing memoization is **manual and load-bearing**: *removing* it is a regression, not a cleanup, and suggest new memoization only where the computation is expensive. Do not tell anyone the compiler will cover it.
 
 Two things worth flagging in review:
 - **Unstable identity feeding a hook dependency** — `foo?.data ?? []` or an inline object/array passed as a dep, or into a `useMemo`/`useEffect` dep array. A fresh identity every render defeats the memo and can loop an effect. This is the common real bug, not a micro-optimisation.
@@ -100,7 +100,7 @@ End with:
 
 ---
 
-## Mode 2: Deep Insights (for PR description)
+## Mode 2: Deep Insights (for the reviewer notes comment)
 
 ### Step 1: Analyze full changeset
 
@@ -181,29 +181,29 @@ flowchart TB
    Context: [what's at stake]
 ```
 
-### Step 6: Output for PR
+### Step 6: Output for reviewers (the notes comment, not the PR body)
 
 Copyable block:
 
 ```markdown
-## Architecture Insights
+### Architecture insights
 
-### Data Flow
+#### Data Flow
 [mermaid diagram if relevant]
 
-### Changes
+#### Changes
 | File | What changed | Impact |
 |------|-------------|--------|
 | [file] | [change] | [breaking/non-breaking/new] |
 
-### DTO Analysis
+#### DTO Analysis
 [questions with pros/cons]
 
-### Questions for Reviewers
+#### Questions for Reviewers
 [numbered list]
 ```
 
-> Here's the architecture insights section. Want me to paste it into the PR description?
+> Here's the architecture insights block. Want me to add it to the PR's `<!-- pr-ready:notes -->` comment? (The body has no room for it: `pr-body-gate.sh` refuses an `Architecture` heading and the repo template says not to list files.)
 
 ---
 

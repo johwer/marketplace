@@ -14,12 +14,12 @@ Tech stack:
 - Python: pandas, matplotlib, seaborn, plotly for analysis
 - SQL: PostgreSQL/SQL Server queries
 - Jupyter notebooks for exploratory analysis
-- dbt for data transformations (read-only — escalate changes to Data Engineer)
+- dbt for data transformations (read-only — hand changes to the `data-engineer` agent)
 
 Key repos:
 - `RepoAB/data-exploration` — Jupyter notebooks for ad-hoc analysis
-- `RepoAB/Repo.DBT` — dbt models (reference, don't modify)
-- `dataops/dbt/service-e/exports/` — dbt export definitions
+- `dataops/dbt/service-e/` (monorepo) — the dbt project; `exports/` holds export definitions. `RepoAB/Repo.DBT` is legacy, read only for views not yet ported
+- dbt changes go to the `data-engineer` agent
 
 Repo data domains:
 - **ServiceA**: Sick leave reports, VAB (child care), rehabilitation cases

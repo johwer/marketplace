@@ -1,6 +1,6 @@
 ---
 name: dotnet-backend-review
-description: Repo-aligned .NET review checklist for the gap other skills don't cover — EF Core query and write hygiene (tracking, projections, N+1, split queries, ExecuteUpdate, transactions, concurrency tokens), async and CancellationToken, typed configuration (IOptions, ValidateOnStart), DI lifetimes, logging, Quartz jobs and BackgroundServices, soft-delete filtering, and a few architecture boundary checks. Every item is checked against Repo's standing decisions, and textbook advice Repo has declined (Result<T>, MediatR, AutoMapper, Dapper-first, stored procedures, aggressive caching, the 4-project layout) is listed so it is never recommended. Use when reviewing or writing C# in services/ or shared/, when someone asks "is this EF query OK", "should this be AsNoTracking / ExecuteUpdate / a transaction", "IOptions or IOptionsSnapshot", "is this lifetime right", or from lift-the-gaze once the layer is chosen.
+description: Repo-checked .NET review checklist (EF Core reads/writes and transactions, async, options, DI lifetimes, logging, workers) plus the textbook advice Repo has declined. Use when reviewing or writing C# in services/ or shared/, when asked whether an EF query, transaction or lifetime is right, or from lift-the-gaze once the layer is chosen.
 user_invocable: true
 ---
 
@@ -22,7 +22,7 @@ If an item here disagrees with 1 or 2, 1 or 2 wins, and the item is a bug in thi
 |---|---|
 | Naming, file layout, DTO mapping, JSONB, seeds, enum migrations, Rebus basics, the four security rules | `backend-conventions` |
 | Security ordering, ServiceC/RBAC, tenancy | repo skill `security-review`, ghost [AUTH-ORDER] [MULTI-TENANCY] |
-| Idempotency, abstraction depth | repo skill `reviewing-changes` (`quality.md`, `replay.md`; `quality-review` on branches before #4470) |
+| Idempotency, abstraction depth | repo skill `reviewing-changes` (`quality.md`, `replay.md`) |
 | Event shape, outbox, redelivery, multi-pod workers | `owl-review` |
 | Query plans, indexes, load | `backend-performance` |
 | Which layer, which rung | `lift-the-gaze` |
@@ -47,47 +47,47 @@ If an item here disagrees with 1 or 2, 1 or 2 wins, and the item is a bug in thi
 
 Details and examples: `references/ef-core.md`.
 
-- **Read-only query → `AsNoTracking()`.** No Repo context sets NoTracking as the default, so a read that never saves pays for tracking. 76 files already do it.
+- **Read-only query → `AsNoTracking()`.** No Repo context sets NoTracking as the default, so a read that never saves pays for tracking.
 - **Shape the result in SQL.** `Select` into the DTO or a projection when the caller needs a few columns. Don't load whole entities with their `Include`s to read two fields.
 - **N+1:** a repository or `CanDoAction` call inside a loop over a list. Batch it ([BATCH-DB], must-fix in ghost).
 - **Many `Include`s → `AsSplitQuery()`** (#backend 2023-10-20). Without it, two collection includes multiply rows.
 - **Filter before you materialise.** `ToList()` / `ToListAsync()` and then `Where` filters in memory. So does a `Where` on something EF can't translate (EF throws or, in older code, evaluates client-side).
 - **A large `Contains(ids)`:** Npgsql sends it as one array parameter (`= ANY(@p)`), so it doesn't blow up like SQL Server's `IN` list. Thousands of ids is still a smell: often the filter belongs in a join on a replica table.
 - **InMemory provider won't catch these.** Translation, `ILike`, JSONB and constraint bugs only show on Postgres ([INMEMORY-BLINDSPOT]). One real-Postgres test where translation is at risk.
-- **Soft delete is filtered by hand.** 16 entity models have `DeletedAt`, and no context uses `HasQueryFilter`, so about 63 queries filter `DeletedAt == null` themselves. A new query on such a table must filter too, or say why it wants deleted rows (data erasure, audit). Missing it shows deleted data. Whether a delete should be soft at all is owl [DELETE-SEMANTICS].
+- **Soft delete is filtered by hand.** No context uses `HasQueryFilter`, so queries on tables with `DeletedAt` filter `DeletedAt == null` themselves. A new query on such a table must filter too, or say why it wants deleted rows (data erasure, audit). Missing it shows deleted data. Whether a delete should be soft at all is owl [DELETE-SEMANTICS].
 - **Heavy SQL with Dapper is fine** (agreed 2026-02-24). Inline SQL in the repository, never a stored procedure ([NO-STORED-PROC]).
 
 ## 2. EF Core writes and transactions
 
-- **One commit per operation.** New code calls `SaveChangesAsync` once, from the service, not once per repository call ([UNIT-OF-WORK], [VALIDATE-BEFORE-COMMIT]). Existing repositories that commit inside (≈85 files) are drift, not something to copy. Don't rewrite them in an unrelated PR ([PR-SCOPE]).
+- **One commit per operation.** New code calls `SaveChangesAsync` once, from the service, not once per repository call ([UNIT-OF-WORK], [VALIDATE-BEFORE-COMMIT]). Existing repositories that commit inside (many) are drift, not something to copy. Don't rewrite them in an unrelated PR ([PR-SCOPE]).
 - **Validate, then write.** No half-saved state on a 400.
-- **Several commits that must succeed together → `BeginTransactionAsync`** (32 files do it). Or one `SaveChanges`. Not two saves and a hope.
+- **Several commits that must succeed together → `BeginTransactionAsync`**. Or one `SaveChanges`. Not two saves and a hope.
 - **Publish after commit** ([PUBLISH-AFTER-COMMIT]), and await the publish ([UNAWAITED-PUBLISH]). The outbox is only for critical transitions (`CODING_STYLE_BACKEND.md` "Transactional Outbox").
 - **Upserts: no `SetValues()` on entities with immutable fields** ([SETVALUES-IMMUTABLE]). It overwrites `InsertedAt`, `UserId` and the rest.
-- **`ExecuteUpdateAsync` / `ExecuteDeleteAsync`** for set-based changes (29 files). Know what you skip: no change tracker, no concurrency token check, and `UpdatedAt` is not set unless you `SetProperty` it. Repo has no interceptor that stamps it. Inside an explicit transaction it joins it; outside it commits on its own.
+- **`ExecuteUpdateAsync` / `ExecuteDeleteAsync`** for set-based changes. Know what you skip: no change tracker, no concurrency token check, and `UpdatedAt` is not set unless you `SetProperty` it. Repo has no interceptor that stamps it. Inside an explicit transaction it joins it; outside it commits on its own.
 - **Concurrency token: `UpdatedAt` with `IsConcurrencyToken()`**, so the check is in the `UPDATE … WHERE`, not an `if` in C# (owl 2025-10-02). Never two tokens (ghost 2026-04-01). Not SQL Server `rowversion` and not `xmin` unless decided.
-- **Serialising a race:** `pg_advisory_xact_lock(hashtext(...))` inside the transaction (`ServiceA.Domain/Repository/UserRepository.cs:154`, `ServiceB…/TemplateRepository.cs:215`), or `PostgresDistributedLockService` across pods. Scope the lock to the smallest key ([CONCURRENCY-SCOPE]).
-- **"One wins, the other gets 409" rests on a unique index: list its columns against the identity being protected.** If the index includes a per-row column (a config id, a generated key), two writers for the same pair both insert and nothing conflicts; serialise with a lock or narrow the index (PROJ-4405).
-- **A dedup key that can see disagreeing writes takes its conflict rule from the domain rule, not the mechanism.** "First write wins" silently dropped a nurse's Answered; legacy's "any answered ⇒ Answered" became `ON CONFLICT … DO UPDATE … WHERE` (PROJ-4748).
-- **A value that a later write or upsert changes is state, not the row's type.** The same-call upsert rewrote `type` (Answered ↔ NoAnswer); review replaced it with one immutable `Call` type plus an `outcome` column. Ask of every enum column: does any write change it? (PROJ-4748; lead, ghost and owl reviews all missed it.)
-- **Postgres unique indexes treat NULLs as distinct**, so rows with a NULL key column never conflict. One table can hold keyed rows and NULL-keyed lifecycle rows without a partial index — and a "unique" guard on a nullable column guards nothing for NULLs (PROJ-4748).
+- **Serialising a race:** `pg_advisory_xact_lock(hashtext(...))` inside the transaction (grep it: `ServiceA.Domain/Repository/UserRepository.cs`, `HealthCaseManagement.Domain/Repository/TemplateRepository.cs`), or `PostgresDistributedLockService` across pods. Scope the lock to the smallest key ([CONCURRENCY-SCOPE]).
+- **"One wins, the other gets 409" rests on a unique index: list its columns against the identity being protected.** If the index includes a per-row column (a config id, a generated key), two writers for the same pair both insert and nothing conflicts; serialise with a lock or narrow the index.
+- **A dedup key that can see disagreeing writes takes its conflict rule from the domain rule, not the mechanism.** "First write wins" silently dropped a nurse's Answered; legacy's "any answered ⇒ Answered" became `ON CONFLICT … DO UPDATE … WHERE`.
+- **A value that a later write or upsert changes is state, not the row's type.** The same-call upsert rewrote `type` (Answered ↔ NoAnswer); review replaced it with one immutable `Call` type plus an `outcome` column. Ask of every enum column: does any write change it?
+- **Postgres unique indexes treat NULLs as distinct**, so rows with a NULL key column never conflict. One table can hold keyed rows and NULL-keyed lifecycle rows without a partial index — and a "unique" guard on a nullable column guards nothing for NULLs.
 - **Child Guids set in C# need `ValueGeneratedNever()`**, or EF treats new rows as Modified and throws a concurrency error (ghost 2026-04-02).
 - **Schema changes:** generated migrations only ([MIGRATION-BY-HAND]). Renaming an entity keeps the table name so EF emits a rename (#backend 2024-09-10). Expand, then contract ([EXPAND-CONTRACT]), and the migration tooling must keep up ([MIGRATOR-PARITY]).
 
-- **Cookies: `ResponseCookies.Delete` removes any earlier `Set-Cookie` with the same name and path**, so two Deletes for two variants of one cookie leave one header. Spike the framework call on the raw header first, and assert raw `Set-Cookie` strings in tests rather than mocked `IResponseCookies` calls (PROJ-4764).
+- **Cookies: `ResponseCookies.Delete` removes any earlier `Set-Cookie` with the same name and path**, so two Deletes for two variants of one cookie leave one header. Spike the framework call on the raw header first, and assert raw `Set-Cookie` strings in tests rather than mocked `IResponseCookies` calls.
 
 ## 3. Async and cancellation
 
 - **Async all the way.** No `.Result`, `.Wait()` or `GetAwaiter().GetResult()` (none on `main` today, keep it that way). No `async void`.
-- **Pass the `CancellationToken` on long-running and worker paths** (`CODING_STYLE_BACKEND.md § Concurrency, the CancellationToken paragraph` scopes it to long-running operations). Few controllers take one today (4 of 138), so don't flag its service-a on an ordinary request path or retrofit it in an unrelated PR ([PR-SCOPE]). Do flag a worker, job or long export that drops the token it was given.
+- **Pass the `CancellationToken` on long-running and worker paths** (`CODING_STYLE_BACKEND.md § Concurrency, the CancellationToken paragraph` scopes it to long-running operations). Few controllers take one (grep to count before citing), so don't flag its service-a on an ordinary request path or retrofit it in an unrelated PR ([PR-SCOPE]). Do flag a worker, job or long export that drops the token it was given.
 - **Don't `Task.WhenAll` over one `DbContext`.** A context is not thread-safe, and two queries in parallel on it throw. Parallel is fine for independent HTTP calls. The generic "use WhenAll" advice is a trap here.
 - **No `Task.Run` around code that is already async.**
-- **New time logic takes `TimeProvider`,** not `DateTime.UtcNow`, so tests can fix the clock. It is registered in ServiceC.API, ServiceD.API, ServiceB.Worker and Billing.API (`Program.cs`); a service elsewhere registers `TimeProvider.System` first. Tests share one fake per test project (there are two hand-rolled `FixedTimeProvider`s today). Don't convert the ~377 existing `DateTime.UtcNow` call sites in an unrelated PR ([PR-SCOPE]).
+- **New time logic takes `TimeProvider`,** not `DateTime.UtcNow`, so tests can fix the clock. It is registered in ServiceC.API, ServiceD.API, ServiceB.Worker and Billing.API (`Program.cs`); a service elsewhere registers `TimeProvider.System` first. Tests share one fake per test project. Don't convert the existing `DateTime.UtcNow` call sites in an unrelated PR ([PR-SCOPE]).
 - **Background work that outlives the request** creates its own scope. Never capture a scoped service in a continuation or a field ([SCOPE-DISPOSAL], must-fix).
 
 ## 4. Configuration
 
-- **Typed options:** a class bound with `services.AddOptions<T>().Bind(config.GetSection("X"))`. Add `.ValidateDataAnnotations().ValidateOnStart()` when a missing value would fail later at runtime (as in `ServiceC.API/Program.cs:58`). A bad config should stop the pod, not the first request.
+- **Typed options:** a class bound with `services.AddOptions<T>().Bind(config.GetSection("X"))`. Add `.ValidateDataAnnotations().ValidateOnStart()` when a missing value would fail later at runtime (as in `ServiceC.API/Program.cs`). A bad config should stop the pod, not the first request.
 - **Lifetimes:** `IOptions<T>` is read once (fine in singletons). `IOptionsSnapshot<T>` is per request (scoped, so never inject it into a singleton). `IOptionsMonitor<T>` notices changes in a singleton. Most Repo config never changes at runtime, so `IOptions<T>` is the default.
 - **No raw `configuration["X:Y"]` deep in services** when a typed options class exists or would do. Read at the edge, inject the typed value.
 - **Secrets and environment:** follow [SECRETS-CONFIG]: sensitive values in AWS Secrets Manager, the rest in appsettings. APIs read `ASPNETCORE_ENVIRONMENT`, workers `DOTNET_ENVIRONMENT` (#backend 2026-09-30).
@@ -99,21 +99,21 @@ Details and examples: `references/ef-core.md`.
 - **`IHttpClientFactory` / `AddHttpClient`,** never `new HttpClient()` (none on `main`).
 - **Resilience:** Repo has no Polly or `Http.Resilience` today, and there is no decision either way (`repo-vs-textbook.md` "HTTP resilience"). Don't add it inside a feature PR. Raise it as a question if the diff adds a new hot cross-service call ([NECESSITY]).
 - **Timeouts:** a new outbound client sets one. The default of 100 s holds a request thread far too long.
-- **Base URLs:** `new Uri(baseUrl)` plus a relative path drops the base's last path segment when the base has no trailing `/` (`https://x/api` + `v1/y` → `https://x/v1/y`). Normalise the trailing slash where the client is built (as in `PuzzelHttpClient.cs:21`) or validate it at startup with `ValidateOnStart` (as in `Billing.API/Program.cs:42`). Five call sites build the `Uri` raw today.
+- **Base URLs:** `new Uri(baseUrl)` plus a relative path drops the base's last path segment when the base has no trailing `/` (`https://x/api` + `v1/y` → `https://x/v1/y`). Normalise the trailing slash where the client is built (as in `PuzzelHttpClient.cs`) or validate it at startup with `ValidateOnStart` (as in `ServiceC.API/Program.cs`).
 
 ## 5b. Logging and exceptions
 
-- **Message templates, never interpolation:** `logger.LogWarning("Send failed for {MessageId}", id)`, not `$"Send failed for {id}"`. A template keeps the field searchable in Elastic and skips formatting when the level is off. 7 lines in 4 files interpolate today (`ServiceD.API/Services/MessageService.cs`, `ServiceAReportService.cs`, `RoleEventHandler.cs`, `GenericMobileProvider.cs`), against 267 files that use templates.
+- **Message templates, never interpolation:** `logger.LogWarning("Send failed for {MessageId}", id)`, not `$"Send failed for {id}"`. A template keeps the field searchable in Elastic and skips formatting when the level is off. A few lines still interpolate; templates are the norm.
 - **What goes in the log:** ids yes, personal data and tokens no ([LOG-PII-BOUNDARY]).
 - **Rethrow with `throw;`,** never `throw ex;`, which resets the stack trace (`GenericMobileProvider.cs:136` does it).
 - **No silent catch.** Log and rethrow, or handle with a reason; a Rebus handler rethrows so the retry and error queue work ([FAIL-LOUD]).
 
 ## 6. Scheduled and hosted workers (Quartz, BackgroundService)
 
-Quartz runs 19 `IJob`s in five ServiceA and ServiceC workers, with the in-memory store (no `UsePersistentStore`, no clustering). Every pod schedules every job. Today the worker deployments checked (deviant engine, callback engine, export, quarantine) run `replicas: 1`, and the engines take `PostgresDistributedLockService` locks in their services rather than in the job.
+Quartz runs the `IJob`s in the ServiceA and ServiceC workers with the in-memory store (no `UsePersistentStore`, no clustering). Every pod schedules every job. Today the worker deployments checked (deviant engine, callback engine, export, quarantine) run `replicas: 1`, and the engines take `PostgresDistributedLockService` locks in their services rather than in the job.
 
 - **More than one pod?** If the diff raises `replicas` or adds a job to a worker with more than one, each pod runs it. Guard the work with a distributed lock or a claim row, or keep `replicas: 1` on purpose. Note that this conflicts with "at least 2 replicas" for workers (owl 2025-04-07, [CONCURRENCY-SCOPE]), so say which one wins. Open question to the tech lead in `dotnet-architecture-reference/repo-vs-textbook.md`.
-- **Overlap on one pod:** a job that can run longer than its interval needs `[DisallowConcurrentExecution]` (3 of the 19 have it).
+- **Overlap on one pod:** a job that can run longer than its interval needs `[DisallowConcurrentExecution]` (few jobs have it).
 - **Re-run safe:** a job can fire again after a crash or a deploy. Each item it handles must be idempotent: a claim, an "already sent" marker in the same transaction, or upsert ([REDELIVERY-SAFETY], [EVENT-IDEMPOTENCY]).
 - **Scope per run:** resolve `DbContext` and repositories from a scope created inside `Execute`, not from the job's constructor if the job is a singleton ([SCOPE-DISPOSAL]).
 - **Cancellation:** pass `context.CancellationToken` down, so a shutdown stops the run instead of being killed mid-write.
@@ -121,7 +121,7 @@ Quartz runs 19 `IJob`s in five ServiceA and ServiceC workers, with the in-memory
 - **Time:** cron in UTC or an explicit time zone, and "today" from `TimeProvider`, not `DateTime.Now`.
 
 
-**`BackgroundService` loops** (15 today, e.g. `CallbackDispatchWorker`, `MessageSentOutboxDispatcher`). They already share one shape; keep it:
+**`BackgroundService` loops** (e.g. `CallbackDispatchWorker`, `MessageSentOutboxDispatcher`). They already share one shape; keep it:
 
 - A new scope per iteration (`scopeFactory.CreateAsyncScope()`), never a `DbContext` held across iterations.
 - A `try/catch` per iteration that logs and continues. Since .NET 6 an unhandled exception in `ExecuteAsync` stops the whole host by default, so one bad row would take the worker down.
@@ -155,7 +155,7 @@ Never recommend these. If someone asks, explain with the source.
 | Domain / Application / Infrastructure / Api projects | `*.API` + `*.Domain` (Domain holds DbContext and migrations) | `repo-vs-textbook.md`, undecided but existing |
 | Ports, presenters, logging behind a domain interface | Not used; `ILogger<T>` injected directly | [NECESSITY] |
 | `AddDbContextPool`, `EnableRetryOnFailure` | Not used anywhere | No decision; don't add in a feature PR |
-| FluentValidation | Hand-written checks at the controller | `CODING_STYLE_BACKEND.md:89` (the `:103` mention is unused) |
+| FluentValidation | Hand-written checks at the controller | `CODING_STYLE_BACKEND.md` "Input Validation" (its FluentValidation mention is not used in code) |
 
 ## Output
 

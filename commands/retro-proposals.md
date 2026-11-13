@@ -8,14 +8,13 @@ ultrathink — this task requires deep reasoning to correctly classify learnings
 
 Analyze accumulated Dream Team session data (retro learnings, history, journals) to identify patterns, flag problems, and propose concrete improvements. Routes learnings to the correct destination files — agent prompts, repo docs, or personal config.
 
-> **Renamed from `/team-review`.** This command is part of the [Learning System](../docs/learning-system.md) alongside `/scrape-pr-history` and `/pr-insights`.
+> Part of the [Learning System](../docs/learning-system.md) alongside `/scrape-pr-history` and `/pr-insights`.
 
 ## STEP 0 — Route Pre-Declaration (DO THIS FIRST, before any analysis)
 
 **Before reading history or producing a health report**, scan `dream-team-learnings.md` for all unresolved deferred items (not struck through) and output the routing table immediately. This is the first thing the user sees.
 
-**Do not trust the counters — recount them.** Sessions write repeats as fresh lines (2026-10-16 pass:
-one counter in the file, eleven clusters that had recurred 3-9 times). Before routing, cluster the
+**Do not trust the counters — recount them.** Sessions write repeats as fresh lines, so the file's counters undercount. Before routing, cluster the
 unresolved items by key term (script name, symbol, tool, error code, rule) and count sessions per
 cluster, e.g.:
 
@@ -33,7 +32,7 @@ While scanning, check each deferred item for a `(recurred: N)` annotation. Items
 
 ## STEP 0b — Give every item a level before routing
 
-Recurrence alone says nothing about whether the team should read it. A reviewer on #4701 (2026-11-09) asked whether the learnings were production bugs or things Claude hit while coding, and said the latter needs a much higher bar of generalisation. All of them were the latter. So grade each item on four things, using the session's `[found-by · cost · if-missed · scope]` tag where it has one, and the session block and journals where it doesn't:
+Recurrence alone says nothing about whether the team should read it. Reviewers hold learnings Claude hit while coding to a much higher bar of generalisation than production bugs. So grade each item on four things, using the session's `[found-by · cost · if-missed · scope]` tag where it has one, and the session block and journals where it doesn't:
 
 | Axis | Values |
 |---|---|
@@ -161,8 +160,8 @@ After the health report, route deferred learnings to the right destination files
 | ID | Destination | Path | Scope |
 |----|-------------|------|-------|
 | `dream-team` | Dream Team command | `~/.claude/commands/my-dream-team.md` | Agent prompts, phases, process |
-| `agent:<name>` | Standalone agent | `~/.claude/agents/<name>.md` | Agent behavior outside Dream Team |
-| `skill:<name>` | Skill/command | `~/.claude/commands/<name>.md` | Skill-specific checklist or workflow |
+| `agent:<name>` | Standalone agent | `~/.claude/agents/<domain>/<name>.md` | Agent behavior outside Dream Team |
+| `skill:<name>` | Skill or command | `~/.claude/skills/<name>/SKILL.md`, or `~/.claude/commands/<name>.md` for a command | Skill-specific checklist or workflow |
 | `project-claude` | Project CLAUDE.md | `<monorepo>/CLAUDE.md` | Monorepo quick-start info only (NOT conventions — use repo-docs for those) |
 | `agents-md:<path>` | Repo AGENTS.md | `<monorepo>/<path>` | Agent-specific operational gotchas only (commands, auth, db names, ports) |
 | `global-claude` | Global CLAUDE.md | `~/.claude/CLAUDE.md` | Every Claude session everywhere |
@@ -310,7 +309,7 @@ Learnings split into two tracks based on who they affect:
 
    a. **STEP 1 — Create Jira ticket**:
       ```bash
-      acli jira workitem create --project PLRS --type Uppgift \
+      acli jira workitem create --project NOVA --type Uppgift \
         --summary "Apply retro learnings to repo docs and conventions" \
         --description "<description with the table of proposed changes>"
       # then, with the key from the create output:

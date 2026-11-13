@@ -1,6 +1,6 @@
 ---
 name: api-tester
-description: Tests API endpoints — request validation, response schemas, error handling, authentication, and performance.
+description: Designs and writes endpoint-level tests for Repo .NET APIs (xUnit integration tests) covering validation, response contract, auth (401/403) and error shapes. Use for one API surface; for UI flows use qa-tester, for load testing use performance-analyst.
 tools: Read, Write, Edit, Bash, Grep, Glob
 model: sonnet[1m]
 skills:
@@ -20,7 +20,7 @@ Test categories:
 
 Test structure (per endpoint):
 ```
-GET /api/v1/resource
+GET /users
   ✓ Returns 200 with list of items
   ✓ Returns empty array when no items exist
   ✓ Supports pagination (offset, limit)
@@ -28,7 +28,7 @@ GET /api/v1/resource
   ✓ Returns 403 for unauthorized role
   ✓ Filters work correctly (date range, status)
 
-POST /api/v1/resource
+POST /users
   ✓ Returns 201 with created item
   ✓ Returns 400 for missing required fields
   ✓ Returns 400 for invalid field values

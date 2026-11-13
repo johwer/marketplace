@@ -43,7 +43,7 @@ the body, including the pros/cons and verification tables other skills put there
 SHAPE=$(bash ~/.claude/scripts/pr-body-shape.sh)   # template | dtf; non-zero exit → stop, don't guess
 ```
 
-- **`template`** (the repo's template has `## Summary` and `## Agent`; Repo since #4470, whose
+- **`template`** (the repo's template has `## Summary` and `## Agent`; Repo, whose
   AGENTS.md says to follow the template): write the same content under the template's headings.
   Why + What changes become **`## Summary`**, 1–3 lines (why it was needed, then what is now true;
   every rule below about outcomes and plain language still applies). How to see it becomes
@@ -112,7 +112,7 @@ only if there is genuinely nothing to say, which is rarer than it feels.>
 | `## Reading this diff`, `## Walkthrough of the changes`, per-file tables | `code-walkthrough` |
 | `## Visual Verification Evidence`, any `<img>` block, `<details>` of superseded shots | `pr-screenshot-captions` |
 | `## Decisions` body text | `pr-decisions` |
-| Test-guide links / attachments | `tester-handoff` |
+| (none — test guides are local files, never linked from the PR) | `tester-handoff` |
 | `## Progress` checklist, anything the user wrote by hand | the user |
 | The body's overall **shape** at the ready transition — which sections survive at all | `pr-ready` |
 
@@ -309,5 +309,5 @@ has not been demonstrated to work.
 - `pr-decisions` — the `## Decisions` section: choices made, alternatives, trade-offs. Use whenever the implementation diverged from the ticket.
 - `code-walkthrough` — the file-by-file section for reviewers. Goes **below** this. Different audience.
 - `pr-screenshot-captions` — captions the screenshots referenced in "How to see it".
-- `tester-handoff` — the full test guide for a non-developer. Referenced from the PR, not inlined.
+- `tester-handoff` — the full test guide for a non-developer. A local file only; never linked from or pasted into the PR.
 - `hook-then-detail` — when posting the PR to Slack, for the message that decides whether anyone clicks.

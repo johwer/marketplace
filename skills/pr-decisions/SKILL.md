@@ -114,7 +114,7 @@ Omit the section entirely when there were no real decisions. An empty or padded 
 teaches readers to skip it, which costs you the one time it matters.
 
 When the repo's PR template has `## Summary` and `## Agent` (`pr-body-shape.sh` prints
-`template`; Repo since #4470), `## Decisions` still sits below `## Summary` while the PR is a
+`template`; Repo), `## Decisions` still sits below `## Summary` while the PR is a
 draft, and an open question belongs there. At the ready transition `pr-ready` turns the 1–3
 decisions that matter into `- **Decision:** …` bullets in the template's `## Considerations` and
 moves the rest to the notes comment. Write each entry so its first sentence works as that bullet.

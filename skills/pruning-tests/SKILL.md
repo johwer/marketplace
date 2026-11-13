@@ -1,6 +1,6 @@
 ---
 name: pruning-tests
-description: Applies the writing-tests value bar backwards: audits an existing test project or folder, proves which tests guard nothing (green when the code under test is broken, or redundant with a test in the same gate), deletes them in small per-area PRs, and removes what only those tests kept alive. Use for test tech-debt work, when a suite is noisy to refactor against, when agents keep copying mock choreography from old tests, or when asked to "rensa tester", "prune tests", "delete low-signal tests".
+description: 'Applies the writing-tests value bar backwards: audits an existing test project or folder, proves which tests guard nothing (green when the code under test is broken, or redundant with a test in the same gate), deletes them in small per-area PRs, and removes what only those tests kept alive. Use for test tech-debt work, when a suite is noisy to refactor against, when agents keep copying mock choreography from old tests, or when asked to "rensa tester", "prune tests", "delete low-signal tests".'
 ---
 
 # Pruning tests

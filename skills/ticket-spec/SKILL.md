@@ -1,6 +1,6 @@
 ---
 name: ticket-spec
-description: Keep the implementation spec for a Repo ticket in a local markdown file at ~/Downloads/<TICKET_ID>/spec.md instead of in the Jira description, so Jira stays a short human summary and the detail an agent needs lives next to the ticket's screenshots. Use when writing or rewriting a ticket, when a subtask needs its parent story's goal and constraints, when scope changes mid-implementation and leftovers from the old shape may remain, or when a decision made in a session never made it into Jira. Covers the frontmatter contract (type, parent), how DTF hydrates the spec into .dream-team/jira-ticket.md, and the write-back back to Jira.
+description: Keep the implementation spec for a Repo ticket in a local markdown file at ~/Downloads/<TICKET_ID>/spec.md instead of in the Jira description, so Jira stays a short human summary and the detail an agent needs lives next to the ticket's screenshots. Use when writing or rewriting a ticket, when a subtask needs its parent story's goal and constraints, when scope changes mid-implementation and leftovers from the old shape may remain, or when a decision made in a session never made it into Jira.
 ---
 
 # Ticket spec files

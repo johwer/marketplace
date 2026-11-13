@@ -35,6 +35,14 @@ Variant lines are `<lens> <model> [effort]`; effort defaults to medium. Effort i
 
 Results stay in `~/.claude/bridge-eval/results/<timestamp>/`. Write the winner into `SKILL.md` Step 2 as the default variant, with the run date.
 
+## Results behind the SKILL.md defaults
+
+Bigger or smarter swarms did not pay either (same eval): `haiku-14` 29.0 with noise 99.5, `haiku-14dup` 28.5 with noise 108, and `fable-planner` (Fable picks 5–8 advisors per decision, about two on Sonnet, sometimes inventing a lens) 28.5 for $1.63. Adding the team's convention docs as they stood at the time to the brief gave 27.0 (no gain).
+
+**Triage with a critic (Step 4, $0.17 per decision).** `eval/critic-run.sh` runs a critic with no code access (default Sonnet. On pre: Sonnet 73 % of findings / 54 % of noise on the shortlist for $0.08 per decision, Opus 70 % / 53 % for $0.17, Fable 77 % / 38 % for $0.38. On post (`post-haiku-7`): Sonnet 83 % / 24 % for $0.16, Opus 79 % / 30 % for $0.36. Pass `claude-fable-5-2` as the critic model for M+ when less noise is worth $0.30) that merges duplicates and splits the points into a shortlist of at most 8 and a "weak" list. On `haiku-7lens` its shortlist held 39 of 56 findings (70 %) and 62 of 117 noise points (53 %). Show the shortlist first and the weak list collapsed, never dropped: 30 % of the real findings land under weak.
+
+Stronger models did not pay: `sonnet-7lens` 27.5, `opus-3lens` 25.5, `fable-1-high` 17. More lenses mean more noise (Haiku 58 vs Sonnet 43 wrong or irrelevant points over 24 runs), so Step 4's check against the repo matters. An automated Opus verifier with repo access was tried (`bin/verify.sh`, `eval/verify-run.sh`): at $2 per decision it dropped true findings (19 → 16 of 22) and hit its budget on 3 of 12 cases, so it is not part of the flow. A stated team lean barely moved Sonnet advisors; keep the brief blind anyway. Rerun the eval before changing these. This follows Anthropic's routing (Opus by default, Fable for the hardest, Sonnet or Haiku for the simpler): advisors answer a narrow lens question from a short brief, which is Haiku or Sonnet work; the critic and the synthesis run on the stronger model. Variant lines may add an effort level; each advisor is capped at `BRIDGE_MAX_USD_PER_ADVISOR` (default 0.50). It prints each advisor's cost and the total. Answers land in `.dream-team/bridge/advisors/<lens>@<model>@<effort>.md` (scratchpad outside a worktree).
+
 ## Cross-vendor
 
 `codex-mixed` fails until `bin/advise.sh` gets a Codex or Gemini branch, which waits on company approval. When it lands, rerun the same cases: the question "is a second vendor worth paying for" is answered by its unique hits against `sonnet-3lens` and `mixed-4`.

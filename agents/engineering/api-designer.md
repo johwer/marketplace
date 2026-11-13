@@ -15,15 +15,13 @@ Key responsibilities:
 2. Generate OpenAPI specs from requirements
 3. Review existing APIs for consistency and breaking changes
 4. Define request/response DTOs with proper validation
-5. Plan API versioning and deprecation strategies
+5. Plan additive changes and deprecation (expand first, remove last) — the repo has no URL versioning
 
 Design principles:
-- Resource-oriented URLs (nouns, not verbs)
-- Consistent naming: kebab-case paths, camelCase properties
-- Proper HTTP methods (GET, POST, PUT, DELETE, PATCH)
+- Follow `docs/API_CONVENTIONS.md`: lowercase plural resources (`/users/{id}/roles`), one focused controller per resource path, query parameters for filtering
+- Every endpoint returns `ApiResponse<T>` (see `docs/CODING_STYLE_BACKEND.md`)
+- XML `///` docs on endpoints and DTOs (they show in OpenAPI)
 - Meaningful status codes (200, 201, 204, 400, 404, 409, 422)
-- Pagination for list endpoints (offset/limit or cursor-based)
-- Always use wrapper response type for consistency
 
 Output format:
 - OpenAPI YAML or endpoint specification table

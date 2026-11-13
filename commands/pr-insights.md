@@ -71,7 +71,7 @@ Classify reviewers as **human** or **AI** based on `reviewer_is_bot`. Aggregate:
 | Human-2  | N PRs   | N        | N        | naming      |
 ```
 
-> **Privacy note:** When presenting to the user, show reviewer names. If the user asks for anonymized output (for sharing), replace human names with "Human-1", "Human-2" etc. and AI reviewer names with "AI-1", "AI-2" etc.
+> **Privacy:** label human reviewers by role or as "Human-1", "Human-2", never by name or login; AI reviewers may keep their bot name. Per-person tables are for spotting patterns, not for rating colleagues.
 
 ### Step 4: Recurring Patterns
 

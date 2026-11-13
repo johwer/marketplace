@@ -1,11 +1,6 @@
 ---
 name: design-an-interface
 description: Generate multiple radically different interface designs for a module using parallel sub-agents. Use when designing an API, service contract, hook, or component interface — or when someone mentions "design it twice".
-autoTrigger:
-  - when user wants to design a new API, service, hook, or component interface
-  - when user mentions "design it twice" or wants to explore interface options
-globs:
-  - "**/*"
 ---
 
 # Design an Interface
@@ -32,12 +27,12 @@ Before designing, understand:
 
 Also explore the codebase briefly to understand:
 - Existing patterns for similar modules
-- Conventions from project-level `.claude/skills/` (backend-conventions.md, frontend-conventions.md)
+- Conventions from the `backend-conventions` / `frontend-conventions` skills and the repo's `.claude/rules/*.md`
 - Adjacent interfaces the new module will interact with
 
 ### Step 2 — Generate designs (parallel sub-agents)
 
-Spawn 3 sub-agents simultaneously using the Task tool. Each must produce a **radically different** approach. Assign a different constraint to each:
+Spawn 3 sub-agents in one message with the Agent tool. Each must produce a **radically different** approach. Assign a different constraint to each:
 
 ```
 Prompt for each sub-agent:

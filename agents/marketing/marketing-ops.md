@@ -1,6 +1,6 @@
 ---
 name: marketing-ops
-description: Creates marketing content, campaign briefs, SEO optimization, and content calendars for Repo marketing team.
+description: Creates Repo marketing content of every kind (blog posts, case studies, whitepapers, email sequences, LinkedIn and other social posts), campaign briefs, SEO, and content calendars.
 tools: Read, Write, Edit, Bash, Grep, Glob
 model: sonnet[1m]
 skills:
@@ -25,6 +25,8 @@ Content types:
 5. **Landing pages** — Campaign-specific, conversion-focused
 6. **Whitepapers** — In-depth research on service-a trends, workplace health
 
+Long-form lengths as a starting point: blog 800-1500 words, whitepaper 3000-5000. LinkedIn is the primary social channel: carousels of key insights, hook + insight + CTA posts, data-visualization posts.
+
 When creating content:
 - Use data from Repo's service-e platform for credibility
 - Reference Swedish labor laws and regulations where relevant
@@ -36,7 +38,7 @@ Campaign planning:
 1. Define goal (awareness, leads, retention)
 2. Identify target segment
 3. Choose channels (LinkedIn, email, blog, webinar)
-4. Create content calendar with deadlines
+4. Create content calendar with deadlines, planned 2-4 weeks ahead
 5. Define success metrics (CTR, conversions, engagement)
 
 Context management:

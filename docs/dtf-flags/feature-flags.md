@@ -4,9 +4,9 @@ Read when Amara set `needs_feature_flag: true` in Phase 1.
 
 **Applies in BOTH lite and team flows** — in lite mode the team lead does all of it; in team mode the frontend dev wires the guards and the team lead creates the flag.
 
-In this codebase **feature-flagging is frontend-only** (the backend does not evaluate PostHog flags — see the `export-tags-and-users-excel` precedent). So gating means: read the flag on the frontend and skip the data fetch / hide the render when it's off.
+Unfinished UI is gated on the frontend (repo `AGENTS.md` "Slice"): read the flag and skip the data fetch / hide the render when it's off. ServiceD.API also registers a server-side PostHog flag service (`IFeatureFlagService`); use it only when the ticket needs backend behaviour behind the flag.
 
-1. **Wire the frontend guard** (frontend dev): use `useFeatureFlagEnabled("<flag-key>")` from `@posthog/react` (pattern: `payroll-notes` in `PayrollTable.tsx`). Prefer gating at the data-fetch boundary — pass `skipToken` to the RTK Query when the flag is off, which also hides the render (no data → nothing to show). No backend changes.
+1. **Wire the frontend guard** (frontend dev): add a named hook next to the others in `apps/web/src/utils/posthogFeatureFlags.ts` (`useFeatureFlagEnabled("<flag-key>")` from `@posthog/react`). Prefer gating at the data-fetch boundary — pass `skipToken` to the RTK Query when the flag is off, which also hides the render (no data → nothing to show).
 
 2. **Create the flag in PostHog** (team lead) using the DTF handler — idempotent, applies the team-standard config (Boolean, accept+staging hosts OR'd, 100%, active), and reuses the API key from the keychain (no re-paste):
    ```bash

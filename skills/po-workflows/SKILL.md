@@ -1,6 +1,6 @@
 ---
 name: po-workflows
-description: Product Owner workflows — ticket refinement, sprint planning, requirements analysis, impact assessment for Repo
+description: Product Owner workflows — ticket refinement, sprint planning, requirements analysis, impact assessment for Repo. Use when refining a ticket's requirements or acceptance criteria, planning a sprint, or assessing a change's impact.
 ---
 
 ## Ticket Refinement Checklist
@@ -88,7 +88,7 @@ acli jira workitem view PROJ-1234
 acli jira workitem update PROJ-1234 --status "In Progress"
 
 # Add comment
-acli jira workitem comment PROJ-1234 "Analysis complete — see AC below"
+acli jira workitem comment create --key PROJ-1234 --body "Analysis complete — see AC below"
 
 # Download attachments
 bash ~/.claude/scripts/jira-download-attachments.sh PROJ-1234

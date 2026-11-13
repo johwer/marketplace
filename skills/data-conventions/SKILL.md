@@ -1,13 +1,11 @@
 ---
 name: data-conventions
-description: Data engineering conventions for the Repo monorepo
+description: Data engineering conventions for the Repo monorepo. Use when writing queries, migrations, seeds or data pipelines in services/.
 ---
 
 ## Loading Conventions
 
-Project-level conventions are loaded automatically via `.claude/skills/backend-conventions.md` when editing `services/**/*.cs` or `shared/**/*.cs` files. Data engineers follow the same backend patterns.
-
-If project-level skills are not available (e.g., older branch), read these files directly:
+Nothing loads these automatically; the repo's `.claude/rules/*.md` (e.g. `ef-migrations.md`) load by path. Data engineers follow the backend patterns in the `backend-conventions` skill. Read these files directly:
 - `docs/CODING_STYLE_BACKEND.md`
 - `docs/API_CONVENTIONS.md`
 - `docs/TESTING_GUIDELINES_BACKEND.md`

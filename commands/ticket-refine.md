@@ -123,7 +123,7 @@ Read `~/.claude/team-profiles.json` to look up the reporter. This file contains 
 - **light**: Trust the intent. Push back only on missing specifics, not missing intent. If this author commented on someone else's ticket, treat it as partially validated.
 - **unknown/not in config**: Default to medium pushback.
 
-**Tech lead weight** — if a tech lead has commented with specific direction, treat their input as higher-weight than AI reviewer (Solomon) analysis. Tech lead one-liners often contain more actionable context than full AI reviews. (Learned: the tech lead's single-line comment on PROJ-1745 was more valuable than Solomon's entire review.)
+**Tech lead weight** — if a tech lead has commented with specific direction, treat their input as higher-weight than the AI reviewer's analysis. Tech lead one-liners often contain more actionable context than full AI reviews.
 
 **High-risk flag** — if the reporter has `pushback_level: "high"` AND no tech lead from the config has commented:
 ```
@@ -161,7 +161,7 @@ Read all downloaded files with the Read tool to understand visual context.
 
 Cross-reference ALL parts of the ticket against each other. Flag any conflicts:
 
-**Title vs Description (CRITICAL — Solomon misses this 100% of the time):**
+**Title vs Description** (the AI reviewer does not check this, so it falls to you):
 - Does the title accurately reflect what the description asks for?
 - Is the scope in the title narrower/broader than the description?
 - Does the title mention a concept (e.g., "Permission") that the description never addresses?
@@ -193,10 +193,9 @@ Check for missing information the AI team needs:
 - [ ] Specifies affected user roles
 - [ ] Mentions edge cases and error states
 
-**Empty section headers check (learned from Solomon analysis):**
+**Empty section headers check:**
 If the ticket or AI reviewer comments have section headers (e.g., "Open Questions", "Acceptance Criteria") with NO content underneath, flag explicitly:
 > "Section '[header]' is present but empty — this is worse than having no section at all because it gives a false impression of coverage. Either fill it with concrete items or remove it."
-Solomon's Jira reviews had empty section headers in 69% of tickets — don't let this pass silently.
 
 **Mandatory edge case checklist:**
 For every ticket at depth 2+, verify these are addressed (or explicitly N/A):
@@ -269,7 +268,7 @@ Categorize all findings into:
 - Missing information that blocks implementation decisions
 - Contradictions that make the requirement ambiguous
 - Domain model changes that need architect/PO sign-off
-- **Thin tickets**: If description is <100 chars AND has no ACs, always flag as BLOCKER: "BLOCKER: Description insufficient for implementation. Need: [specific missing items]." Do NOT use polite prompts — state it clearly. (Learned: Solomon's gentle pushback resulted in 0% ticket improvement across 13 tickets.)
+- **Thin tickets**: If description is <100 chars AND has no ACs, flag as BLOCKER: "BLOCKER: Description insufficient for implementation. Need: [specific missing items]." State it plainly; softened prompts on thin tickets have not led to changes.
 
 **QUESTION** — Need clarity but could start with assumptions:
 - Unclear edge cases

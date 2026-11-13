@@ -32,7 +32,7 @@ Tears down a workspace after a story is merged. Stops worktree Docker services, 
 
 ## /review-pr {#review-pr}
 
-Reviews a pull request with line-level GitHub comments. Auto-detects the PR from the current branch, or specify a PR number. Runs in fast (API-only), full (local checkout + builds), or deep (4 parallel review agents + validation pass to eliminate false positives) mode.
+Reviews a pull request with line-level GitHub comments. Auto-detects the PR from the current branch, or specify a PR number. Runs in fast (API-only), full (local checkout + builds), or deep (7 parallel review agents + a validation pass; implies full) mode.
 
 **Flags:** `--full` · `--deep` · `--skip` · `--focus` · `--no-approve`
 
@@ -88,13 +88,13 @@ Reviews patterns detected from tool usage analysis. Runs `analyze-patterns.sh` t
 
 ## /reviewers {#reviewers}
 
-Manages pre-configured PR reviewers per category (frontend, backend, fullstack, infra, data). Reviewers are assigned only after the user confirms in Phase 6 — never auto-assigned.
+Manages pre-configured PR reviewers per category (frontend, backend, fullstack, infra, data), for adding extra reviewers on request. Default reviewers come from CODEOWNERS when the PR goes ready.
 
 ---
 
 ## /sync-config {#sync-config}
 
-Pushes all Claude configuration files (commands, scripts, agents, settings) to the private `shared-claude-files` repo and the public `dream-team-flow` repo on GitHub.
+Pushes Claude configuration files (commands, scripts, agents, skills) to the private and public marketplace repos and the public `dream-team-flow` repo on GitHub.
 
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: uat-workflows
-description: UAT testing workflows — acceptance criteria validation, structured bug reporting, permission testing, and business rule verification for Repo
+description: UAT testing workflows — acceptance criteria validation, structured bug reporting, permission testing, and business rule verification for Repo. Use when testing a feature in accept against its acceptance criteria or writing up a UAT finding.
 ---
 
 ## UAT Execution Workflow
@@ -137,7 +137,7 @@ For each feature under test:
 acli jira workitem view PROJ-1234
 
 # Add UAT finding as comment
-acli jira workitem comment PROJ-1234 "UAT Finding: [description]. See bug ticket PROJ-5678."
+acli jira workitem comment create --key PROJ-1234 --body "UAT Finding: [description]. See bug ticket PROJ-5678."
 
 # Create a bug ticket (a real subtask of the feature under test when it is an open story)
 acli jira workitem create --project PLRS --type Bug --summary "UAT: [description]" --description "[full report]"

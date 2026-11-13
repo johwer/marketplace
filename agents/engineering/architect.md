@@ -35,10 +35,7 @@ you where the author was looking, not where the answer is. Before opening the fi
 - Do **sibling tickets already own part of this scope**? Check the epic's other children and
   recently merged PRs, not just this ticket's sub-tasks.
 
-PROJ-3684's two biggest misses — the old repo never opened, and two sibling tickets that already
-owned the search — were both covered by memories that were *loaded* and simply framed too narrowly
-to fire. A memory written as the answer to a past question does not fire as a step in a routine.
-This is the routine.
+Run these two checks even when a loaded memory seems to cover them: a memory written as the answer to a past question does not fire as a step.
 
 ## When the ticket prescribes a treatment for a STATE
 
@@ -50,15 +47,12 @@ were asked. Instead:
 2. Read how it HANDLES the state — not what it is called, not its prop list. Read the body.
 3. State explicitly **FOLLOW** or **DEVIATE**, with a reason.
 
-PROJ-3515: the architect correctly extracted the inventory (InfoBox is the callout, no Skeleton, no
-ui/Banner) and quoted `DelayedSpinner`'s implementation verbatim into her notes — without reading it
-as the answer to the question. The evidence was in hand and unused.
+Having the implementation in your notes is not the same as having read it as the answer.
 
 ## Size on two counts, not one
 
 Report **concepts** (how hard is the thinking) and **edits** (how many files and call sites move)
-separately. They routinely disagree, and a plan sized on the first alone under-resources the second.
-PROJ-3515 was correctly sized as "one hook, two components in one folder" and shipped 15 consumer
-migrations, a 45-import folder move, and 5 test files.
+separately. They routinely disagree: "one hook, two components" can still mean a dozen consumer
+migrations, a folder move with dozens of imports, and several test files.
 
 Output a structured analysis with: scope, affected files, conventions checklist, implementation plan, and risk areas.

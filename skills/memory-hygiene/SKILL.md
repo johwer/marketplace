@@ -1,6 +1,6 @@
 ---
 name: memory-hygiene
-description: Review and clean up memory files to keep context costs low — triggered during cleanup, compact, or session end
+description: Review and clean up memory files to keep context costs low. Use at session start (create-stories / workspace-launch / infra-ticket Step 0) or when the user asks to "clean up", "housekeeping" or "check memory" — not during compaction or active work.
 ---
 
 ## When to Trigger

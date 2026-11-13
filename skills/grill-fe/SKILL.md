@@ -1,12 +1,6 @@
 ---
 name: grill-fe
-description: Adaptive frontend grilling — reads the frontend conventions and the repo first, then asks one sharp question at a time (with a recommended answer) about ONLY what's genuinely unresolved. Run DURING a frontend ticket while building a component, page, or hook. Question count scales to the ticket; not the broad pre-ticket design interview.
-autoTrigger:
-  - when user says "grill-fe", "mini grill", or "grill me on this component/page/hook"
-  - when starting frontend implementation on a ticket and the approach has open questions (which component to reuse, what states to handle, where the data comes from)
-globs:
-  - "apps/web/src/**/*.ts"
-  - "apps/web/src/**/*.tsx"
+description: Adaptive frontend grilling — reads the frontend conventions and the repo first, then asks one sharp question at a time (with a recommended answer) about ONLY what's genuinely unresolved. Run DURING a frontend ticket while building a component, page, or hook. Question count scales to the ticket; not the broad pre-ticket design interview. Use when the user says "grill-fe" or "mini grill", or when frontend implementation starts with open questions (which component to reuse, which states, where the data comes from).
 ---
 
 # Grill FE — Mini Frontend Grilling
@@ -27,12 +21,9 @@ Treat arguments as the component / page / hook / feature being built. If none gi
 
 **Recon first, conversation second.** Before asking the user a single question, do a silent pass: read the conventions AND explore the repo. Only once you know what the rules and the codebase already settle do you open the conversation — and then only on what's left. Never start interviewing cold.
 
-**Conventions-first — read the rules before you ask anything.** Before the first question, load the frontend conventions from **wherever they live** — don't depend on a single path. Try in order, take the first that resolves:
-1. **Project-level skill** in the repo — `.claude/skills/frontend-conventions/SKILL.md` (or `.claude/skills/frontend-conventions.md`). Auto-loads via globs when editing `apps/web/src/**/*.ts{x}`.
-2. **Global skill** — `~/.claude/skills/frontend-conventions/SKILL.md`.
-3. **Raw docs fallback** (older branch / neither skill present) — `docs/CODING_STYLE_FRONTEND.md`, `docs/FRONTEND_COMPONENTS.md`, `docs/TAILWIND_CONVENTIONS.md`, `docs/INTERNATIONALIZATION.md`.
+**Conventions-first — read the rules before you ask anything.** Before the first question, read the `frontend-conventions` skill and the `docs/` files it lists (`CODING_STYLE_FRONTEND.md`, `FRONTEND_COMPONENTS.md`, `TAILWIND_CONVENTIONS.md`, `INTERNATIONALIZATION.md`). The repo's `.claude/rules/*.md` load by path on their own.
 
-The same applies to any backend/data conventions if the ticket touches them (project-level `.claude/skills/<x>-conventions/SKILL.md` → global → docs). **Anything the conventions settle is NOT a question** — apply it silently and move on (tabs → `useSearchParamTab`; never `defaultValue` in `t()`; `bg-warning` is red; never edit generated `*Api.ts`). The conventions are what make this grill short: they pre-answer a whole class of questions so you only ask about what's left.
+The same applies to the backend/data conventions skills if the ticket touches them. **Anything the conventions settle is NOT a question** — apply it silently and move on (tabs → `useSearchParamTab`; never `defaultValue` in `t()`; never edit generated `*Api.ts`). The conventions are what make this grill short: they pre-answer a whole class of questions so you only ask about what's left.
 
 **Codebase-first — explore before you ask.** If a question can be answered by reading the repo, answer it yourself and confirm, instead of asking blind. Check `apps/web/src/` for existing components/hooks, the relevant `*Api.ts` / `*ApiEnhanced.ts`, and the Tailwind token usage before posing the question.
 
@@ -49,9 +40,9 @@ Work through these, codebase-first, one at a time:
 3. **Reuse vs. new** — Does a component or hook already exist for this? Explore `apps/web/src/` first; propose the reuse, only build new if nothing fits.
 4. **State persistence** — Does any state (tabs, filters, selection) need to survive a refresh or be shareable via URL? If tabs → `useSearchParamTab`, not `useState`.
 5. **i18n** — Any new user-facing strings? Reminder: no `defaultValue` in `t()`; create keys in all 5 languages (en, sv, da, no, fi); dynamic enum keys use `t(\`prefix_${value}\`)` and must be added to `scripts/lokalise_whitelist.json`. Commonly missed: empty states, dialogs, table headers, dropdown labels.
-6. **Tailwind tokens** — Is the right semantic token being used? Flag the trap: `bg-warning` is **red**, not yellow. Confirm intended color matches the token.
+6. **Tailwind tokens** — Is the right semantic token being used (`docs/TAILWIND_CONVENTIONS.md` "Feedback / Banner Colours")? Confirm the intended colour matches the token, including retailer overrides.
 7. **Responsive / edge** — Mobile viewport, long/overflowing content, null/zero rows, very large lists.
-8. **Visual proof** — Plan a screenshot into `__screenshots__/` next to the component before marking done. Verbal "verified" is not enough.
+8. **Visual proof** — Plan the screenshot that goes in the PR description (saved to `~/Downloads/<TICKET>/`, see `pr-screenshot-captions`), or a Cosmos fixture render. Verbal "verified" is not enough.
 
 ## Output — no menu
 

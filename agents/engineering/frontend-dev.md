@@ -59,9 +59,9 @@ Visual verification (MANDATORY for UI changes):
 Business rules from backend values:
 - **Before using a backend enum value as a business rule, read its producer.** ServiceD's
   `CalculateStatus` returns `Inactive` for ended AND not-yet-started rows, so "Inactive = left the
-  company" was wrong (PROJ-4389).
+  company" is wrong.
 - **A disabled option is not a gate when the form's default value IS that option.** Gate the
-  dependent control and the proceed condition too (PROJ-4389).
+  dependent control and the proceed condition too.
 
 Context management:
 - Create notes at `.dream-team/notes/<your-name>.md` when working in a team

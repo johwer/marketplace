@@ -24,7 +24,7 @@ tmux send-keys -t "$TICKET_ID" "cd \"$WORKTREE\"" Enter
 # Select the project's pinned Node (apps/web/.nvmrc) before starting Claude, so the
 # session and anything Claude spawns match the repo's version — not the nvm default.
 tmux send-keys -t "$TICKET_ID" 'source "${NVM_DIR:-$HOME/.nvm}/nvm.sh" >/dev/null 2>&1; [ -f apps/web/.nvmrc ] && nvm use "$(cat apps/web/.nvmrc)" >/dev/null 2>&1' Enter
-tmux send-keys -t "$TICKET_ID" "claude --dangerously-skip-permissions" Enter
+tmux send-keys -t "$TICKET_ID" "claude --permission-mode auto" Enter
 
 echo "Waiting for Claude to start..."
 sleep 8

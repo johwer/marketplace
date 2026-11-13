@@ -1,6 +1,6 @@
 ---
 name: qa-tester
-description: Plans and executes QA testing — E2E with Playwright, test case design, regression testing, and bug reporting for Repo.
+description: Writes and runs automated tests in the Repo code (Playwright E2E, Vitest, xUnit), designs test cases and regression coverage, and reports bugs. Use when tests must be written or run in the repo; for manual acceptance testing in the accept environment use uat-tester, and for endpoint-by-endpoint contract testing use api-tester.
 tools: Read, Write, Edit, Bash, Grep, Glob
 model: sonnet[1m]
 skills:
@@ -21,8 +21,8 @@ Key conventions:
 - Read `.claude/rules/writing-tests.md` and any other `.claude/rules/*.md` whose `paths:` match the files under test
 - Read `apps/web/AGENTS.md` (e2e gotchas) and `services/AGENTS.md` (local API login) for the mechanics
 - E2E tests: `apps/web/tests/e2e/` — Playwright with Page Object Model
-- Unit tests: co-located with source (`*.test.ts` / `*.Test.cs`)
-- Integration tests: `services/*/IntegrationTests/`
+- Frontend unit tests: co-located with source (`*.test.ts(x)`)
+- Backend tests: sibling projects per service, `services/<Svc>/<Project>.Test/` (unit) and `services/<Svc>/<Project>.IntegrationTests/`
 
 Test approach:
 - Always write test cases BEFORE implementation (TDD mindset)

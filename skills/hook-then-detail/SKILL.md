@@ -1,12 +1,6 @@
 ---
 name: hook-then-detail
-description: Turn a long technical writeup into a short, human-sounding "hook" (1-2 sentences in Slack/chat voice) plus a polished follow-up comment with the full detail. Use when posting to Slack, Jira, GitHub PRs, or any thread where the FIRST message decides whether anyone reads the rest. Triggers on phrases like "shorten this", "make this human", "Slack version of this", "post this as a hook", "hook + comment", "shorten and humanize", "turn this into a thread".
-autoTrigger:
-  - when user wants to post a long technical message to Slack/Jira/PR and asks to "shorten", "humanize", "make it punchy", or "make a hook"
-  - when user pastes a long writeup and asks for an attention-grabbing opener with the rest as a follow-up
-  - when user says "hook and detail", "tease then detail", "Slack version", "first line then comment"
-globs:
-  - "**/*"
+description: Turn a long technical writeup into a 1-2 sentence human "hook" in Slack/chat voice plus a follow-up comment with the full detail. Use when a writeup is headed for Slack, Jira or a PR thread where the first message decides whether anyone reads on, or when the user says "shorten this", "make this human", "Slack version", "make a hook" or "hook + comment".
 ---
 
 # Hook-Then-Detail — Lead With a Human Sentence, Park the Detail Below

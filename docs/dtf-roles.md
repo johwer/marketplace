@@ -364,7 +364,7 @@ All frontend + backend steps combined.
 
 ---
 
-## Agents (29 total)
+## Agents (24 total)
 
 Agents are organized by domain in `~/.claude/agents/`. Your role determines which agents are available — you don't spin up all of them, just the ones relevant to your work.
 
@@ -381,7 +381,6 @@ agents/
 ├── data/                 # Data & analytics
 │   ├── data-engineer.md
 │   ├── data-analyst.md
-│   ├── pipeline-builder.md
 │   └── insights-reporter.md
 ├── design/               # UX & UI
 │   ├── ui-designer.md
@@ -392,21 +391,17 @@ agents/
 │   └── security-auditor.md
 ├── marketing/            # Content & sales
 │   ├── marketing-ops.md
-│   ├── sales-enablement.md
-│   ├── content-creator.md
-│   └── social-strategist.md
+│   └── sales-enablement.md
 ├── operations/           # Support & customer
 │   ├── customer-ops.md
 │   └── support-responder.md
 ├── product/              # Product management
 │   ├── po-analyst.md
-│   ├── requirements-analyst.md
 │   └── sprint-prioritizer.md
 └── testing/              # QA & performance
     ├── qa-tester.md
     ├── uat-tester.md
-    ├── api-tester.md
-    └── performance-benchmarker.md
+    └── api-tester.md
 ```
 
 ### Which Agents Load per Role
@@ -416,14 +411,14 @@ agents/
 | **Frontend Dev** | `engineering/frontend-dev`, `architect`, `pr-reviewer`, `api-designer`, `design/ui-designer` |
 | **Backend Dev** | `engineering/backend-dev`, `architect`, `pr-reviewer`, `api-designer`, `migration-planner` |
 | **Fullstack Dev** | `engineering/*` (all 7) |
-| **Data Engineer** | `data/data-engineer`, `pipeline-builder`, `insights-reporter`, `architect` |
+| **Data Engineer** | `data/data-engineer`, `insights-reporter`, `architect` |
 | **Data Analyst** | `data/data-analyst`, `insights-reporter` |
 | **Infra / DevOps** | `infrastructure/*` (all 3) |
-| **QA / Tester** | `testing/qa-tester`, `api-tester`, `performance-benchmarker` |
+| **QA / Tester** | `testing/qa-tester`, `api-tester`, `engineering/performance-analyst` |
 | **UAT Stakeholder** | `testing/uat-tester` |
-| **Product Owner** | `product/*` (all 3) + `architect` |
+| **Product Owner** | `product/*` (all 2) + `architect` |
 | **Sales** | `marketing/sales-enablement`, `data/data-analyst`, `insights-reporter` |
-| **Marketing** | `marketing/marketing-ops`, `content-creator`, `social-strategist` |
+| **Marketing** | `marketing/marketing-ops` |
 | **Customer Ops** | `operations/*` (all 2) |
 
 Agents not in your role are still accessible — they just aren't loaded by default. You can always reference any agent explicitly.
@@ -696,7 +691,7 @@ Shared config (`company-config.json`) distributed by a team lead. Defines roles,
 
 ```
 ~/.claude/
-├── agents/                        # 29 agents, organized by domain
+├── agents/                        # 24 agents, organized by domain
 │   ├── engineering/               #   Core development (7)
 │   │   ├── frontend-dev.md
 │   │   ├── backend-dev.md
@@ -705,10 +700,9 @@ Shared config (`company-config.json`) distributed by a team lead. Defines roles,
 │   │   ├── api-designer.md
 │   │   ├── performance-analyst.md
 │   │   └── migration-planner.md
-│   ├── data/                      #   Data & analytics (4)
+│   ├── data/                      #   Data & analytics (3)
 │   │   ├── data-engineer.md
 │   │   ├── data-analyst.md
-│   │   ├── pipeline-builder.md
 │   │   └── insights-reporter.md
 │   ├── design/                    #   UX & UI (2)
 │   │   ├── ui-designer.md
@@ -717,23 +711,19 @@ Shared config (`company-config.json`) distributed by a team lead. Defines roles,
 │   │   ├── infra-engineer.md
 │   │   ├── ci-cd-engineer.md
 │   │   └── security-auditor.md
-│   ├── marketing/                 #   Content & sales (4)
+│   ├── marketing/                 #   Content & sales (2)
 │   │   ├── marketing-ops.md
-│   │   ├── sales-enablement.md
-│   │   ├── content-creator.md
-│   │   └── social-strategist.md
+│   │   └── sales-enablement.md
 │   ├── operations/                #   Support & customer (2)
 │   │   ├── customer-ops.md
 │   │   └── support-responder.md
-│   ├── product/                   #   Product management (3)
+│   ├── product/                   #   Product management (2)
 │   │   ├── po-analyst.md
-│   │   ├── requirements-analyst.md
 │   │   └── sprint-prioritizer.md
-│   └── testing/                   #   QA & performance (4)
+│   └── testing/                   #   QA & performance (3)
 │       ├── qa-tester.md
 │       ├── uat-tester.md
-│       ├── api-tester.md
-│       └── performance-benchmarker.md
+│       └── api-tester.md
 ├── skills/                        # Workflow guides (20+ skills)
 │   ├── backend-conventions/
 │   ├── content-workflows/

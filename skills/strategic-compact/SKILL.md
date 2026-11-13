@@ -1,11 +1,6 @@
 ---
 name: strategic-compact
-description: Proactive context management — suggests /compact at logical breakpoints to maintain quality in long sessions
-autoTrigger:
-  - when conversation is long and context usage is high
-  - when switching between major phases of work
-globs:
-  - "**/*"
+description: Proactive context management — suggests /compact at logical breakpoints to maintain quality in long sessions. Use when a long session reaches a phase boundary (research done, milestone reached, debugging finished) or switches between major phases of work.
 ---
 
 # Strategic Compaction
@@ -31,12 +26,7 @@ Long sessions degrade output quality as context fills up. This skill provides ru
 
 ## Context Usage Awareness
 
-Monitor your context usage. General guidelines:
-- **< 30%**: No action needed
-- **30-50%**: Be aware, start thinking about natural breakpoints
-- **50-70%**: Actively look for the next good breakpoint to compact
-- **> 70%**: Compact at the VERY NEXT good breakpoint — don't wait for a perfect one
-- **> 85%**: Compact NOW, even if the breakpoint isn't ideal. Quality degradation at this level is worse than losing some context.
+Auto-compaction fires at 50% (`CLAUDE_AUTOCOMPACT_PCT_OVERRIDE`), so the goal is to reach a good breakpoint before it does: in a long session, suggest /compact at the next breakpoint above rather than letting auto-compaction land mid-work.
 
 ## How to Compact Well
 

@@ -1,6 +1,6 @@
 ---
 name: story-points
-description: Estimate and set story points on Repo Jira tickets using the complexity-and-unknowns scale (1-4), where the number says how much is unresolved rather than how long it takes. Use when pointing a ticket or a batch of tickets, when asked to estimate, size or score work, during sprint planning or triage, or when a ticket needs its Story point estimate field set. Also covers writing the points to Jira, which acli cannot do.
+description: Estimate and set story points on Repo Jira tickets using the complexity-and-unknowns scale (1-4, where 4 signals a probable epic), where the number says how much is unresolved rather than how long it takes. Use when pointing a ticket or a batch of tickets, when asked to estimate, size or score work, during sprint planning or triage, or when a ticket needs its Story point estimate field set. Also covers writing the points to Jira, which acli cannot do.
 ---
 
 # Story points — complexity and unknowns, not time
@@ -14,7 +14,7 @@ from someone is a 2.
 | **1** | Just get going. Nothing to ask, nothing to decide — the work is understood end to end. | Put it in the sprint and work it. |
 | **2** | Relatively easy, but **something has to be asked** before or during. One open question, one measurement, one decision that belongs to someone else. | Sprint it, and name the question in `## Open questions` so it gets asked early rather than discovered late. |
 | **3** | Hard. Many unknowns, or it is really a **parent ticket that needs breaking down**. | A 3 is a signal, not a size. Break it down before committing to it; the children are usually 1s and 2s. |
-| **4** | Does not exist. Something this big is an **epic**, not a ticket. | Never set a 4. If the work looks like one, it is an epic and needs stories under it. |
+| **4** | Usually an **epic**: too big and unresolved to finish as one ticket. | A 4 is valid, and it is a signal: say it is probably an epic and offer to break it into stories. When there is no time to break it down before the sprint, set the 4 so the size is visible. |
 
 **A 3 is a finding.** Do not quietly point something a 3 and move on — say what would have to be
 answered or split for it to become 1s and 2s, and offer the breakdown. For a 3 the user owns, the
@@ -45,7 +45,15 @@ Estimate against what is actually true, not what the ticket says:
 ## Writing points to Jira
 
 `acli jira workitem edit` cannot set story points — it has no flag for custom fields, and its
-`--assignee` path fails with "unexpected error" as well. Use the Atlassian Rovo MCP:
+`--assignee` path fails with "unexpected error" as well. Use the script:
+
+```bash
+bash ~/.claude/scripts/jira-set-field.sh <TICKET_ID> customfield_10437 2
+```
+
+It handles the ACLI OAuth token from the macOS keychain and the cloud id, and its header
+documents the known field ids. Loop it for a batch. If the script is unavailable, the Atlassian
+MCP call is:
 
 ```
 editJiraIssue(
@@ -66,12 +74,4 @@ kopplas till en sprint" and it follows its parent instead. Set the parent's spri
 land there. A PUT that mixes the sprint field with others fails as a whole, so set the assignee
 in its own call rather than losing it to the sprint rejection.
 
-**There is already a script for this — use it rather than hand-rolling curl:**
-
-```bash
-bash ~/.claude/scripts/jira-set-field.sh <TICKET_ID> customfield_10437 2
-```
-
-It handles the ACLI OAuth token from the macOS keychain and the cloud id, and its header
-documents the known field ids. Loop it for a batch. Reach for the REST API directly only for
-something the script does not cover.
+Reach for the REST API directly only for something neither covers.

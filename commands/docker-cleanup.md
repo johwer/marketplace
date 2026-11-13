@@ -32,7 +32,7 @@ Flags (passed straight to the script):
 
 ## Safety model
 
-1. **Never pass `--volumes` without the user explicitly requesting it.** Dev DB data is persistent and hard to recreate.
+1. **Never delete a named volume.** Dev DB data is persistent and hard to recreate. The script only removes orphaned anonymous volumes; never run `docker volume prune` or `docker compose down -v` by hand.
 2. **Active worktree protection** — enumerate `git worktree list` in `~/Documents/Repo`. For each ticket worktree, its `repo-<ticket-lowercase>-*-wt` images/containers belong to that worktree. If the worktree's compose stack is **up**, those images are automatically protected by `docker image prune` (they're in use). If it's **down**, they'd be eligible for `-a` pruning — **warn the user** before aggressive mode.
 3. **Running Repo services are always safe** — `docker image prune` (with or without `-a`) never removes images in use by running containers.
 4. **Never stop running containers.** This command only removes already-stopped containers.
@@ -95,7 +95,7 @@ Wire this via `/schedule` (e.g. daily) or call `--auto` from `docker-health-chec
 ## Important rules
 
 - **Default is conservative.** Only remove unused images / full build cache when the user passes `--aggressive`.
-- **Never prune volumes by default.** Requires explicit `--volumes` flag AND user confirmation after showing what would be removed.
+- **Named volumes are never removed.** The default sweep only touches orphaned anonymous volumes; pass `--no-volumes` to skip even that.
 - **Never stop running containers.** If the user wants to reclaim space from a running worktree, direct them to `/workspace-cleanup`.
 - **Always show the active worktree list first** so the user sees what's at risk before destructive action.
 - If `--aggressive` is combined with any worktree whose stack is down, warn explicitly and require confirmation.

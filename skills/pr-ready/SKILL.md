@@ -32,7 +32,7 @@ it will scroll and the reader who doesn't is unaffected.
 SHAPE=$(bash ~/.claude/scripts/pr-body-shape.sh)   # template | dtf; non-zero exit → stop, don't guess
 ```
 
-### `template` — the repo's template has `## Summary` and `## Agent` (Repo since #4470)
+### `template` — the repo's template has `## Summary` and `## Agent` (Repo)
 
 AGENTS.md says to follow `.github/pull_request_template.md`, so the body uses its headings. The
 DTF sections still exist; they live under the template's headings:
@@ -98,8 +98,7 @@ Not covered: <one line>. Follow-up: PROJ-XXXX.
 ```
 
 **Image captions DO count toward the budget** — `pr-body-gate.sh` strips image markup, not the
-prose a human reads (four recurrences: PROJ-4179, PROJ-4013, PROJ-4421, PROJ-4423, each a refused
-gate round). Budget ~10 words per caption, one line each, and count them before the first gate run.
+prose a human reads. Budget ~10 words per caption, one line each, and count them before the first gate run.
 Anything inside `<details>` does not count.
 
 ## Keep, move, drop
@@ -146,7 +145,7 @@ where it did), it just stops costing 400 words above the fold.
 > Read the rule above as: **an open `## Decisions` means you are not ready yet.** Resolve the gate,
 > move the decision to the notes comment as one line, then go ready. Do not edit the gate's pattern,
 > and do not silently delete an unresolved question to get past the refusal — that is the one
-> failure mode this whole section exists to prevent (PROJ-3217).
+> failure mode this whole section exists to prevent.
 
 ## SignedIn: the template checklist ends the body
 
@@ -280,17 +279,17 @@ does — the reader cannot tell which mode wrote it, so neither can the gate.
    still writing. This runs once, at ready.
 7. **A stale browser tab saves the old body back.** If the user will drag screenshots in after
    this runs, tell them to reload the PR page first; an edit from a tab opened before the rewrite
-   overwrites the shrunk body with the long one (PROJ-4351, #3941).
+   overwrites the shrunk body with the long one.
 8. **`gh` from a non-git directory returns an empty body.** Run from the scratchpad and `gh pr view`
    prints an error to stderr and nothing to stdout, so a rewrite pipeline builds the new body from
    "". Always pass `-R <owner>/<repo>` when not inside the repo, and refuse to write a body that
-   lost its images (PROJ-4421).
+   lost its images.
 9. **A reviewer asks for a section whose heading is banned.** "Please add an Architecture section"
    puts `## Architecture` in the body and the gate refuses it. Before writing it, offer the nearest
    allowed home: scope and key files go in `## Scope` (`template`: `## Considerations`), design detail in the notes comment. Say so
-   in the reply to the reviewer up front rather than discovering it on the gate run (PROJ-4472).
+   in the reply to the reviewer up front rather than discovering it on the gate run.
 10. **`pr-body-gate.sh` run from the scratchpad** refuses with "cannot determine the repo" (same
-   family as 8). Run it from the worktree (PROJ-4752).
+   family as 8). Run it from the worktree.
 
 ## Related
 

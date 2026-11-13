@@ -1,13 +1,6 @@
 ---
 name: improve-codebase-architecture
-description: Audit a service or module for agent-friendliness — identify confusing boundaries, tightly coupled code, and shallow modules that make AI implementation harder and less reliable
-autoTrigger:
-  - when user says "improve architecture" or "refactor for agents"
-  - when user asks to audit a service for testability or maintainability
-globs:
-  - "**/*.ts"
-  - "**/*.tsx"
-  - "**/*.cs"
+description: Audit a service or module for agent-friendliness — confusing boundaries, tight coupling and shallow modules that make AI implementation harder. Use when the user says "improve architecture" or "refactor for agents", or asks to audit a service for testability or maintainability.
 ---
 
 # Improve Codebase Architecture
@@ -39,7 +32,7 @@ Read the directory structure and key files to understand what exists:
 find apps/web/src/<area> -type f | head -60
 
 # Backend
-find services/<Service>/<Service>/ -type f -name "*.cs" | head -60
+find services/<Domain>/<Project>/ -type f -name "*.cs" | head -60   # e.g. services/ServiceA/ServiceA.API
 ```
 
 For each module/file, note:
@@ -151,7 +144,7 @@ For approved refactors:
 cd apps/web && npm run type-check && npm run test
 
 # Backend
-cd services/<Service>/<Service>.Test && dotnet test
+cd services/<Domain>/<Project>.Test && dotnet test
 ```
 
 No new test failures. No new type errors.

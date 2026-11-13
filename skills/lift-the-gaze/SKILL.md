@@ -1,6 +1,6 @@
 ---
 name: lift-the-gaze
-description: Lift the gaze before writing backend code — find the highest place a decision can live (product scope, contract, retailer, feature flag, ServiceC permission, endpoint) so the layers below never have to handle it; then ball 2-3 architectural options with the user, spell out each one's consequences, and check that what remains lands in the right backend layer (Controller → Service → Domain/Repository, DTO vs entity). Teaching mode, not a gate. Use when a ticket or plan asks "which controller/service/repository do we change", when a feature is only for one retailer or behind a flag, when the user says "lyft blicken", "bolla alternativ", "var ska det här ligga", "vilket lager", "why do we need a DTO", or wants to understand the backend architecture of a change. Also for a PR review with "lyft blicken" (Step 0.7: the shared mechanisms and decisions the PR passes through).
+description: 'Lift the gaze before writing backend code: find the highest place a decision can live (scope, contract, retailer, feature flag, ServiceC permission, endpoint), ball 2-3 options with their consequences, and check that what remains lands in the right backend layer. Teaching mode, not a gate. Use when a plan asks which controller/service/repository to change, when a feature is retailer- or flag-scoped, for a PR review with "lyft blicken", or when the user says "lyft blicken", "bolla alternativ", "var ska det här ligga", "vilket lager" or "why do we need a DTO".'
 user_invocable: true
 ---
 
@@ -85,7 +85,7 @@ Before choosing *where* a decision lives, name *what kind* of problem it is. Tur
 | Reads or writes | Is the load lopsided? | Replicas via events (the owning service enriches), Dapper for heavy reads, cache only with invalidation ([CACHE-INVALIDATION]). Writes through a worker were rejected (2025-08-18) |
 | Operational simplicity | Are we solving a problem we don't have? | Existing mechanism first; something new needs taste, judgment and consensus (2026-10-16, [NECESSITY]). Fewer, bigger services is the direction (ServiceC merged 2025-01) |
 
-**Measure, don't guess (data or logic lens).** For a performance or "it's slow / it fails" question, fetch numbers before proposing anything. The Elastic MCP tools (`mcp__claude_ai_Elastic_mh-accept__*`, load them via ToolSearch) read the **accept** environment:
+**Measure, don't guess (data or logic lens).** For a performance or "it's slow / it fails" question, fetch numbers before proposing anything. The Elastic MCP tools (`mcp__claude_ai_elastic-proj-accept__*` for Nova, `mcp__claude_ai_elastic-signedin-accept__*` for legacy; load them via ToolSearch) read the **accept** environment:
 
 1. `observability_get_services` (start `now-24h`): find the service. Only the APIs and `service-c-sync-worker` have APM traces (service-a-api, service-c-api, service-d-api, service-b-api); service-e-api, billing-api and the workers show up in logs only.
 2. `observability_get_trace_metrics` with `kqlFilter: 'service.name: "service-a-api"'`, `groupBy: "transaction.name"`, `latencyType: "p95"`: which endpoint is slow or failing.
@@ -114,8 +114,6 @@ Then continue with Step 1 for what the PR decides (is the flag the right rung?),
 
 **Writing the review:** suggestions, not questions; addressed to the author ("you", and check whose PR it is); no praise; say up front whether anything blocks. Show the user the text first; it goes out through `review-pr`. When lifting the gaze lands on the placement the PR already implemented, explain that only to the user; it never goes in the posted review. Post a point only when it asks the author to change or know something (a better placement, a decision checked too low, a duplicated concept, a boundary leak).
 
-**Tested 2026-10-27 on PR #4205 (PROJ-4548, PKCE login),** blind at the pre-fix commit, against the human review. Without this step the skill found the missing ServiceC log, the analytics flow tag and the WebView reason, but only noted the loosened docstring. With it, point 2 traced the docstring to PROJ-4622's "never in storage" decision, and point 3 proposed the fix the author shipped: carry the attempt id in `state` like the implicit flow, with one shared encoder. The blind run also misjudged one trade-off the PR body already stated, which is why the body comes first.
-
 ## Step 1 — The altitude ladder
 
 Walk this ladder top-down and stop at the **highest rung that can carry the decision**. Every rung you can stop at higher up deletes branches in every rung below.
@@ -134,7 +132,7 @@ Walk this ladder top-down and stop at the **highest rung that can carry the deci
 
 For the chosen rung, list concretely **what code you no longer need lower down** ("no null-handling for companies without the contract in the export mapper", "no retailer branch in `XService`"). That list is the payoff — show it.
 
-### The four traps of a high gate (always check)
+### The traps of a high gate (always check)
 
 - **A frontend gate is UX, not security.** Hiding a menu with a PostHog flag or `SettingsMap` does not stop `curl`. If the data is sensitive, the endpoint still needs rung 4/5. Real example: `services/ServiceD/ServiceD.API/Controllers/SupportController.cs` — for non-RetailerB retailers the page is gated in the frontend only, so the endpoint asks for nothing beyond a signed-in user. That was a deliberate choice; make it deliberate every time.
 - **A flag is temporary.** When the flag is removed, everyone gets the code. Either the lower code is correct for everyone by then, or the flag must become a contract/permission (a permanent rung). Ask: "What happens the day this flag is deleted?"

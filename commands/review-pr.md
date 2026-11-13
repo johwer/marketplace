@@ -199,6 +199,9 @@ Include build/type/lint/test results in the review — any failures become **MUS
 
 ### Step 6: Review the Code
 
+**Security gate (every mode, before the review):** run `bash ~/.claude/scripts/security-relevant.sh origin/<base> <PR head>` in a checkout of the PR (in the cloud routine: `<dtf-skills>/scripts/security-relevant.sh`). On `SECURITY: yes`, or when the script fails, also run the repo's `.claude/skills/security-review` on the PR diff (head vs. base, not the current branch) with the script's hits as starting points, and merge its surviving findings as MUST FIX. On `SECURITY: no`, the security checks below are enough. Put the script's first line in the Step 7 summary.
+
+
 **If `--deep` flag is NOT set**, do a standard single-pass review (the default — fast and token-efficient):
 
 For each file's diff, check for:

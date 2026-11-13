@@ -1,11 +1,6 @@
 ---
 name: request-refactor-plan
-description: Create a detailed refactor plan with tiny commits via user interview, then file it as a Jira ticket. Use when planning a refactor, creating a refactoring RFC, or breaking a refactor into safe incremental steps.
-autoTrigger:
-  - when user wants to plan a refactor
-  - when user mentions "refactor plan", "RFC", or "safe incremental steps"
-globs:
-  - "**/*"
+description: Create a detailed refactor plan with tiny commits via user interview, then file it as a Jira ticket. Use when planning a refactor, when the user mentions a "refactor plan" or a refactoring RFC, or breaking a refactor into safe incremental steps.
 ---
 
 # Request Refactor Plan

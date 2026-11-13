@@ -36,12 +36,12 @@ Parse the arguments to determine what to do:
 Fetch open tickets assigned to the current user:
 
 ```bash
-acli jira workitem search --jql "project = PLRS AND assignee = currentUser() AND status not in (Done) ORDER BY priority DESC" --fields "key,summary,status,story_points" --json
+acli jira workitem search --jql "project in (NOVA, PLRS) AND assignee = currentUser() AND status not in (Done) ORDER BY priority DESC" --fields "key,summary,status,story_points" --json
 ```
 
 ### `sprint` — Scout next sprint (unassigned included)
 ```bash
-acli jira workitem search --jql "project = PLRS AND sprint in openSprints() AND status not in (Done) ORDER BY priority DESC" --fields "key,summary,status,assignee,story_points" --json
+acli jira workitem search --jql "project in (NOVA, PLRS) AND sprint in openSprints() AND status not in (Done) ORDER BY priority DESC" --fields "key,summary,status,assignee,story_points" --json
 ```
 
 ### `<TICKET-ID>` — Scout a single ticket

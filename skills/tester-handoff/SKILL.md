@@ -1,12 +1,6 @@
 ---
 name: tester-handoff
-description: Generate a non-developer-friendly test guide for a PR or Jira ticket. Outputs a structured text file with self-testable visual checks, developer-required dev-tools checks, and non-testable items. Each scenario has a plain-language explanation, a clickable URL into the QA/accept environment, step-by-step instructions, expected behavior, and "what could be wrong". Use when handing off a PR to QA, writing test scenarios for a tester, preparing UAT instructions, or creating a local "how to test" document. Never posts it anywhere. Pulls QA environment URL + test user + customer ID from `~/.claude/dtf-config.json` (`qaEnvironment` section).
-autoTrigger:
-  - when user asks to write a test guide, tester handoff, QA handoff, or "how to test" doc
-  - when user wants to give a non-developer tester clear test instructions for a PR
-  - when user mentions sending test instructions to QA / a tester
-globs:
-  - "**/*"
+description: Generate a plain-language test guide for a non-developer tester from a PR or Jira ticket, as a local text file that is never posted. Covers self-testable checks, dev-tools checks and non-testable items, each with an accept-environment URL, steps and expected behaviour. Use when handing a PR to QA, writing test scenarios or UAT instructions for a tester, or when the user asks for a "how to test" doc.
 ---
 
 # Tester Handoff — Non-Developer Test Guide Generator
@@ -110,7 +104,7 @@ Read `~/.claude/dtf-config.json`. Look for a `qaEnvironment` block:
 }
 ```
 
-**Do NOT prompt the user mid-flow.** This skill is typically invoked automatically by DTF — interrupting with config questions breaks the flow.
+**Do NOT prompt the user mid-flow.** The user asked for a guide, not a setup interview; take defaults from config and mark gaps as placeholders.
 
 If the block is missing or incomplete:
 - Fill missing fields with `<TODO: set in ~/.claude/dtf-config.json qaEnvironment.<field>>` placeholders in URLs

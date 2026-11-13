@@ -1,7 +1,9 @@
 ---
 name: backend-performance
-description: Backend/.NET performance optimization — EF Core queries, API response times, caching, database tuning, memory profiling
+description: Backend/.NET performance optimization — EF Core queries, API response times, caching, database tuning, memory profiling. Use when an endpoint, query or worker is slow or a change needs a performance check.
 ---
+
+For Repo, `dotnet-backend-review` overrides this checklist (projections over `Include`s, no Polly/resilience in a feature PR, cache only with invalidation and measured first), and `lift-the-gaze` "Measure, don't guess" comes first. The database is Postgres.
 
 ## Performance Targets
 

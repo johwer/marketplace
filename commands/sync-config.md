@@ -1,6 +1,6 @@
 # Sync Config — Push Claude Configuration to GitHub
 
-Sync all Claude configuration files (commands, scripts, skills, settings) to the `~/Privat/shared-claude-files` git repo and push to GitHub.
+Sync Claude configuration files to the repos `scripts/sync-config.sh` lists in its header (a private marketplace, a sanitized public marketplace, and the public `dream-team-flow` repo) and push to GitHub.
 
 ## Workflow
 
@@ -21,4 +21,4 @@ If the script reports no changes, tell the user everything is already in sync.
 
 ## Adding New Files to Track
 
-If the user wants to track additional files, edit the `TRACKED_FILES` or `TRACKED_DIRS` arrays in `~/.claude/scripts/sync-config.sh`.
+If the user wants to track additional files, edit the `PLUGIN_FILES` or `PLUGIN_DIRS` arrays in `~/.claude/scripts/sync-config.sh`.

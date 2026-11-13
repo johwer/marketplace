@@ -1,6 +1,6 @@
 ---
 name: frontend-conventions
-description: Frontend coding conventions for the Repo monorepo
+description: Repo frontend conventions not in the repo docs (i18n, tab state, RTK enhanced files, Cosmos fixtures, dates via utils/date.ts, dependency bumps). Use when writing or reviewing code in apps/web.
 ---
 
 ## Loading Conventions
@@ -37,7 +37,7 @@ These patterns come from team experience and are not in the project-level skills
 - Use `/generate-api` to regenerate from backend Swagger specs.
 
 ### Cosmos Fixtures
-- **New or meaningfully-changed visual components should get a Cosmos fixture** in `apps/web/src/fixtures/RetailerBranded/` (`react-cosmos` 7.3.0; run with `npm run cosmos`).
+- **New or meaningfully-changed visual components should get a Cosmos fixture** in `apps/web/src/fixtures/RetailerBranded/` (run with `npm run cosmos`).
 - Follow the nearest sibling as a template (e.g. a new `DocumentationNoteRow` mirrors the existing `EmployeeDocumentRow.fixture.tsx`). If an analogous component is already fixtured, the new one should be too.
 - Fixtures give an isolated render, so they're also the cheapest way to produce visual proof when the full flow can't run locally (no backend, blocked click-through).
 

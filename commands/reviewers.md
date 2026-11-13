@@ -1,6 +1,6 @@
 # Reviewers — Manage PR Reviewer Assignments
 
-Manage pre-configured GitHub reviewers per category. These are auto-assigned when Dream Team PRs are marked ready for human review.
+Manage pre-configured GitHub reviewers per category, for adding extra reviewers on request. CODEOWNERS assigns the default reviewers when a PR goes ready; this list is opt-in on top of that.
 
 ## Input
 
@@ -67,15 +67,7 @@ Read `~/.claude/reviewers.json` and display all categories with their reviewers:
 
 ## How It's Used
 
-The Dream Team (`/my-dream-team`) reads this config in **Phase 6** when the user explicitly confirms the PR is ready. Reviewers are **never auto-assigned** — the user must say "Done — assign reviewers & ship it" first. It maps the ticket's scope to a category:
-
-- `frontend-only` → `frontend`
-- `backend-only` → `backend`
-- `full-stack` → `fullstack`
-- `infra-only` → `infra`
-- `data` → `data`
-
-Then assigns all reviewers in that category via `gh pr edit --add-reviewer`.
+`/my-dream-team` does not assign from this file: `.github/CODEOWNERS` requests reviewers when the PR goes ready. Use this list only when the user asks for extra or specific reviewers; then add that category's reviewers with `gh pr edit --add-reviewer`.
 
 See `~/.claude/docs/dev-workflow-checklist.md` Section 4 for the full PR lifecycle.
 

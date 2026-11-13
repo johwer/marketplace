@@ -22,10 +22,10 @@ WORKTREE_PARENT="${DTF_WORKTREE_PARENT:-$HOME/Documents}"
 WORKTREE="$WORKTREE_PARENT/$TICKET_ID"
 if [ -d "$WORKTREE" ]; then
   # Find node processes whose cwd is inside this worktree
-  PIDS=$(pgrep -f "node.*$WORKTREE" 2>/dev/null || true)
+  PIDS=$(pgrep -f "node.*${WORKTREE}(/| |$)" 2>/dev/null || true)
   if [ -z "$PIDS" ]; then
     # Fallback: check lsof for listening node processes in this worktree
-    PIDS=$(lsof -i -P 2>/dev/null | grep node | grep LISTEN | grep "$WORKTREE" | awk '{print $2}' | sort -u || true)
+    PIDS=$(lsof -i -P 2>/dev/null | grep node | grep LISTEN | grep -E "${WORKTREE}(/| |$)" | awk '{print $2}' | sort -u || true)
   fi
   if [ -n "$PIDS" ]; then
     echo "Stopping dev server(s): $PIDS"

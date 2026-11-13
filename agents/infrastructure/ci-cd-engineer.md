@@ -26,8 +26,8 @@ GitHub Actions patterns:
 - Conditional steps based on changed files
 
 Deployment safety:
-- Always deploy to staging first
-- Require manual approval for production
+- In the Repo monorepo a push to `main` deploys to prod (`deploy-main.yml`, plus `deploy-mh-accept.yml`); `deploy-*-prod.yml` are `workflow_dispatch` extras. There is no staging gate to rely on: changes must be releasable on merge (feature flags, additive-first).
+- Read `.github/workflows/README.md` and the workflow itself before proposing a gate that may not exist
 - Automated rollback on health check failure
 - Separate notification channels per environment
 - Immutable artifacts (never re-deploy the same tag with different code)

@@ -34,14 +34,14 @@ get_role_agents() {
     frontend-dev)  echo "engineering/frontend-dev engineering/architect engineering/pr-reviewer engineering/api-designer design/ui-designer" ;;
     backend-dev)   echo "engineering/backend-dev engineering/architect engineering/pr-reviewer engineering/api-designer engineering/migration-planner" ;;
     fullstack-dev) echo "engineering/frontend-dev engineering/backend-dev engineering/architect engineering/pr-reviewer engineering/api-designer engineering/performance-analyst engineering/migration-planner" ;;
-    data-engineer) echo "data/data-engineer data/pipeline-builder data/insights-reporter engineering/architect" ;;
+    data-engineer) echo "data/data-engineer data/insights-reporter engineering/architect" ;;
     data-analyst)  echo "data/data-analyst data/insights-reporter" ;;
     infra)         echo "infrastructure/infra-engineer infrastructure/ci-cd-engineer infrastructure/security-auditor" ;;
-    tester)        echo "testing/qa-tester testing/api-tester testing/performance-benchmarker" ;;
+    tester)        echo "testing/qa-tester testing/api-tester" ;;
     uat-tester)    echo "testing/uat-tester" ;;
-    po)            echo "product/po-analyst product/requirements-analyst product/sprint-prioritizer engineering/architect" ;;
+    po)            echo "product/po-analyst product/sprint-prioritizer engineering/architect" ;;
     sales)         echo "marketing/sales-enablement data/data-analyst data/insights-reporter" ;;
-    marketing)     echo "marketing/marketing-ops marketing/content-creator marketing/social-strategist" ;;
+    marketing)     echo "marketing/marketing-ops" ;;
     customer-ops)  echo "operations/customer-ops operations/support-responder" ;;
     *)             echo "" ;;
   esac

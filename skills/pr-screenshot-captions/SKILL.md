@@ -1,12 +1,6 @@
 ---
 name: pr-screenshot-captions
-description: Caption screenshots that have been uploaded to a GitHub PR description — group them into before/after pairs by step/feature, add a short caption under each explaining what it shows and what it proves, add spacing between them, drop broken/error captures, and collapse intermediate/exploration shots. Verifies each image against the local source files (never captions from filenames alone) and uses a re-fetch-before-write flow to avoid clobbering concurrent edits. Use when a PR has raw uploaded screenshots that need before/after captions, a "Visual Verification Evidence" section, or descriptions added. Also holds the capture rules (market locale, scroll to the change, mobile only for employee flows, save to ~/Downloads, check each shot) for when PR screenshots are being taken.
-autoTrigger:
-  - when the user says they added pictures/screenshots to a PR and wants captions / before-after / descriptions / spacing
-  - when asked to add a visual verification section to a PR from uploaded images
-  - when asked to label, caption, or organize PR screenshots
-globs:
-  - "**/*"
+description: Caption screenshots uploaded to a GitHub PR as before/after pairs under Visual verification, checked against the local source files, plus the rules for taking PR screenshots. Use when a PR has raw uploaded images that need captions, grouping or a visual verification section, or when screenshots for a PR are about to be captured.
 ---
 
 # PR Screenshot Captions — before/after + descriptions

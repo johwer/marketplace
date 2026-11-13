@@ -79,7 +79,7 @@ Applies to all tickets that add or modify user-facing text.
 
 ### Rules
 
-- Use **bare `t("key")` only** — NEVER use `defaultValue`
+- Use bare `t("key")` in production code. `defaultValue` only as the repo's `docs/INTERNATIONALIZATION.md` allows it: a dev placeholder removed once real translations land, or a permanent fallback for computed keys (permission translations)
 - Before creating new keys, **grep the codebase** for existing keys to avoid duplicates and casing mismatches (e.g., `common_logout` not `common_logOut`)
 - Key naming pattern: `{page}_{section}_{element}` (e.g., `employeeCard_service-aForm_submitButton`)
 - Dynamic keys: add pattern to `scripts/lokalise_whitelist.json`
@@ -189,7 +189,7 @@ In the Repo repo, invoke `/writing-tests` before adding or changing what any tes
 
 ### Empty State Tests
 
-When writing tests for endpoints or UI that read/write data, always include a test case for **empty state** (no existing records). If the endpoint creates or updates, test both:
+When `/writing-tests` says a test for an endpoint or UI that reads/writes data belongs, cover the **empty state** (no existing records) in it. If the endpoint creates or updates, cover both:
 - Entity exists → update
 - Entity **doesn't exist** → create or handle gracefully (not 400/500)
 
@@ -369,12 +369,6 @@ Long sessions degrade output quality. Follow these rules:
 - While debugging — need error context and hypotheses
 - Between related file edits — finish all dependent files first
 
-**Context thresholds:**
-- < 30%: No action needed
-- 50-70%: Look for the next good breakpoint
-- \> 70%: Compact at the VERY NEXT good breakpoint
-- \> 85%: Compact NOW — quality degradation is worse than losing context
-
 ### Context Modes
 
 Switch mindset based on current activity:
@@ -412,7 +406,7 @@ apps/web/src/.../<Component>.fixture.tsx
 | Visual-verification screenshot | `~/Downloads/<TICKET_ID>/` | `<state>.png` | `changelog-external-receivers.png` |
 | Walkthrough video (flow changes) | `~/Downloads/<TICKET_ID>/` | `walkthrough-<flow>.webm` | `walkthrough-slide-focus.webm` |
 | Cosmos fixture (new component) | next to the component | `<Component>.fixture.tsx` | `Callout.fixture.tsx` |
-| Jira attachments | `~/Downloads/` | Original filename from Jira | `image-20260227-140735.png` |
+| Jira attachments | `~/Downloads/<TICKET_ID>/` | Original filename from Jira | `image-20260227-140735.png` |
 
 ### Download Location
 
@@ -422,9 +416,8 @@ apps/web/src/.../<Component>.fixture.tsx
 
 ### Jira Attachments
 
-- **Never use curl/wget** for Jira attachments (401 Unauthorized)
-- Open in Chrome for authenticated download: `open -a "Google Chrome" "<URL>"`
-- Or navigate to the ticket page in Chrome, click the attachment, and use the download button
+- `bash ~/.claude/scripts/jira-download-attachments.sh <TICKET_ID> [OUTPUT_DIR]` downloads via the API with the ACLI OAuth token (default `~/Downloads/<TICKET_ID>/`)
+- A plain unauthenticated curl/wget gets 401. If the script exits 2 (no token, or every download failed), open the attachment in Chrome: `open -a "Google Chrome" "<URL>"`
 
 ---
 

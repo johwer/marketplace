@@ -1,11 +1,11 @@
 ---
 name: backend-conventions
-description: Backend coding conventions for the Repo monorepo
+description: Repo backend conventions not in the repo docs (JSONB naming, seeds, enum-removal migrations, Rebus handlers, the four security rules). Use when writing or reviewing C# in services/ or shared/.
 ---
 
 ## Loading Conventions
 
-Nothing loads these docs automatically: the repo has no `.claude/skills/backend-conventions.md` (checked 2026-11-04). What does load by path since #4470 is `.claude/rules/*.md`: `ef-migrations.md`, `service-c-permissions.md` and `writing-tests.md`. Comments follow root `AGENTS.md#comments` (analyzer `MH0001` fails the build on comments in member bodies), and `/writing-tests` gates every test change. The `backend-skill-reminder.sh` hook nudges once per session when C# under `services/` or `shared/` is edited. Read these files directly:
+Nothing loads these docs automatically: the repo has no `.claude/skills/backend-conventions.md`. What does load by path is `.claude/rules/*.md`: `ef-migrations.md`, `generated-api-clients.md`, `service-c-permissions.md` and `writing-tests.md`. Comments follow root `AGENTS.md#comments` (analyzer `MH0001` fails the build on comments in member bodies), and `/writing-tests` gates every test change. The `backend-skill-reminder.sh` hook nudges once per session when C# under `services/` or `shared/` is edited. Read these files directly:
 - `docs/CODING_STYLE_BACKEND.md`
 - `docs/API_CONVENTIONS.md`
 - `docs/TESTING_GUIDELINES_BACKEND.md`
@@ -39,11 +39,11 @@ These patterns come from team experience and are not in the project-level skills
 
 ### API Generation
 - After changing backend endpoints, regenerate frontend types: `/generate-api`
-- Never run `npx @rtk-query/codegen-openapi` directly — use `npm run generate:api:{service}` from `apps/web/src/api/`.
+- Never run `npx @rtk-query/codegen-openapi` directly — use `npm run generate:api:{service}` from `apps/web` (or `apps/mobile`).
 
 ### Security — four rules that get flagged in review
 
-These are recurring backend security defects, not style preferences. They are **not** in any repo doc: PROJ-3219 attempted to add them to `docs/CODING_STYLE_BACKEND.md` and the additions were removed (always-loaded context files shouldn't carry this specificity). Re-homing to a repo-resident on-demand skill is tracked in **PROJ-3433**. Until that lands, this is the written home — so apply them before opening a PR rather than discovering them in review.
+These are recurring backend security defects, not style preferences, and no repo doc carries them. Apply them before opening a PR rather than discovering them in review.
 
 **1. HTML-encode user-controlled values before email-template substitution.**
 Values like Department or tag names must pass through `HtmlEncode()` before substitution into an email template, or you have HTML injection.

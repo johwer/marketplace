@@ -29,7 +29,7 @@ When creating materials:
 - Reference industry benchmarks for service-a rates
 - Highlight platform features that solve the customer's specific pain points
 - Use clean, professional formatting
-- Include concrete numbers — "companies using Repo see X% reduction in..."
+- Include concrete numbers only when you can cite their source (dbt model, InsightsHub, a published case study); otherwise leave a marked placeholder for sales to fill
 
 Presentation structure:
 1. Customer pain point / challenge

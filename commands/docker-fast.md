@@ -1,10 +1,10 @@
 # Docker Fast — Start/Restart the Repo Stack Without the OOM
 
-Bring the Repo docker stack up **fast and safely**, avoiding the full-stack parallel rebuild that OOMs Docker Desktop (exit 137) and triggers the R1 EF-migration zombie. Encodes the daily-workflow recommendations from **PROJ-1613 (PROJ-1613 "Make docker fast again")** — whose Dockerfile-level wins (NuGet cache mount + publish-only) are *already merged*; this command adds the two missing pieces (parallel cap + service "categories") at the **orchestration layer only — no repo files are edited, nothing is created on disk**.
+Bring the Repo docker stack up **fast and safely**, avoiding the full-stack parallel rebuild that OOMs Docker Desktop (exit 137) and leaves an EF-migrating API stuck at 100% CPU. This command works at the orchestration layer only (parallel cap, bake, service groups): it edits no repo files and creates nothing on disk.
 
 ## The core rule (why this exists)
 
-**NEVER run `docker compose up -d --build` with no service args.** That rebuilds all ~12 .NET services in parallel (6–12 GB RAM → SIGKILL) and races concurrent EF migrations (R1 zombie at 100% CPU). Instead: keep infra + already-built images running, and only `--build` the specific service(s) you changed, with `COMPOSE_PARALLEL_LIMIT` capped.
+**Never run an unbounded parallel build of the whole stack** (`docker compose up -d --build` with no service list, no bake, no `COMPOSE_PARALLEL_LIMIT`). It rebuilds every .NET service at once (6–12 GB RAM → SIGKILL) and races concurrent EF migrations, leaving an API at 100% CPU. Build the whole backend only through the `rebuild` mode (bake + parallel cap); otherwise `--build` only the service(s) you changed.
 
 ## Input
 
@@ -120,7 +120,7 @@ sleep 15
 docker compose ps --format 'table {{.Name}}\t{{.Status}}'
 # fail signals:
 docker compose ps -a --format '{{.Name}}\t{{.Status}}' | grep -iE 'exit|unhealthy|restarting' | grep -v localstack-init
-# zombie check (R1):
+# zombie check:
 docker stats --no-stream --format '{{.Name}}\t{{.CPUPerc}}' | sort -t$'\t' -k2 -rn | head -5
 ```
 Report: running count, any exited/unhealthy (empty = good — `localstack-init` exiting 0 is normal), and top CPU (flag anything pegged near 100%).
@@ -142,7 +142,7 @@ Inside a worktree (`~/Documents/<TICKET>`), the stack runs under a per-slot comp
 | Tear down a **worktree** (git/tmux/vite) | `/workspace-cleanup` |
 
 ## Hard rules
-- Never `up -d --build` without explicit service args. Never build the whole stack.
+- Never `up -d --build` without an explicit service list and the parallel cap; the whole backend is built only via `rebuild`.
 - Never `-v` on `down` (would wipe dev DB volumes).
 - Default excludes `web-app`/`nginx` (prod frontend) — only with `--web`.
 - Always export `COMPOSE_PARALLEL_LIMIT` (default 4) before any build.

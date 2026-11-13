@@ -46,6 +46,7 @@ tech-lead lens, or the `pr-reviewer` subagent — **plus `/hard-simplify` always
 ✓ PHASE 4 COMPLETE (review pass)
   rc:       <reviewing-changes: N rounds, M fixed, K asked / "n/a — branch before #4470">
   ran:      <ghost-review | owl-review | pr-reviewer subagent — which, and on what diff>
+  security: <security-relevant.sh first line> — security-review <ran: N findings | skipped (script said no)>
   simplify: <hard-simplify: N REUSE resolved / none>
   gaze:     <lift-the-gaze 0.7: findings / "n/a — no contract or boundary change">
   findings: <N> (<must-fix count> MUST FIX, <suggestion count> suggestions)

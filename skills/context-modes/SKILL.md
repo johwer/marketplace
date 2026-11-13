@@ -1,13 +1,6 @@
 ---
 name: context-modes
-description: Switch between dev, review, and research mindsets — changes priorities, tool preferences, and output style
-autoTrigger:
-  - when user says "dev mode", "review mode", or "research mode"
-  - when starting /my-dream-team (dev mode)
-  - when starting /review-pr (review mode)
-  - when starting /ticket-refine or /ticket-scout (research mode)
-globs:
-  - "**/*"
+description: Switch between dev, review, and research mindsets — changes priorities, tool preferences, and output style. Use when the user says "dev mode", "review mode" or "research mode", or when starting /my-dream-team (dev), /review-pr (review), or /ticket-refine or /ticket-scout (research).
 ---
 
 # Context Modes
@@ -37,7 +30,7 @@ Activate by saying "dev mode", "review mode", or "research mode". Or modes activ
 - Start with the smallest change that could work
 - Run the build/tests after every meaningful edit
 - Don't refactor surrounding code unless it blocks the task
-- Don't add comments explaining obvious code
+- Follow the project's comment rule (Repo: root `CLAUDE.md` "Comments" — avoid them, with its listed exceptions)
 - If stuck for > 3 attempts, step back and rethink the approach
 
 ## Mode: Review

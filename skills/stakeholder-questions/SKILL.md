@@ -1,6 +1,6 @@
 ---
 name: stakeholder-questions
-description: Write the questions a ticket needs answered by someone other than the user (the tech lead or the PO) in the format each reader answers fastest. Tech lead in English, one or two sentences each, yes/no. PO in Swedish, plain words, a concrete example and our proposal. Then record the answers back into the ticket spec, the draft PR and any running DTF session. Use when DTF work hits a decision that belongs to someone else, when ticket-refine, grill-me or an architecture report leaves questions for the PO or tech lead, when the user asks "vilka frågor har vi till PO / tech lead", "make these yes/no", "skriv frågor till …", or pastes answers back from them.
+description: Write the questions a ticket needs answered by the tech lead (English, yes/no) or the PO (Swedish, with an example and our proposal), then record the answers back into the spec, the draft PR and any DTF session. Use when a decision belongs to someone else, when ticket-refine, grill-me or an architecture report leaves questions for them, when the user asks "vilka frågor har vi till PO / tech lead", "make these yes/no" or "skriv frågor till …", or pastes answers back from them.
 ---
 
 # Stakeholder questions: ask the person who decides, in the shape they answer

@@ -17,13 +17,7 @@ Regenerates frontend RTK Query API types from backend Swagger specs after backen
 
 ## Service Map
 
-| Service | Docker service | Port | Swagger URL |
-|---------|---------------|------|-------------|
-| ServiceC | service-c-api | 5001 | http://localhost:5001/api/service-c/swagger/v1.json |
-| ServiceA | service-a-api | 5002 | http://localhost:5002/api/service-a/swagger/v1.json |
-| ServiceE | service-e-api | 5003 | http://localhost:5003/api/service-e/swagger/v1.json |
-| ServiceB | service-b-api | 5005 | http://localhost:5005/api/service-b/swagger/v1.json |
-| ServiceD | service-d-api | 5006 | http://localhost:5006/api/service-d/swagger/v1.json |
+The services that can be generated are the `generate:api:*` scripts in `apps/web/package.json`; the docker service is in `docker-compose.yml`. Each `scripts/api-codegen/openapi-config-{service}.ts` holds the Swagger URL and reads its port with `resolvePort("<SERVICE>_API_PORT")` (env var, else the repo-root `.env`), so read the port there, not a fixed number, before polling Swagger in step 4.
 
 ## File Structure
 
@@ -53,8 +47,9 @@ Each service has three file types in `apps/web/src/store/rtk-apis/{service}/`:
 
 4. **Wait for Swagger to be available:**
    ```bash
+   PORT=<the <SERVICE>_API_PORT value from the env or repo-root .env>
    for i in {1..30}; do
-     curl -sf http://localhost:{port}/api/{service}/swagger/v1.json > /dev/null && echo "Ready" && break
+     curl -sf http://localhost:${PORT}/api/{service}/swagger/v1.json > /dev/null && echo "Ready" && break
      echo "Waiting... ($i/30)"
      sleep 2
    done
@@ -117,7 +112,7 @@ docker compose up -d --build service-c-api service-a-api
 
 ## Config Files
 
-Generation configs live in `scripts/api-codegen/openapi-config-{service}.ts` (all 13 were consolidated there by PROJ-3438 / PR #3299). Each defines:
+Generation configs live in `scripts/api-codegen/openapi-config-{service}.ts`. Each defines:
 - `schemaFile` — Swagger JSON URL (localhost)
 - `apiFile` — Path to the BaseApi file
 - `outputFile` — Path to the generated Api file

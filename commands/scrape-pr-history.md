@@ -37,8 +37,8 @@ gh pr list --repo RepoAB/Repo --state merged --limit <N> \
 Filter out PR numbers already in the stored data (unless `--force`).
 
 Extract the ticket ID from branch name or title using this priority:
-1. Branch name: find `PROJ-\d+` pattern (case-insensitive)
-2. PR title: find `PROJ-\d+` pattern
+1. Branch name: find `(NOVA|PLRS|MEDH)-\d+` (case-insensitive)
+2. PR title: same pattern
 3. If neither: `ticket: null`
 
 ## Step 3: Fan Out — 30 Haiku Agents in Parallel
@@ -71,7 +71,7 @@ Then return ONLY a JSON object (no markdown, no explanation) in this exact shape
 
 {
   "pr": {PR_NUMBER},
-  "ticket": "PROJ-XXXX or null",
+  "ticket": "PROJ-XXXX / PROJ-XXXX / MEDH-XXXX or null",
   "title": "PR title",
   "merged_at": "ISO date",
   "author": "github login",
@@ -96,7 +96,7 @@ Rules:
 - Only include findings from actual review comments (not general PR description text)
 - Include findings from ALL reviewers: humans AND bots (Gemini, Claude, etc.) — mark reviewer_is_bot accordingly
 - `was_resolved` = true if the comment thread is marked resolved OR a follow-up commit clearly addresses it
-- `has_dream_team_markers` = true if the PR body or branch name suggests it was a Dream Team session (branch named exactly PROJ-XXXX, or body mentions "Dream Team" or "my-dream-team")
+- `has_dream_team_markers` = true if the PR body or branch name suggests it was a Dream Team session (branch named exactly a ticket key such as PROJ-XXXX, or body mentions "Dream Team" or "my-dream-team")
 - `severity` = your best judgment: must-fix (blocking approval), suggestion (improvement), question (clarification), nitpick (style/minor)
 - If there are no review comments, return findings: []
 - Return ONLY the JSON object, nothing else

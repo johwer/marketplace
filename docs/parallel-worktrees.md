@@ -40,7 +40,7 @@ which mechanism is *honored* is the difference between "it just works" and "why 
 ### Vite — the gotcha
 `apps/web/vite.config.mts` calls `loadEnv()` (so `.env.local` *is* loaded into
 `process.env`) **but then hardcodes `server.port: 3000`** and hardcodes the proxy targets
-to `5001–5006`. It never reads `VITE_DEV_PORT`. Consequences:
+to the main stack's `50xx` ports. It never reads `VITE_DEV_PORT`. Consequences:
 
 - **`npm start` in a worktree silently runs on 3000** — it uses the default config. To get
   the worktree port you MUST run `npx vite --config vite.config.worktree.mts --host`.
@@ -160,11 +160,6 @@ the main stack's `500x` ports: regenerating against a stale shared container has
 deleted generated members that other people had just added (twice, during PROJ-3366), so an
 unset port is a hard error rather than a guess. Start the service you changed first
 (`worktree-service.sh up <svc>`).
-
-> Historical note: this used to require `~/.claude/scripts/generate-api.sh`, which injected the
-> worktree port into a config that hardcoded `localhost:5001`. That script was deleted once
-> PROJ-3438 moved all 13 codegen configs into `scripts/api-codegen/` and made the configs resolve
-> their own port. If you find a reference to it anywhere, it is stale.
 
 ## Backend builds/tests when the local .NET SDK is pinned
 

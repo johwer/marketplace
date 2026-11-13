@@ -19,7 +19,7 @@ $ARGUMENTS
 
 ### Step 0: Ensure We're Not Inside the Worktree
 
-**CRITICAL:** If the current working directory is inside the worktree being cleaned up (e.g., `~/Documents/PROJ-1234`), you MUST `cd ~/Documents/Repo` first. Git cannot remove a worktree while a process has its cwd inside it. Always run all cleanup commands from `~/Documents/Repo`.
+If the current working directory is inside the worktree being cleaned up (e.g., `~/Documents/PROJ-1234`), `cd ~/Documents/Repo` first. Git cannot remove a worktree while a process has its cwd inside it. Always run all cleanup commands from `~/Documents/Repo`.
 
 ```bash
 cd ~/Documents/Repo
@@ -58,124 +58,35 @@ gh api graphql -f query='{ repository(owner: "<OWNER>", name: "<REPO>") { pullRe
 
 If any unresolved threads are found, **STOP** and tell the user which comments are still open. Do not proceed until the user confirms they're aware. Reminder: every comment needs a **reply** (explaining what was done or pushing back) AND a **resolve** — not just one or the other.
 
-### Step 3: Stop Worktree Docker Services (if running)
+### Step 3: Check for Uncommitted Work
 
-Stop any running worktree containers through the script that started them (the compose template
-lives in `~/.claude/templates/`, so the old `docker compose -f docker-compose.worktree.yml down` from
-inside the worktree never found a file and silently no-op'd on every run — PROJ-3890):
+Before anything is stopped or deleted:
 
 ```bash
-bash ~/.claude/scripts/worktree-service.sh --worktree ~/Documents/<TICKET_ID> down
-```
-
-Paste the output. A failure here is not fatal — Step 3.5 removes the containers by name — but say so.
-
-### Step 3.5: Remove Worktree Docker Containers & Images
-
-Worktree services create Docker images named `repo-<ticket-lowercase>-<service>-wt` (e.g., `repo-proj-1234-service-c-api-wt`). Clean these up to reclaim disk space.
-
-```bash
-# Convert ticket ID to lowercase for Docker naming (e.g., PROJ-1234 → proj-1234)
-TICKET_LOWER=$(echo "<TICKET_ID>" | tr '[:upper:]' '[:lower:]')
-
-# Remove any stopped containers matching this worktree
-docker ps -a --format '{{.Names}}' | grep "$TICKET_LOWER" | xargs -r docker rm -f 2>/dev/null || true
-
-# Remove images matching this worktree
-docker images --format '{{.Repository}}:{{.Tag}}' | grep "$TICKET_LOWER" | xargs -r docker rmi 2>/dev/null || true
-
-# Remove this worktree's NAMED volumes (repo-<ticket>_postgres_data, _redis_data, etc.).
-# Safe here: the worktree (and its DB) is being torn down. Prevents dead-worktree
-# volumes from accumulating (the disk-exhaustion source). Only this ticket's volumes.
-docker volume ls -q | grep "^repo-$TICKET_LOWER""_" | xargs -r docker volume rm 2>/dev/null || true
-```
-
-Report how many images and volumes were removed and how much space was reclaimed. If none found, skip silently.
-
-> Belt-and-suspenders: a periodic `bash ~/.claude/scripts/docker-cleanup.sh --orphan-worktrees` reclaims named volumes from any worktrees that were removed without this step.
-
-### Step 4: Kill Vite Dev Server & tmux Session
-
-Before removing the worktree, check if there's a Vite dev server running on its allocated port and ask the user whether to kill it.
-
-```bash
-# Read the allocated port from the worktree's .env.local
-VITE_PORT=$(grep VITE_DEV_PORT ~/Documents/<TICKET_ID>/apps/web/.env.local 2>/dev/null | cut -d= -f2)
-
-# Check if anything is listening on that port
-if [ -n "$VITE_PORT" ]; then
-  PORT_PID=$(lsof -ti tcp:$VITE_PORT 2>/dev/null || true)
-fi
-```
-
-**If a process is found on the port**, tell the user: "Vite dev server is still running on port `$VITE_PORT` (PID $PORT_PID). Kill it?" and kill it if they confirm:
-
-```bash
-kill $PORT_PID 2>/dev/null || true
-```
-
-**If no port is found or nothing is listening**, skip silently.
-
-Cosmos uses fixed global ports (3999/3998), so a stale one blocks every other worktree. Kill it only if this worktree owns it: `lsof -a -p <pid> -d cwd` must show `~/Documents/<TICKET_ID>`.
-
-Then kill the tmux session regardless:
-
-```bash
-tmux kill-session -t <TICKET_ID> 2>/dev/null || true
-```
-
-### Step 5: Check for Uncommitted Work
-
-```bash
-cd ~/Documents/<TICKET_ID> && git status --porcelain
+git -C ~/Documents/<TICKET_ID> status --porcelain
 ```
 
 If there are uncommitted changes, **STOP** and tell the user. Only proceed if they confirm.
 
-### Step 5.5: Archive the bridge session
-
-Run before anything is deleted. It copies `.dream-team/bridge/` to `~/.claude/bridge-eval/live/<TICKET_ID>/` so the brief written before implementation survives as an eval case; it is a no-op when the ticket never ran bridge.
-
-```bash
-bash ~/.claude/skills/bridge-pre/bin/archive-live.sh <TICKET_ID>
-```
-
-### Step 6: Remove Git Worktree
-
-```bash
-cd ~/Documents/Repo && git worktree remove ~/Documents/<TICKET_ID> --force
-```
-
-### Step 7: Clean Up Directory (if leftover)
-
-This also removes `.dream-team/` notes, journals, and any other leftover files.
-
-```bash
-rm -rf ~/Documents/<TICKET_ID>
-```
-
-### Step 8: Delete the Branch
+### Step 4: Ask About the Branch
 
 Ask the user if they want to delete the branch too. If the PR is merged, suggest yes. If not merged, suggest no.
 
-If yes:
-```bash
-cd ~/Documents/Repo && git branch -D <TICKET_ID>
-```
+### Step 5: Tear Down
 
-### Step 9: Prune Worktree References
+One script does the whole teardown, the same one `/create-stories` uses: bridge archive, worktree services, this worktree's Vite and Cosmos processes (only those whose cwd is inside the worktree), tmux session, this ticket's containers, images and named volumes (matched on the exact ticket id, so `PROJ-48` never touches `PROJ-4880`), the worktree and its directory (including `.dream-team/`), `git worktree prune`, and the workspace status file.
 
 ```bash
-cd ~/Documents/Repo && git worktree prune
+bash ~/.claude/scripts/cleanup-workspace.sh <TICKET_ID> [--delete-branch] [--discard-local-work]
 ```
 
-### Step 10: Confirm
+- `--delete-branch` only if the user said yes in Step 4.
+- `--discard-local-work` only if the user confirmed in Step 3 or Step 2 (no PR) that local work may be lost. Without it the script refuses with exit 3 when it finds uncommitted work or commits not pushed to the upstream branch, and touches nothing.
+- `--dry-run` prints what would be removed.
 
-Show the updated worktree list:
+Paste the output. It ends with the updated `git worktree list`.
 
-```bash
-cd ~/Documents/Repo && git worktree list
-```
+> A periodic `bash ~/.claude/scripts/docker-cleanup.sh --orphan-worktrees` reclaims named volumes from any worktrees that were removed without this step.
 
 ## Important Rules
 
@@ -183,4 +94,4 @@ cd ~/Documents/Repo && git worktree list
 - Always confirm with the user before deleting the branch
 - If PR is open/unmerged, default to keeping both worktree and branch — user must explicitly confirm deletion
 - The main repo is always at `~/Documents/Repo`
-- If the worktree directory doesn't exist, skip the removal step and just clean up the branch
+- If the worktree directory doesn't exist, the script skips the worktree steps and still cleans up containers, refs and the branch

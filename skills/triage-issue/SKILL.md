@@ -1,11 +1,6 @@
 ---
 name: triage-issue
 description: Triage a bug by exploring the codebase to find root cause, then create a Jira ticket with a TDD-based fix plan. Use when user reports a bug, mentions "triage", or wants to investigate and plan a fix.
-autoTrigger:
-  - when user reports a bug and wants to investigate it
-  - when user says "triage" or "investigate this bug"
-globs:
-  - "**/*"
 ---
 
 # Triage Issue
@@ -68,7 +63,7 @@ Rules:
 
 **Stack-specific test patterns:**
 - Frontend: Vitest + React Testing Library — assert on rendered output or hook return values
-- Backend: xUnit + NSubstitute + FluentAssertions — assert on service return values or repository calls
+- Backend: xUnit + Moq — assert with `Assert` on service return values or repository calls
 
 ### Step 4 — Create the Jira ticket
 

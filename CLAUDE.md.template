@@ -50,23 +50,23 @@ See `~/.claude/docs/integrations.md` for full details including prerequisites an
 
 | Integration | Status |
 |-------------|--------|
-| GitHub Actions (`@claude` in PRs) | Workflow ready — needs `ANTHROPIC_API_KEY` repo secret |
+| GitHub Actions (`@claude` in PRs) | Not installed — no `claude.yml` in the monorepo's workflows |
 | Slack (`@Claude` in channels) | Documented — needs Claude Code on the Web + Pro/Max/Teams plan |
 | Code intelligence plugin | Documented — run `/plugin` to browse marketplace |
 
 ## Jira Integration
 
 - Use `acli jira workitem` commands to interact with Jira (see `/acli-jira-cheatsheet` for full reference)
-- Jira attachments require browser authentication — use `open` or AppleScript with Chrome to download them, as `curl`/`wget` will get 401 Unauthorized
-- To open a Jira attachment URL in Chrome for authenticated download:
+- **Jira attachments** — download via API (preferred); if the script exits 2, open the attachment in Chrome:
   ```bash
+  bash ~/.claude/scripts/jira-download-attachments.sh <TICKET_ID> [OUTPUT_DIR]
   open -a "Google Chrome" "<ATTACHMENT_URL>"
   ```
 
 ## Workspace Preferences
 
 - **Terminal app:** `{{TERMINAL}}` — used when opening new windows for worktrees
-- To change, run `dtf install` again or edit `~/.claude/dtf-config.json`
+- To change, run `bash ~/.claude/scripts/dtf.sh configure` or edit `~/.claude/dtf-config.json`
 - Supported terminals (10):
   - Cross-platform: `Alacritty`, `Kitty`, `WezTerm`, `Ghostty`, `Warp`
   - macOS only: `Terminal`, `iTerm`/`iTerm2`
@@ -82,8 +82,8 @@ See `~/.claude/docs/integrations.md` for full details including prerequisites an
 
 ## DTF Config
 
-All paths and preferences are stored in `~/.claude/dtf-config.json`. Run `dtf doctor` to verify your setup.
+All paths and preferences are stored in `~/.claude/dtf-config.json`. The DTF CLI is `bash ~/.claude/scripts/dtf.sh <command>` (not on PATH as `dtf`); run its `doctor` command to verify your setup.
 - Core paths: `paths.monorepo`, `paths.worktreeParent`, `paths.workflowRepo`
 - Extra paths: `extraPaths.*` (project-specific, defined by company config)
-- Update: `dtf update` pulls latest workflow changes
-- Contribute: `dtf contribute` exports your retro learnings as a PR
+- Update: `dtf.sh update` pulls latest workflow changes
+- Contribute: `dtf.sh contribute` exports your retro learnings as a PR

@@ -1,13 +1,6 @@
 ---
 name: tdd
-description: Test-driven development loop — red-green-refactor with interface confirmation before writing any implementation
-autoTrigger:
-  - when user says "tdd" or "test-driven"
-  - when implementing a new service method, hook, or utility that has clear input/output contracts
-globs:
-  - "**/*.ts"
-  - "**/*.tsx"
-  - "**/*.cs"
+description: Test-driven development loop (red-green-refactor, interface confirmed first) for Vitest or xUnit. Use when the user says "tdd" or "test-driven", or when building a service method, hook or utility with a clear input/output contract.
 ---
 
 # TDD — Test-Driven Development Loop
@@ -29,7 +22,9 @@ If arguments are provided, treat them as the feature or function to implement. O
 Detect the stack from file context or arguments:
 
 - **Frontend** (`.ts`, `.tsx` in `apps/web/`): Vitest + React Testing Library
-- **Backend** (`.cs` in `services/`): xUnit + NSubstitute + FluentAssertions
+- **Backend** (`.cs` in `services/`): xUnit + Moq, asserting with xUnit's `Assert` (FluentAssertions is not used)
+
+In Repo, run the repo's `/writing-tests` skill before adding or changing a test.
 
 ## Workflow
 
@@ -88,7 +83,7 @@ cd apps/web && npx vitest run --reporter=verbose <test-file-path>
 
 **Backend:**
 ```bash
-cd services/<Service>/<Service>.Test && dotnet test --filter "<TestName>"
+cd services/<Domain>/<Project>.Test && dotnet test --filter "<TestName>"   # e.g. services/ServiceA/ServiceA.API.Test
 ```
 
 The test must fail for the right reason — not "file not found" or "method doesn't exist", but an assertion failure.
@@ -125,7 +120,7 @@ cd apps/web && npx vitest run --reporter=verbose <test-file-path>
 
 **Backend:**
 ```bash
-cd services/<Service>/<Service>.Test && dotnet test
+cd services/<Domain>/<Project>.Test && dotnet test
 ```
 
 Also run type-check for frontend:
@@ -157,12 +152,12 @@ File location: co-located with the source file as `<filename>.test.ts`.
 ```csharp
 public class ServiceNameTests
 {
-    private readonly IServiceNameRepository _repository = Substitute.For<IServiceNameRepository>();
+    private readonly Mock<IServiceNameRepository> _repository = new();
     private readonly ServiceName _sut;
 
     public ServiceNameTests()
     {
-        _sut = new ServiceName(_repository);
+        _sut = new ServiceName(_repository.Object);
     }
 
     [Fact]
@@ -172,14 +167,14 @@ public class ServiceNameTests
         // Act
         var result = await _sut.MethodNameAsync(...);
         // Assert
-        result.Should().Be(...);
+        Assert.Equal(..., result);
     }
 }
 ```
 
 ## What NOT to Do
 
-- Don't flip an e2e expectation from a guessed URL — probe the real landing URL first, pin it, and do one mutation run against the old code (PROJ-4244)
+- Don't flip an e2e expectation from a guessed URL — probe the real landing URL first, pin it, and do one mutation run against the old code
 
 - Don't write all tests first, then all implementation — one test at a time
 - Don't write implementation "to get ahead" before a test fails

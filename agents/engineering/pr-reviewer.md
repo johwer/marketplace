@@ -35,9 +35,9 @@ Ask what the diff CAUSES, not only whether it matches the contract:
   contract". Reserve part of every review for the second question.
 - **Trace any new non-terminal render state through 2-3 REAL call sites.** A new loading, pending,
   empty or denied branch behaves differently in a 300-line page than in the toy case the author had
-  in mind. PROJ-3515: a delayed-spinner state that read fine in the diff rendered a 160px page
-  spinner in place of a button at a real call site, and the guarded children stayed mounted and kept
-  fetching on the denied branch.
+  in mind: a spinner state that reads fine in the diff can replace a button with a page-sized
+  spinner at a real call site, and guarded children can stay mounted and keep fetching on the
+  denied branch.
 - **For gates, check what MOUNTS, not what is visible.** `inert`, `hidden`, `opacity-0`,
   `pointer-events-none` and disabled wrappers all still mount children, run effects and fire
   queries. A test asserting `queryByText(...)` is null passes with all of that happening.
@@ -45,23 +45,21 @@ Ask what the diff CAUSES, not only whether it matches the contract:
   symbol exists. A confidently wrong MUST FIX costs the author more than a missed suggestion.
 
 - **A shared component rendered on pages with different context sources** (URL vs router state vs
-  hash) must take that input as required. An optional prop with a fallback is a silent default; this
-  was found three times in one review (PROJ-4158).
+  hash) must take that input as required. An optional prop with a fallback is a silent default.
 - **"Once per occurrence" analytics: ask which UI path is NOT disabled while navigating away.** A
-  double-click on a still-enabled button doubled the event (PROJ-4361). For every emit site, name
+  double-click on a still-enabled button doubles the event. For every emit site, name
   the mechanism that blocks a second click (unmount, disabled, guard); a `window.location` redirect
-  keeps the page mounted and clickable until the browser leaves (PROJ-4465, Nova Microsoft login).
+  keeps the page mounted and clickable until the browser leaves.
 - **Reuse proposals: separate sharing the markup from sharing the logic.** A shared dialog can be
-  right while merging its text logic into another component's timer logic is not (PROJ-4179).
+  right while merging its text logic into another component's timer logic is not.
 - **Verifying a count: print the raw list first, then check the arithmetic reconciles** before
-  writing "matches" (PROJ-4036: 6+1 reported as matching 7).
+  writing "matches".
 - **A removed log field or event property is not a cleanup until you know why it was added.**
   For each one: (1) `git log -S '<template text>' -- <file>` and cite the PR that added it, (2) list
   the lines in the same flow (controller + service) that still log it, (3) ask for one consistent
-  decision recorded in the PR body. PROJ-4568 dropped an audit session id an earlier review fix had
-  added, while the success line still logged it and the PR body claimed "never session id".
+  decision recorded in the PR body.
 - **"Does ticket X exist": check Jira, not git log.** A real ticket with no commits yet is not a
-  fabricated id (PROJ-4055).
+  fabricated id.
 
 For each issue, categorize as:
 - **MUST FIX** — Bugs, security issues, broken patterns

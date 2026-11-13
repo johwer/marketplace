@@ -57,15 +57,15 @@ Branch naming: `PROJ-2345-rds-monitoring` (ticket + kebab-case summary).
 Map the relevant Terraform modules:
 
 ```bash
-# Find relevant modules
-find infra/ -name "*.tf" | head -30
-
-# Check existing module structure
-ls infra/modules/
+# Terraform roots are per project: infra/tf-* (tf-backend, tf-ci, tf-monitoring, tf-shared, ...)
+ls -d infra/tf-*/
+# Which project a path belongs to, and what triggers it:
+cat .github/terraform-projects.json
 
 # Find files related to the ticket's resources
 grep -r "aws_db_instance\|aws_rds" infra/ --include="*.tf" -l
 ```
+Read `infra/agents.md` and `infra/CI-CD-SETUP.md` before changing anything.
 
 Present the user with:
 - Which modules exist
@@ -77,7 +77,7 @@ Present the user with:
 Ensure Terraform is initialized for the relevant workspace:
 
 ```bash
-cd infra/
+cd infra/<tf-project>/
 terraform init
 ```
 
@@ -183,58 +183,16 @@ git commit -m "PROJ-2345: Enable RDS Enhanced Monitoring
 - Enable Enhanced Monitoring (60s granularity) on prod RDS instances
 - Add ServiceC role for RDS monitoring
 - Add CloudWatch alarm for CPU > 80%
-
-Co-Authored-By: Claude <noreply@anthropic.com>"
+"   # add the attribution trailer the session's instructions specify
 
 git push -u origin <BRANCH>
 ```
 
-Create PR with terraform plan in the body:
-
-```bash
-gh pr create --title "PROJ-2345: Enable RDS Enhanced Monitoring" --body "$(cat <<'EOF'
-## Summary
-- Enable Enhanced Monitoring (60s) on production RDS instances
-- Add CloudWatch CPU alarm (threshold: 80%)
-- Add dedicated ServiceC monitoring role
-
-## Terraform Plan
-```
-<paste plan output>
-```
-
-## Checklist
-- [ ] `terraform plan` reviewed
-- [ ] No secrets in code
-- [ ] No destroy operations
-- [ ] CODEOWNERS covers infra/ changes
-- [ ] Security implications reviewed
-
-## Test plan
-- [ ] Verify plan output matches expected changes
-- [ ] After merge: confirm GH Actions `terraform-apply` runs
-- [ ] After apply: verify Enhanced Monitoring active in AWS Console
-- [ ] After apply: verify CloudWatch alarm created
-EOF
-)"
-```
+Create the PR with the body shape `.github/pull_request_template.md` asks for (Summary, Considerations, Agent). Put the `terraform plan` summary under Considerations; the title must match `pr-title-validation.yml` (`<TICKET>: <Title>`).
 
 ### Step 10: Verify GitHub Actions
 
-After PR creation, check that the plan/apply workflows exist for the changed modules:
-
-```bash
-# Check if terraform plan workflow exists
-ls .github/workflows/terraform-plan.yml 2>/dev/null && echo "✓ Plan workflow exists" || echo "⚠ No plan workflow found"
-
-# Check if terraform apply workflow exists
-ls .github/workflows/terraform-apply.yml 2>/dev/null && echo "✓ Apply workflow exists" || echo "⚠ No apply workflow found"
-
-# Verify the workflows cover the changed paths
-grep -l "infra/" .github/workflows/*.yml 2>/dev/null
-```
-
-If workflows are missing, offer to create them using the `ci-cd-engineer` agent.
+After PR creation, confirm `.github/workflows/terraform.yml` picked up the changed project: the project must be listed in `.github/terraform-projects.json` with paths covering your change. If it is not, say so and offer to add it with the `ci-cd-engineer` agent.
 
 ### Step 11: Post-PR Summary
 
@@ -248,13 +206,12 @@ Present final summary:
 **PR:** #<number>
 
 **Changes:**
-- infra/modules/rds/main.tf (monitoring config)
-- infra/modules/monitoring/alarms.tf (new CPU alarm)
-- infra/modules/rds/service-c.tf (monitoring ServiceC role)
+- infra/<tf-project>/<file>.tf (what changed)
+- ...
 
 **What happens next:**
 1. GH Actions runs `terraform plan` → posted as PR comment
 2. Infra team reviews (CODEOWNERS)
-3. After approval + merge → `terraform apply` with manual prod approval
+3. After approval + merge → `terraform.yml` applies mgmt → shared → accept → prod in order
 4. Verify in AWS Console after apply
 ```

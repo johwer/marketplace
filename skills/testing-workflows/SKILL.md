@@ -1,6 +1,6 @@
 ---
 name: testing-workflows
-description: QA testing workflows — test planning, E2E with Playwright, regression testing, bug reporting for Repo
+description: QA testing workflows — test planning, E2E with Playwright, regression testing, bug reporting for Repo. Use when planning QA for a feature, writing Playwright E2E tests, or writing up a bug found in testing.
 ---
 
 ## Test Strategy
@@ -26,7 +26,7 @@ description: QA testing workflows — test planning, E2E with Playwright, regres
 - Use `@testing-library/react` for rendering
 
 ### E2E Tests (Playwright)
-- Location: `apps/web/e2e/`
+- Location: `apps/web/tests/e2e/` (`playwright.config.ts` `testDir`)
 - Use Page Object Model pattern
 - Stable selectors: `data-testid` attributes (never CSS classes)
 - Auth: use `storageState` for pre-authenticated sessions
@@ -70,19 +70,4 @@ description: QA testing workflows — test planning, E2E with Playwright, regres
 - Console errors: [if any]
 
 **Severity:** Critical / High / Medium / Low
-```
-
-## Recommended External Skills
-
-Install for enhanced testing capabilities:
-```bash
-# QA Skills — 20+ testing skills (Playwright, Jest, security, accessibility)
-npx @qaskills/cli add playwright-e2e
-npx @qaskills/cli add jest-unit-testing
-
-# Agentic QE — AI-powered test generation and coverage analysis
-npm install -g agentic-qe && cd your-project && aqe init --auto
-
-# Playwright QA — No-code recording → production-ready tests
-git clone https://github.com/sharmasundip/playwright-qa-skills.git ~/.claude/skills/playwright-qa
 ```

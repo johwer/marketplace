@@ -123,4 +123,4 @@ Read when the arguments contain `--resume`. This runs instead of the normal Phas
 
 8. **Continue from the appropriate phase** in the normal workflow.
 
-- Phase 4 Step 0 (`/reviewing-changes`): skip this step on such a branch and say so in the PR body and to the user.
+- **Branch cut before `.claude/skills/reviewing-changes/` existed (#4470):** skip Phase 4 Step 0 (`/reviewing-changes`) and say so in the PR body and to the user.

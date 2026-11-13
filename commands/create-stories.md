@@ -102,15 +102,11 @@ Before creating new workspaces, check if any existing worktrees have merged/clos
    ```
    Ask the user with AskUserQuestion which ones to clean up. **Always ask** — some may need to be kept (e.g., reverted PRs with code that a new ticket references).
 
-3. **For each confirmed cleanup**, run from the main repo (NOT from inside the worktree):
+3. **For each confirmed cleanup**, run the shared teardown from the main repo (not from inside the worktree) — the same script as "When the user says it's merged" below:
    ```bash
-   bash ~/.claude/skills/bridge-pre/bin/archive-live.sh <TICKET_ID>
-   cd ~/Documents/Repo && git worktree remove ~/Documents/<TICKET_ID> --force
-   rm -rf ~/Documents/<TICKET_ID>
-   git branch -D <TICKET_ID>
-   git worktree prune
-   rm -f ~/.claude/workspace-status/<TICKET_ID>.json
+   cd ~/Documents/Repo && bash ~/.claude/scripts/cleanup-workspace.sh <TICKET_ID> --delete-branch
    ```
+   Exit 3 means uncommitted or unpushed work: show it to the user and rerun with `--discard-local-work` only if they confirm.
 
 4. **If no stale worktrees**, skip silently and proceed.
 
@@ -153,11 +149,11 @@ The script flags any `repo-*` container that is:
 
 Every issue is appended to `~/.claude/data/docker-health-log.jsonl` with a timestamp (machine-readable, for recurrence counting). On each run, the script also reports **recurring** issues — same container + same symptom seen in the last 7 days — so a flaky service stops looking like a one-off.
 
-**Evidence collection.** Separately, `~/.claude/data/docker-health-findings.md` is a human-readable log where we accumulate investigations and root-cause hypotheses. When the check surfaces something worth understanding — especially a recurring issue — append a curated entry using the template at the top of that file (symptom, evidence, suspected trigger, root cause, corroboration, workaround, real fix, status). Promote a confirmed mechanism into the file's "Known root causes" section. This is how we build the case toward a structural fix instead of re-diagnosing the same thing every time. (Known cause so far: **R1 — concurrent EF migrations racing on `docker compose up --build`**, which can leave a worker zombied at 100% CPU.)
+**Evidence collection.** `~/.claude/data/docker-health-findings.md` (create it on first use) is the human-readable log of investigations and root-cause hypotheses. When the check surfaces something worth understanding — especially a recurring issue — append an entry with: symptom, evidence, suspected trigger, root cause, corroboration, workaround, real fix, status. Keep confirmed mechanisms under a "Known root causes" heading. This is how we build the case toward a structural fix instead of re-diagnosing the same thing every time. (Known cause so far: **R1 — concurrent EF migrations racing on `docker compose up --build`**, which can leave a worker zombied at 100% CPU.)
 
 **How to react:**
 - **Exit 0 (all healthy):** continue silently to Phase A.
-- **Exit 1 (issues found):** show the script output to the user. Ask with AskUserQuestion whether to (a) investigate and fix before proceeding, (b) proceed anyway (e.g. `repo-pgadmin` may be intentionally idle), or (c) abort. Never auto-restart containers — another worktree session may depend on current state ([feedback_never_rebuild_main.md]).
+- **Exit 1 (issues found):** show the script output to the user. Ask with AskUserQuestion whether to (a) investigate and fix before proceeding, (b) proceed anyway (e.g. `repo-pgadmin` may be intentionally idle), or (c) abort. Never auto-restart containers — another worktree session may depend on current state.
 - **Exit 2 (docker not running):** tell the user and stop — they need to start Docker Desktop before any DTF work.
 
 **Recurring issues take priority.** If the same container has been flagged before in the last 7 days, mention it explicitly and suggest filing a Jira ticket if it keeps coming back.
@@ -170,14 +166,13 @@ Every issue is appended to `~/.claude/data/docker-health-log.jsonl` with a times
 
 #### Step 1: Fetch ALL Tickets from Jira (Parallel)
 
-Fetch all tickets in parallel using the Agent tool (one agent per ticket, subagent_type `Explore`, model `haiku`):
+Fetch all tickets in one Bash call (a plain CLI call, no agents), and keep the full output — Step 6 writes it to `jira-ticket.md` verbatim:
 
-```
-For each ticket ID, spawn an explore agent:
-  "Fetch Jira ticket <TICKET_ID>: run `acli jira workitem view <TICKET_ID>` and return the full output including summary, description, acceptance criteria, and attachment URLs."
+```bash
+for t in <TICKET_IDS>; do echo "=== $t"; acli jira workitem view "$t" || echo "FETCH_FAILED $t"; done
 ```
 
-If any ACLI call fails, note it — you'll ask the user for those ticket details in Step 4.
+If any ticket prints `FETCH_FAILED`, note it — you'll ask the user for those ticket details in Step 4.
 
 #### Step 1.5: Quick Triage Checkpoint (User Decision Gate)
 
@@ -309,35 +304,25 @@ VERIFIED vs UNVERIFIED — the one rule that matters more than coverage:
 - Proposing an env var or flag: grep every reader of it, not the one you found first.
 - A "no existing endpoint" / "must build new" claim lists the controllers you grepped and the grep
   (route + action filter), e.g. `git grep -n 'UserAction' -- 'services/ServiceC/**/Controllers/*.cs'`. A
-  bare "none exists" is `[unverified]`: PROJ-4406's said stop while `POST authorization/users`
-  already filtered by any UserAction.
+  bare "none exists" is `[unverified]`.
 - A name or field translated at a boundary (legacy ↔ Nova, service ↔ service) is traced in BOTH
   directions — read path AND write/submit path — before you scope it as one-sided, and the writers
   (producer service, its data migrations, seeds) are grepped, not only the UI that reads it.
-  PROJ-4696's report marked the submit half `[unverified]` and scoped the ticket as read-only; the
-  submit half was broken too.
 - "The one place that does X" is a claim about every caller: map the backend WRITERS (e.g. every route
-  that calls SetRefreshCookie) instead of naming the nearest regex or helper. PROJ-4014's "one place"
-  missed three routes; PROJ-4752's prescribed preload was not what the legacy call site did.
+  that calls SetRefreshCookie) instead of naming the nearest regex or helper.
 - Parity ticket ("same as legacy/SignedIn"): quote the legacy strings and behaviour verbatim with
-  file:line in context.md, so the ticket's own proposed wording is visibly a deviation (PROJ-3796).
+  file:line in context.md, so the ticket's own proposed wording is visibly a deviation.
 - Investigation ticket that will drive an environment: list the pages that WRITE when opened, and the
-  role grants the plan assumes, before anyone drives them (PROJ-4821).
+  role grants the plan assumes, before anyone drives them.
 Half a report with honest [unverified] tags is worth more than a full one stated with equal confidence.
 
 Return your analysis as a structured report. If you haven't finished all 13 points by tool use 25, wrap up with what you have — partial is fine, Amara will fill gaps."
 ```
 
-> **Why the VERIFIED/UNVERIFIED rule is in the prompt (A6, ten sessions):** pre-hydration asserted
-> unopened facts in PROJ-3978, 4019, 4036, 4055, 4158, 4179, 4005, 4231, 4361, 4406 — each stated with the
-> same confidence as the true claims beside it, each fixed in one worktree's copy while the generator
-> kept producing them. The 30-tool budget is why the agent may not verify everything; it is not
-> permission to assert what it did not verify.
-
 **Sibling tickets that share a cross-repo contract** (event names, stage unions, payload shapes —
 e.g. a Nova half and a SignedIn half): write the contract into each sibling's `context.md` NOW, during
 pre-hydration, and have each sibling list its emit sites against it before planning. A contract that
-arrives mid-implementation cannot express failure paths a sibling already built (PROJ-4327).
+arrives mid-implementation cannot express failure paths a sibling already built.
 
 #### Step 4: Present Recommendations Table
 
@@ -403,7 +388,7 @@ Pre-hydration (Step 3) and worktree creation (Step 3.5) should both be complete 
 
 - **"Launch mode for \<TICKET_ID\> (\<SUMMARY\>)? Recommended: \<MODE\>"**
   - **"Dream Team"** — Full orchestration with Opus architect + agents. Best for medium/large tickets.
-  - **"Lite"** — Sonnet solo session, spawns agents only if needed. Same quality gates, lower cost. Best for small/medium tickets.
+  - **"Lite"** — Solo session (no team), spawns agents only if needed. Same quality gates, lower cost. Best for small/medium tickets.
 
 Note: "Just worktree" tickets were already separated in Step 1.5 — their worktrees are already created from Step 3.5.
 
@@ -450,7 +435,7 @@ See the `ticket-spec` skill for the frontmatter contract and the type semantics.
 
 Then write the pre-hydration results from Step 3 to `.dream-team/context.md` in the worktree. This file is consumed by `/my-dream-team` to skip redundant exploration.
 
-> **Re-verify context refs against disk at worktree-launch (retro P).** `context.md` is a *hypothesis* captured during pre-hydration; it can go stale before launch — especially when a sibling ticket merges mid-session (e.g. an epic dependency landing on `main`). At worktree-launch, quickly re-check that the file paths / endpoints / RTK hooks named in `context.md` still exist on the freshly-pulled base (Glob/grep the top few), and note "greenfield vs already-merged" so the dev agent diffs rather than trusts. Don't treat `context.md` as ground truth.
+> **Re-verify context refs against disk at worktree-launch.** `context.md` is a *hypothesis* captured during pre-hydration; it can go stale before launch — especially when a sibling ticket merges mid-session (e.g. an epic dependency landing on `main`). At worktree-launch, quickly re-check that the file paths / endpoints / RTK hooks named in `context.md` still exist on the freshly-pulled base (Glob/grep the top few), and note "greenfield vs already-merged" so the dev agent diffs rather than trusts. Don't treat `context.md` as ground truth.
 
 Then write the file using the Write tool at `~/Documents/<TICKET_ID>/.dream-team/context.md` with this format:
 
@@ -508,7 +493,7 @@ S3 translations work on all 3xxx ports (CORS: `http://localhost:3*`) — no need
 Multiple worktrees can run Playwright verification simultaneously on different ports.
 
 ## Visual Verification — Playwright CLI (include for frontend-only or full-stack tickets)
-Use the `playwright-cli` skill for ALL browser verification. Do NOT use Puppeteer MCP tools — those are deprecated.
+Use the `playwright-cli` skill for all browser verification.
 
 \```bash
 # Open browser with named session (use the worktree's port from .env.local)
@@ -525,16 +510,16 @@ playwright-cli -s=<TICKET_ID>-lena fill <ref> "value"
 bash ~/.claude/scripts/pw-mask-pii.sh <TICKET_ID>-lena && playwright-cli -s=<TICKET_ID>-lena screenshot --filename="$HOME/Downloads/<TICKET_ID>/after.png"   # mask first — HARD RULE
 
 # Video recording
-playwright-cli -s=<TICKET_ID>-lena video-start
+playwright-cli -s=<TICKET_ID>-lena video-start ~/Downloads/<TICKET_ID>/walkthrough-<flow>.webm
 # ... do interactions ...
-playwright-cli -s=<TICKET_ID>-lena video-stop <TICKET_ID>-after.webm
+playwright-cli -s=<TICKET_ID>-lena video-stop
 
 # Close when done
 playwright-cli -s=<TICKET_ID>-lena close
 \```
 
 Login sequence: click "More login options" → "Username and password" → fill username (gunner/anna) → fill password (tolvan) → submit.
-Screenshots go to `~/Downloads/<TICKET_ID>-*.png`. This is NOT optional for UI changes.
+Screenshots go to `~/Downloads/<TICKET_ID>/<state>.png`; UI changes require them.
 ```
 
 #### Step 6.5: Write Worktree CLAUDE.md
@@ -556,13 +541,13 @@ This copies the monorepo's base `CLAUDE.md` and appends DTF-specific context (po
 bash ~/.claude/scripts/open-terminal.sh "<TERMINAL_APP>" "bash ~/.claude/scripts/launch-workspace.sh '<TICKET_ID>' '/my-dream-team <TICKET_SUMMARY>: <CONCISE_DESCRIPTION>'"
 ```
 
-**If "Lite"** (Sonnet solo, same quality gates):
+**If "Lite"** (solo session, same quality gates):
 ```bash
 bash ~/.claude/scripts/open-terminal.sh "<TERMINAL_APP>" "bash ~/.claude/scripts/launch-workspace.sh '<TICKET_ID>' '/my-dream-team --lite <TICKET_SUMMARY>: <CONCISE_DESCRIPTION>'"
 ```
 
 **If "Just worktree"** (no Claude session):
-- Skip this step entirely. The worktree is already created from Steps 6-7.
+- Skip this step entirely. The worktree was created in Step 3.5.
 - Tell the user the worktree is ready at `~/Documents/<TICKET_ID>` and they can start working manually or resume later with "resume \<TICKET_ID\>".
 
 Replace `<TERMINAL_APP>` with the configured app (Alacritty, Terminal, iTerm, Warp, Kitty, WezTerm, or Ghostty).
@@ -593,7 +578,7 @@ This kills the tmux session and any Vite dev servers, but **preserves everything
 
 To pause **all running workspaces**:
 ```bash
-for session in $(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^PROJ-'); do
+for session in $(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep -E '^(PLRS|NOVA)-'); do
   bash ~/.claude/scripts/pause-workspace.sh "$session"
 done
 ```
@@ -645,58 +630,26 @@ Report a summary table showing each workspace's status (tmux running / no sessio
 
 When the user indicates a story is done or merged (e.g., "PROJ-1234 is merged", "clean up PROJ-1234", "that story is finished"):
 
-1. **Run cleanup from this orchestrator session** (NOT from inside the worktree). Execute these steps directly — do NOT delegate to `/workspace-cleanup` since we're already in the orchestrator:
-
-   ```bash
-   # Safety: check PR status first
-   cd ~/Documents/Repo && gh pr list --head <TICKET_ID> --state all --json number,state,mergedAt,title
-
-   # Stop the session + dev servers CLEANLY — use pause-workspace.sh, do NOT broad-kill.
-   # (`pgrep -f "<TICKET_ID>" | xargs kill` once took down the whole tmux server, killing
-   #  in-progress sessions too. pause-workspace.sh scopes the kill to this session/port.)
-   bash ~/.claude/scripts/pause-workspace.sh <TICKET_ID>
-
-   # Archive the bridge session (brief + advisor answers) before the worktree goes
-   bash ~/.claude/skills/bridge-pre/bin/archive-live.sh <TICKET_ID>
-
-   # Remove worktree (we're in Repo, not inside the worktree)
-   cd ~/Documents/Repo && git worktree remove ~/Documents/<TICKET_ID> --force
-
-   # Clean up leftover directory + branch + refs
-   rm -rf ~/Documents/<TICKET_ID>
-   cd ~/Documents/Repo && git branch -D <TICKET_ID>   # ask user first if PR is not merged
-   cd ~/Documents/Repo && git worktree prune
-   rm -f ~/.claude/workspace-status/<TICKET_ID>.json
-   ```
-
-2. **Docker pass (part of every cleanup — do NOT skip).** After removing the worktree(s):
-   - **Health check + CPU-load fix (DO THIS — the dev machine runs hot):** `bash ~/.claude/scripts/docker-health-check.sh`. If it flags a **single `repo-*` worker pegged at ~100% CPU** (known cause **R1** = concurrent EF migrations racing on `docker compose up --build` → a zombied worker), **restart that one container to clear it**: `docker restart <container>`, then confirm CPU dropped (`docker stats --no-stream <container>`). Restarting a stateless worker is safe (volumes persist). What you must NOT do: rebuild or restart the **whole stack** / `docker compose up --build` (that can trigger the R1 race again and another worktree may depend on running state), and never touch volumes. For anything other than a clear single-worker CPU zombie (unhealthy DB, restart-loop, etc.), report to the user rather than restarting. If R1 keeps recurring, offer to file a Jira ticket for the structural fix.
-   - **Remove THIS ticket's worktree containers, images and volumes** — the same `$TICKET_LOWER`
-     block as `/workspace-cleanup` Step 3.5, scoped to the ticket being torn down. Leftover
-     containers are not just disk: compose registers the service name as a network alias that is
-     identical for every worktree, so stale sibling ServiceC containers answer a live worktree's calls
-     round-robin and a route that exists 404s intermittently (PROJ-3890). The "never touch
-     `repo-*`" rule below protects OTHER tickets and the main stack, not the one being removed:
+1. **Run cleanup from this orchestrator session** (not from inside the worktree), with the same steps as `/workspace-cleanup`:
+   - Check PR state and unresolved review threads (`/workspace-cleanup` Step 2). If the PR is not merged, warn the user before proceeding — code may only exist on the remote branch.
+   - Ask whether to delete the branch (suggest yes when merged).
+   - Run the shared teardown script. It refuses (exit 3) on uncommitted or unpushed work; pass `--discard-local-work` only after the user confirms:
      ```bash
-     bash ~/.claude/scripts/worktree-service.sh --worktree ~/Documents/<TICKET_ID> down 2>&1 || true   # before the worktree is removed, if still present
-     TICKET_LOWER=$(echo "<TICKET_ID>" | tr '[:upper:]' '[:lower:]')
-     docker ps -a --format '{{.Names}}' | grep -- "$TICKET_LOWER" | xargs -r docker rm -f
-     docker images --format '{{.Repository}}:{{.Tag}}' | grep -- "$TICKET_LOWER" | xargs -r docker rmi
-     docker volume ls -q | grep "^repo-$TICKET_LOWER""_" | xargs -r docker volume rm
+     cd ~/Documents/Repo && bash ~/.claude/scripts/cleanup-workspace.sh <TICKET_ID> [--delete-branch]
      ```
-   - **Leak check (port-scoped, NOT broad):** for each removed worktree's `VITE_DEV_PORT`, `lsof -ti tcp:<PORT> -sTCP:LISTEN` and kill only that PID. Never `pgrep`-match by ticket name.
+     It scopes every kill and removal to this ticket (dev servers by worktree cwd, containers/images/volumes by exact ticket id), so it never broad-kills by `pgrep` on the ticket name. Paste the output.
+
+2. **Docker pass (part of every cleanup).** After removing the worktree(s):
+   - **Health check + CPU-load fix (the dev machine runs hot):** `bash ~/.claude/scripts/docker-health-check.sh`. If it flags a **single `repo-*` worker pegged at ~100% CPU** (known cause **R1** = concurrent EF migrations racing on `docker compose up --build` → a zombied worker), **restart that one container to clear it**: `docker restart <container>`, then confirm CPU dropped (`docker stats --no-stream <container>`). Restarting a stateless worker is safe (volumes persist). What you must NOT do: rebuild or restart the **whole stack** / `docker compose up --build` (that can trigger the R1 race again and another worktree may depend on running state), and never touch volumes. For anything other than a clear single-worker CPU zombie (unhealthy DB, restart-loop, etc.), report to the user rather than restarting. If R1 keeps recurring, offer to file a Jira ticket for the structural fix.
+   - Leftover worktree containers are not just disk: compose registers the service name as a network alias that is identical for every worktree, so a stale sibling ServiceC container answers a live worktree's calls round-robin and a route that exists 404s intermittently. `cleanup-workspace.sh` removes this ticket's; the "never touch `repo-*`" rule below protects OTHER tickets and the main stack.
    - **Remove unused (conservative):** `docker image prune -f` (dangling only) + `docker builder prune -f` (build cache). **NEVER** `docker volume prune` / `--volumes` (DB & seed state) and never remove running or stopped `repo-*` containers of the main stack or of OTHER tickets (e.g. the `localstack-init` one-shot exits 0 by design). Inspect `docker system df` / `docker ps -a` before pruning.
    - **Log recurring issues:** the health-check script logs to `~/.claude/data/docker-health-log.jsonl`; if a symptom recurs (same container, last 7d), append a curated entry to `~/.claude/data/docker-health-findings.md` and suggest a Jira ticket if it keeps recurring.
 
-3. **If PR is NOT merged**, warn the user before proceeding — code may only exist on the remote branch.
+3. **Retro proposals (don't forget).** After cleanup, run/offer `/retro-proposals` to route accumulated Dream Team learnings (it stops at an approval gate; route-all applies personal-config edits + opens a draft PR for shared-repo doc items). Capturing learnings at cleanup time is how they stop getting lost between story batches.
 
-4. **Confirm** by showing the updated worktree list.
-
-5. **Retro proposals (don't forget).** After cleanup, run/offer `/retro-proposals` to route accumulated Dream Team learnings (it stops at an approval gate; route-all applies personal-config edits + opens a draft PR for shared-repo doc items). Capturing learnings at cleanup time is how they stop getting lost between story batches.
-
-**Cleanup checklist — verify ALL of these ran (this bundle keeps getting half-done):**
-- [ ] merged worktrees/branches removed (safe `pause-workspace.sh`, not broad kill)
-- [ ] Docker pass: health check, **CPU-load fix** (restart any single R1 zombie worker), port-scoped leak check, conservative prune (images + build cache only), log recurring
+**Cleanup checklist — verify all of these ran:**
+- [ ] `cleanup-workspace.sh` ran for each merged worktree (output pasted)
+- [ ] Docker pass: health check, **CPU-load fix** (restart any single R1 zombie worker), conservative prune (images + build cache only), log recurring
 - [ ] `/retro-proposals` run/offered
 - [ ] AWS session valid (Nova-monorepo tickets only — via `aws-setup` skill if it needs a refresh; N/A for MEDH-*/SignedIn)
 
@@ -717,5 +670,5 @@ When the user says "clean up all done workspaces" or similar:
 - tmux sessions are always named `<TICKET_ID>`
 - If anything fails, stop and report — do not continue blindly
 - For Jira attachments, use `~/.claude/scripts/jira-download-attachments.sh` (API download via ACLI OAuth token). Falls back to Chrome if API fails.
-- **Phase A** (pre-hydration) runs in parallel across all tickets — Phase B (worktree creation + launch) runs sequentially one ticket at a time
+- **Phase A** (pre-hydration and worktree creation) runs in parallel across all tickets — Phase B (context files + launch) runs sequentially one ticket at a time
 - When sending ticket text via tmux send-keys, keep it concise if the description is very long — include the essential description and acceptance criteria

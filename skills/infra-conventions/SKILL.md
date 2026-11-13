@@ -1,6 +1,6 @@
 ---
 name: infra-conventions
-description: Infrastructure and DevOps conventions — Terraform, AWS, CI/CD, monitoring, and security for Repo
+description: Infrastructure and DevOps conventions — Terraform, AWS, CI/CD, monitoring, and security for Repo. Use when changing infra/, Terraform or GitHub Actions workflows, or planning how to verify an infra PR.
 ---
 
 ## Terraform Conventions
@@ -46,9 +46,9 @@ docker run --rm -v "$SP":/w -w /w hashicorp/terraform:latest validate
 
 ### The real verification for an infra change is the PR, not a local plan
 
-Name `.github/workflows/terraform-plan.yml` as THE verification vehicle up front, in the PR body. It
-plans every changed project against **all four environments** with real AWS state and posts each
-rendered plan as a PR comment — strictly better evidence than anything reproducible locally.
+Name `.github/workflows/terraform.yml` as THE verification vehicle up front, in the PR body. On a PR it
+plans every project/environment the change touches (mapping in `.github/terraform-projects.json`) with
+real AWS state and posts the plans in one PR comment — strictly better evidence than anything reproducible locally.
 
 A green check only means the plan *succeeded*. Read the comment and diff the rendered value.
 
@@ -155,8 +155,7 @@ resource "aws_ecr_repository" "service" {
 ## CI/CD (GitHub Actions)
 
 ### Workflows
-- `terraform-plan.yml` — runs on PR, posts plan as comment
-- `terraform-apply.yml` — runs on merge to main, requires approval for prod
+- `terraform.yml` — on a PR, plans the touched projects/environments and posts one comment; on merge to main, applies them in order (mgmt → shared → accept → prod), each in its GitHub environment
 - Separate Slack notification channels for prod vs accept
 - CODEOWNERS for `infra/` directory
 
@@ -185,17 +184,3 @@ DTF includes two scripts for infra workflow steps:
 
 - **`terraform-plan-summary.sh`** — Runs `terraform plan` and shows a structured summary box with add/change/destroy counts. Warns loudly on destroy operations.
 - **`verify-infra-workflows.sh`** — Checks that GH Actions plan/apply workflows exist, trigger on `infra/`, have environment protection, CODEOWNERS covers the path, and lock files are committed.
-
-## Recommended External Skills
-
-Install for enhanced Terraform support:
-```bash
-# TerraShark — failure-mode-first Terraform skill (600 tokens activation)
-git clone https://github.com/LukasNiessen/terrashark.git ~/.claude/skills/terrashark
-
-# Terramate agent skills — 37 rules across 10 categories
-npx skills add terramate-io/agent-skills --skill terraform-best-practices
-
-# AWS cost optimization with MCP servers
-/plugin marketplace add zxkane/aws-skills
-```

@@ -57,16 +57,20 @@ If an image was provided instead of a ticket ID, read it carefully and extract:
 
 If the ticket has attachments (design mockups, specs, etc.):
 
-1. List the attachments and their URLs to the user
-2. Open each attachment in Chrome for authenticated download:
-   ```bash
-   open -a "Google Chrome" "<ATTACHMENT_URL>"
-   ```
-3. Tell the user where Chrome will download the files (`~/Downloads/` — shown as "Hämtade filer" on Swedish macOS)
-4. Ask the user to confirm once downloads are complete
-5. Read any downloaded images/PDFs to understand the full ticket context
+**Default — API download** (uses the ACLI OAuth token from the keychain):
 
-**Note:** Do NOT use `curl` or `wget` for Jira attachments — they require browser authentication and will return 401 Unauthorized.
+```bash
+bash ~/.claude/scripts/jira-download-attachments.sh <TICKET_ID>
+```
+
+It downloads to `~/Downloads/<TICKET_ID>/` and prints the file paths, or `NO_ATTACHMENTS`. Read the downloaded images/PDFs to understand the full ticket context.
+
+**Fallback — Chrome, only when the script exits 2** (token or API failure). Plain `curl`/`wget` against attachment URLs returns 401, so use the browser:
+
+1. List the attachments and their URLs to the user
+2. Open each one: `open -a "Google Chrome" "<ATTACHMENT_URL>"`
+3. Tell the user Chrome downloads to `~/Downloads/` (shown as "Hämtade filer" on Swedish macOS) and ask them to confirm once the downloads are complete
+4. Read the downloaded files
 
 ### Step 3: Confirm with User
 
@@ -172,6 +176,13 @@ idempotent (safe to re-run after the spec changes), and costs no tokens.
 
 See the `ticket-spec` skill for the frontmatter contract and the type semantics.
 
+### Step 6.6: Write the Worktree CLAUDE.md
+
+```bash
+bash ~/.claude/scripts/write-worktree-claude-md.sh <TICKET_ID>
+```
+
+This copies the monorepo's `CLAUDE.md` into the worktree and appends the DTF context (ports, scripts, workflow rules), so every Claude session started there knows it is in a DTF worktree. `allocate-ports.sh` has already marked the file skip-worktree, so it never shows in `git status`.
 
 ### Step 7: Launch Claude in New Terminal
 
@@ -224,4 +235,4 @@ to paste it. The Dream Team will read it from disk.
 - If anything fails, stop and report the error — do not continue blindly
 - After setup is complete, remind the user they can run `/workspace-cleanup <TICKET_ID>` when done
 - Prefer ACLI Jira CLI over image screenshots when a ticket ID is available
-- Never use curl/wget for Jira attachments — always use Chrome for authenticated access
+- Jira attachments: `jira-download-attachments.sh` first, Chrome only when it exits 2

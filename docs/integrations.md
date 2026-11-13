@@ -178,8 +178,8 @@ Use the architect subagent to analyze what files need changing for this feature
 
 ### GitHub Actions — Claude Code in CI
 
-**Status:** Workflow created, needs API key setup
-**Location:** `~/Documents/Repo/.github/workflows/claude.yml`
+**Status:** Not installed — the monorepo has no `claude.yml` workflow
+**Location:** would be `~/Documents/Repo/.github/workflows/claude.yml`
 
 **What it does:**
 - Responds to `@claude` mentions in PR comments and issues
