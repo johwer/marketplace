@@ -25,6 +25,7 @@ Flags (passed straight to the script):
 - (default, no flags) — stopped containers + dangling images + unused build cache + **orphaned ANONYMOUS volumes** (64-hex, used by no container). All safe; never touches named volumes or in-use resources.
 - `--aggressive` — also remove ALL unused images (`image prune -a`) and ALL build cache (`builder prune -a`).
 - `--no-volumes` — skip the orphaned-anonymous-volume sweep.
+- `--orphan-worktrees` — also remove NAMED `repo-<ticket>_*` volumes whose ticket has no worktree and no container. The main stack's `repo_*` volumes never match.
 - `--dry-run` — show what would be reclaimed, change nothing.
 - `--auto [--threshold N]` — only act if host disk usage ≥ N% (default 85). For scheduled/unattended prevention runs.
 

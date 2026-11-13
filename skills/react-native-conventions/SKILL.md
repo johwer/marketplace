@@ -47,6 +47,12 @@ Consequences when reviewing/answering font questions:
 - **Don't commit credentials**, even `__DEV__`-gated ones — they stay in the JS bundle and trip secret scanners. Load from untracked local config / runtime entry.
 - **401 handling should match web parity**: single-flight refresh + one retry before force-logout, not log-out-on-every-401.
 
+## Verifying Nova web inside the app
+
+- The login screen is a WebView on Nova web. With `worktree-mobile.sh up --<platform> --local` it loads the worktree's Vite (3100 + slot), not 3000. The app sets `window.MedhelpNativeApp = true` and clears `sessionStorage` on every load, so keep harness state in `localStorage`.
+- **Android:** forward `adb forward tcp:9333 localabstract:webview_devtools_remote_<pid>` (pid from `adb shell cat /proc/net/unix`). Playwright `connectOverCDP` fails there; use raw CDP over Node's `WebSocket` (`Runtime.evaluate`, `Input.dispatchMouseEvent`, `Input.insertText`) on the `/json/list` target whose `document.visibilityState` is `visible`. Close the dev-client menu with `adb shell input keyevent KEYCODE_BACK`.
+- **iOS:** the shared dev client crashes on iOS 27, so do in-app checks on Android.
+
 ## Components & Expo config
 
 - **Use the app's UI primitives** (`components/ui/*`), not raw `react-native` elements, at call sites. HTML elements don't exist in RN.

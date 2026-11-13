@@ -88,7 +88,7 @@ Applies to all tickets that add or modify user-facing text.
 
 1. Implement all UI text using `t("key")` references
 2. Grep your changed files for all `t(` calls — collect every key
-3. For each new key, create it in TranslationService via the API with **all 5 languages** (en, sv, da, no, fi):
+3. For each new key, create it in TranslationService via the API with **all 5 languages** (en, sv, da, nb, fi). Norwegian is `nb`: the API answers 400 for `no` (PROJ-4651).
    ```bash
    TRANSLATION_SERVICE_KEY=$(grep TRANSLATION_SERVICE_API_KEY apps/web/.env.local | cut -d= -f2)
    curl -X POST "https://api.lokalise.com/api2/projects/3907704568ac1345097c75.30587214/keys" \
@@ -98,7 +98,7 @@ Applies to all tickets that add or modify user-facing text.
        {"language_iso": "en", "translation": "English text"},
        {"language_iso": "sv", "translation": "Svensk text"},
        {"language_iso": "da", "translation": "Dansk tekst"},
-       {"language_iso": "no", "translation": "Norsk tekst"},
+       {"language_iso": "nb", "translation": "Norsk tekst"},
        {"language_iso": "fi", "translation": "Suomalainen teksti"}
      ]}]}'
    ```
@@ -115,6 +115,8 @@ Reference: `docs/INTERNATIONALIZATION.md`
 ---
 
 ## Section 3: PR Review Comment Resolution — HARD GATE
+
+**A missing or declined Copilot review is not a clean one.** Copilot on this repo intermittently declines ("wasn't able to review any files"), hits the requester's quota, or stays silent. `poll-ai-reviews.sh` exits 3 on a decline and 1 on silence; re-request at most once (`--add-reviewer @copilot` bills the requester's quota), then treat the pre-emptive ghost/owl pass as the only review before humans.
 
 ### Triage — Before Acting on a Comment
 
@@ -413,6 +415,11 @@ apps/web/src/.../<Component>.fixture.tsx
 - macOS path: `~/Downloads/`
 - On Swedish macOS, Finder shows this as **"Hämtade filer"** but the filesystem path is still `~/Downloads/`
 - Visual-verification screenshots and Jira attachments live here
+- Writing into an **existing** `~/Downloads/<TICKET_ID>/` does not update its Date Added, so in the user's Finder (sorted by Date Added) an old folder stays buried and looks empty. Hand off with `open ~/Downloads/<TICKET_ID>`; if challenged, prove it with `ls -ld` + `stat`.
+
+### GitHub environment variables
+
+`gh api .../environments/<env>/variables?per_page=100` returns only 30 entries while `total_count` says more, so a late variable looks unset. Check per key (`gh api repos/<owner>/<repo>/environments/<env>/variables/<NAME>`: 404 = genuinely unset), or compare `total_count` with the array length first.
 
 ### Jira Attachments
 

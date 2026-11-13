@@ -160,6 +160,15 @@ else
 fi
 echo ""
 
+# ── Walkthrough decision ────────────────────────
+# needs_walkthrough was left unset at plan time in three sessions in a row (PROJ-4836, 4651,
+# 4826), each time caught only at ready or by the user. The prose rule existed; nothing refused.
+# The first push is the earliest moment a script sees both the plan files and the diff.
+WT_DECISION=$(bash "$HOME/.claude/scripts/walkthrough-required.sh" "$WORKTREE" 2>/dev/null || echo "no-dtf")
+if [[ "$WT_DECISION" == "unset" ]] && echo "$CHANGED" | grep -qE '^apps/web/src/'; then
+  add_result "Walkthrough decision" "FAIL" "branch changes apps/web/src but no plan file declares needs_walkthrough: true|false — write it with a one-clause reason in .dream-team/notes/team-lead.md (lite) or context.md, then re-run"
+fi
+
 # ── Added comments ──────────────────────────────
 # CI does NOT cover this: lint, type-check and prettier all pass on a comment that
 # merely restates the line below it. The rule is AGENTS.md#comments (in C# the build also
@@ -307,7 +316,11 @@ if [[ "$RUN_BACKEND" == "true" ]]; then
       [[ -z "$sln" ]] && continue
       if ! (cd "$WORKTREE" && dotnet restore "$sln" 2>&1) > /tmp/qg-restore.log 2>&1; then
         BUILD_PASS=false
-        BUILD_OUTPUT="restore failed for $sln (not a code error — network/feed?): $(tail -3 /tmp/qg-restore.log)"
+        if grep -qE 'NU190[0-9]' /tmp/qg-restore.log; then
+          BUILD_OUTPUT="restore failed for $sln on a NuGet vulnerability advisory ($(grep -oE 'NU190[0-9]' /tmp/qg-restore.log | sort -u | tr '\n' ' ')as error): main usually already pins the fix — rebase onto origin/$BASE_BRANCH (rebase-and-regate.sh) and re-run before touching package versions. $(grep -E 'NU190[0-9]' /tmp/qg-restore.log | head -1)"
+        else
+          BUILD_OUTPUT="restore failed for $sln (not a code error — network/feed?): $(tail -3 /tmp/qg-restore.log)"
+        fi
         continue
       fi
       # Release + /warnaserror is what the service CI workflows run. A Debug build passed while CI
@@ -387,6 +400,8 @@ if [[ "$RUN_FRONTEND" == "true" ]]; then
       # eslint_d's daemon can time out loading the config; that is a tool failure, not a lint
       # failure, so retry once with plain eslint before reporting (PROJ-4467).
       add_result "ESLint" "PASS" "npx eslint (eslint_d timed out), ${#ESLINT_TARGETS[@]} changed file(s)"
+    elif grep -q 'suppressions left that do not occur anymore' /tmp/qg-eslint.log; then
+      add_result "ESLint" "FAIL" "no lint error: your change removed a baselined error, so eslint-suppressions.json is stale. Run: cd apps/web && npx eslint src --prune-suppressions && npx prettier --no-editorconfig --write eslint-suppressions.json, then commit it"
     else
       ESLINT_ERRORS=$(grep -c "error" /tmp/qg-eslint.log 2>/dev/null || echo "?")
       add_result "ESLint" "FAIL" "$ESLINT_ERRORS errors (see /tmp/qg-eslint.log)"

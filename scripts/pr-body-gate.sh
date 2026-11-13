@@ -296,21 +296,24 @@ fi
 
 # --- 8b. Walkthrough for a flow (needs_walkthrough, decided at plan time) ---------------
 # Run from the ticket worktree. true → the body needs `### Walkthrough` (the video, captioned).
-# unset in a DTF worktree whose PR changes .tsx → refuse: the decision was never made, which is
+# unset in a DTF worktree whose PR changes apps/web/src (.ts too: PROJ-4836) → refuse: the decision was never made, which is
 # how a flow ships with screenshots only. Outside a DTF worktree there is nothing to read.
 walkthrough=$(bash "$HOME/.claude/scripts/walkthrough-required.sh" 2>/dev/null || echo "no-dtf")
 has_walkthrough_heading=0
 grep -qE '^###[[:space:]]+Walkthrough[[:space:]]*$' "$tmp" && has_walkthrough_heading=1
 case "$walkthrough" in
   true)
+    # A stacked PR shares its worktree's plan with the PR that holds the video (PROJ-4836 #4777):
+    # a line "Walkthrough: see #N" points there instead of re-uploading it.
+    grep -qiE 'walkthrough:?[[:space:]]+see[[:space:]]+#[0-9]+' "$tmp" && has_walkthrough_heading=1
     if [ "$has_walkthrough_heading" -eq 0 ]; then
-      fail+=("needs_walkthrough: true, but the body has no '### Walkthrough' under '## Visual verification' (upload walkthrough-<flow>.webm and caption it with pr-screenshot-captions)")
+      fail+=("needs_walkthrough: true, but the body has no '### Walkthrough' under '## Visual verification' (upload walkthrough-<flow>.webm and caption it with pr-screenshot-captions; a stacked PR may instead say 'Walkthrough: see #N')")
     fi
     ;;
   unset)
-    pr_tsx=$(gh pr diff "$PR" --repo "$REPO_ALLOW" --name-only 2>/dev/null | grep -cE '\.tsx$' || true)
+    pr_tsx=$(gh pr diff "$PR" --repo "$REPO_ALLOW" --name-only 2>/dev/null | grep -cE '^apps/web/src/' || true)
     if [ "${pr_tsx:-0}" -gt 0 ]; then
-      fail+=("PR changes $pr_tsx .tsx file(s) but no plan file declares needs_walkthrough: true|false (.dream-team/context.md or notes/*.md). Decide it, with a one-clause reason")
+      fail+=("PR changes $pr_tsx apps/web/src file(s) but no plan file declares needs_walkthrough: true|false (.dream-team/context.md or notes/*.md). Decide it, with a one-clause reason")
     fi
     ;;
   no-dtf)

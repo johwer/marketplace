@@ -317,7 +317,14 @@ bash ~/.claude/scripts/pw-mask-pii.sh <session> && \
   the person's name; each word is masked as well, in text, inputs, `title`/`aria-label`/`placeholder`
   and open shadow roots. After masking it waits 300 ms and re-reads the page: if a name came back (a
   re-render) it exits 1 — do not capture. Blanking the h1 alone left the name in the nurse form's
-  Samtalsguide (PROJ-4761, PROJ-4821). Names are arguments only, never written to a file.
+  Samtalsguide (PROJ-4761, PROJ-4821). Names are arguments only, never written to a file. An h1 that
+  already reads `Namn` (second capture of a masked page) is skipped, and the output says what it used:
+  `masked: N (name words: K, h1: used|already masked|none, persist: ...)`.
+- **`masked: N` is not proof.** Read every saved PNG back and check the h1, Samtalsguide, employee
+  summary and sidebar yourself (PROJ-4818: 4 of 5 shots leaked names after `masked: 1`).
+- **Videos: `--persist`** installs a MutationObserver that re-masks every change until the page
+  reloads. Run it right before `video-start`; one mask covers one frame, and an SPA navigation
+  re-renders the sidebar name mid-recording (PROJ-4826).
 - **Never write an image transform over its input.** A browser-overlay redaction captured before the
   `file://` image loaded overwrote six originals, then the scratch copies were deleted (PROJ-4821).
   Write to a new file and compare before deleting anything.
@@ -389,11 +396,27 @@ date bugs invisible, so the test passes on broken code.
 
 ### Analytics (PostHog) verification
 
-The recipe — wrap `posthog.capture` through Vite's module graph, headed browser, route PostHog to a
-local fulfill — lives in memory `reference_posthog_verify_with_ph_debug`. Two additions: report events
-through `ctx.exposeBinding` rather than `window.__events` so they survive the hard reload that
-FORCE_LOGOUT does, and loop anything racing a navigation 10x before calling it stable
-(PROJ-4327, PROJ-4373).
+`posthog` is not on `window`. Reach the SDK through Vite's module graph and wrap `capture`; in dev
+the same URL returns the instance the app uses (hash from the network list; re-install after every
+full `goto`):
+
+```js
+const ph = (await import('/node_modules/.vite/deps/posthog-js.js?v=<hash>')).default;
+const orig = ph.capture.bind(ph); ph.capture = (n, p) => { /* record n, p */ return orig(n, p); };
+```
+
+- **Headed, or a real Chrome UA.** PostHog treats `HeadlessChrome` as a bot: `/flags` returns no
+  flags and posthog-js drops every event (`ph._is_bot`). A headless "flag off" or "no event" proves
+  nothing.
+- **Not proof of the wire:** the wrapper sees properties before `before_send`. To prove what PostHog
+  receives, run headed, `ctx.route(/eu\.i\.posthog\.com\/(e|i\/v0\/e|batch)\//)` → `route.fulfill`
+  (nothing reaches the real project; local `.env` has a live key), gunzip `postDataBuffer`, and run
+  a control without the change.
+- Don't trust `localStorage.ph_debug` (its silence is not "no events") or the service-a of an `/e/`
+  POST (captures are batched). `sendBeacon` is invisible to Playwright: before a navigation use
+  `capture(..., { send_instantly: true })`. `useEffect` events fire twice under StrictMode in dev.
+- Report events through `ctx.exposeBinding` rather than `window.__events` so they survive the hard
+  reload that FORCE_LOGOUT does, and loop anything racing a navigation 10x before calling it stable.
 
 ### Detecting error pages
 
@@ -426,6 +449,18 @@ only on exit 0 and assert the baked value in `dist` before browsing: `$(gh api A
 concatenated gh's 404 JSON with the fallback, and the flag-gated page silently redirected (PROJ-4648,
 PROJ-4761).
 
+### Recording and checking walkthrough videos
+
+- **Dry-run the scripted path once before `video-start`.** After a selection a snapshot combobox reads
+  `combobox [active] [ref=…]`, so a script matching `combobox \[ref` skips it; match
+  `combobox (\[active\] )?\[ref` (PROJ-4836, two re-recordings).
+- **DateTimePicker time segments:** close the date popover first, then click the segment, `Ctrl+A`,
+  `Backspace` and type slowly (`press` per digit). Typing while the popover is open lands in the date.
+- **Checking a recorded webm:** there is no ffmpeg, Playwright's webm has no duration index, and
+  `python3 -m http.server` has no Range support, so seeking returns the first frame (`currentTime`
+  stays 0). Serve it in an HTML page with a `<video autoplay>`, set `playbackRate` 2–4, and take
+  screenshots as it plays (PROJ-4836, PROJ-4826).
+
 ### Toasts and other self-dismissing UI
 
 `react-toastify` autocloses at **5 seconds**. A screenshot poll is slower than that, so you will
@@ -445,11 +480,20 @@ Verify per element — `scrollIntoView`, then assert the element sits inside bot
 and the viewport. One bulk measurement at one scroll position flags items that scrolled off the
 **top** and makes a working fix look broken.
 
+**Overflow:** `child.right > card.right` alone gives false positives inside a working
+`overflow-x-auto` scroller. Skip an element if any ancestor up to the card has `overflowX`/`overflowY`
+other than `visible`, and sweep several viewport widths, measuring the container too.
+
 Echo the value **the page itself reports** (`innerHeight`) from inside the measurement loop. A shell
 loop that silently fails to change the viewport produces a run of identical PASSes, which is
 indistinguishable from a real pass unless the page states its own size.
 
 ### Localhost
 
-See the `reference_playwright_localhost_ipv6_cors` memory — IPv6/CORS resolution on `localhost`
-bites in a specific, recurring way.
+- Drive the app on `localhost:<port>`, never `127.0.0.1`: the S3 translations CORS allows only
+  `http://localhost:3*`, so `127.0.0.1` renders raw i18n keys.
+- A restarted `vite --host` can answer `curl localhost` yet be unreachable on `localhost` in a fresh
+  Chromium (IPv6 `::1` bind). Prefer reusing the original dev server; after a restart, check the
+  browser reaches `localhost` before relying on it.
+- Forcing `sv`: `localStorage.mh_lang` is overwritten by the user's ServiceC language preference on every
+  load, so mock `GET /api/service-c/v1/user/*/preference/language` instead.

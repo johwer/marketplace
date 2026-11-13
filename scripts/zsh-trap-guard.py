@@ -70,6 +70,16 @@ def check(cmd, bg):
               "--force-with-lease leases against a wrong ref. Use `git push ... && git update-ref ...`.")
         raise SystemExit(0)
 
+    # 8. a work-discarding git command after ';' runs even when the step before it failed (PROJ-4835)
+    DESTRUCTIVE = (r'git\s+(checkout\s+(\S+\s+)?--(\s|$)|checkout\s+(-f|--force)\b|restore\b|reset\s+--hard\b'
+                   r'|clean\s+-\w*f|stash\s+(drop|clear)\b|branch\s+-D\b)')
+    m = re.search(r';\s*' + DESTRUCTIVE, plain)
+    if m:
+        print("`...; " + m.group(0).lstrip('; ').strip() + "` discards work even when the command before the ';' failed "
+              "(a failed git add followed by git checkout HEAD -- wiped uncommitted changes). Chain it with && "
+              "after checking the earlier step, or run it as its own command.")
+        raise SystemExit(0)
+
     # Already running under bash: the traps do not apply.
     if re.search(r'(^|[\s;&|(])(/bin/)?bash\s+(-[a-z]*c\b|<<|-s\b|\S+\.sh\b)', cmd):
         raise SystemExit(0)

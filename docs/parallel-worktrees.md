@@ -26,6 +26,15 @@ Each worktree gets a unique **slot** (derived from ticket number mod 99):
 
 Collision detection: if two tickets hash to the same slot, the second one increments until free.
 
+**Legacy SignedIn API calls only work from `http://localhost:3000`.** Its CORS is an exact-match
+allowlist, so every 31xx worktree port gets `TypeError: Failed to fetch` (S3 translations, by
+contrast, allow `localhost:3*`; always use `localhost`, never `127.0.0.1`). To verify legacy calls
+(or the iframe embed, whose `VITE_EMBED_ALLOWED_ORIGINS` also lists 3000) from a worktree, set both
+`server.port` and `preview.port` in that worktree's `vite.config.worktree.mts` to 3000, one worktree
+at a time, with the main stack's Vite stopped. Asking for a `localhost:3*` entry is a no-op
+(`WithOrigins` matches exactly); the standing decision is to serialise on port 3000, not change the
+legacy API.
+
 ## How dev-server ports ACTUALLY resolve (read this when a port looks wrong)
 
 A worktree allocates ports, but each dev server resolves its port differently. Knowing
@@ -96,6 +105,17 @@ still holding the renderer port.
 (`npm start` → 3000, `npm run cosmos` → 3999/3998) against the committed configs. The
 override files are additive, opt-in, and marked `skip-worktree`, so they never get committed
 and never affect anyone not using DTF. The fallback is always "use the hardcoded defaults."
+
+### Committing a change to a skip-worktree file
+`AGENTS.md`, `CLAUDE.md` and `vite.config.worktree.mts` are `skip-worktree` in a worktree (list:
+`git ls-files -v | grep '^S'`). Never clear the flag. When a ticket must change one, write the blob
+from `HEAD` straight into the index, so the local DTF section never reaches the diff:
+
+```bash
+git show HEAD:AGENTS.md > <scratch>/new.md      # edit the copy
+git update-index --cacheinfo 100644,$(git hash-object -w <scratch>/new.md),AGENTS.md
+git update-index --skip-worktree AGENTS.md      # --cacheinfo silently clears the bit
+```
 
 ## File Structure Per Worktree
 
@@ -177,8 +197,17 @@ docker run --rm -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:10.0 bash -c
 ```
 
 - CI builds with `/warnaserror` — this also flags `CS1573` (a new parameter with no XML-doc `<param>` tag on a documented method).
-- **Integration tests need testcontainers (Docker-in-Docker)** → they can't run in this simple container; rely on CI for those and say so rather than claiming a local pass.
+- **Integration tests run too** when the container gets the Docker socket, so testcontainers can start siblings: add `-v /var/run/docker.sock:/var/run/docker.sock -e TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal --add-host host.docker.internal:host-gateway`.
+- **CSharpier must be the repo-pinned version** (`.config/dotnet-tools.json`, after `dotnet tool restore`); another version formats differently and CI fails. CI also checks EF-generated `Migrations/` files, so format those too.
+- **EF migrations:** `dotnet tool restore && dotnet ef migrations add ...` in the **same** `docker run` (a separate run loses the tool cache), then check the `.cs` + `.Designer.cs` + snapshot triple.
+- On resume of an older branch, a pin-blocked host means its C# may never have compiled: build in the container before trusting what a previous session pushed.
 - Always verify backend changes this way **before pushing** to avoid burning CI rounds.
+
+**ServiceD.API does not run EF migrations on startup** (the three ServiceD workers do, so every
+deploy applies them). A new ServiceD migration on a worktree branch therefore 500s with `42P01
+relation ... does not exist` on the worktree API: apply it to `repo_service-d` by hand (`dotnet ef
+database update` in the SDK container, or the SQL plus an `__EFMigrationsHistory` row). This is a
+local gap only; it is not evidence that a deployed environment lacks the migration.
 
 ## Proxy Strategy
 
@@ -186,7 +215,7 @@ By default, API proxies point to the **main stack** (500x ports). Only services 
 - You only rebuild what you changed
 - Everything else uses the shared running services
 - Zero overhead for services you don't touch
-- A frontend-only ticket starts no worktree service; take `down` any you started and stopped using (a worktree container that crashes on start can stay Up at ~100% CPU)
+- A frontend-only ticket starts no worktree service; take `down <svc>` any you started and stopped using (`down` without a service stops all of this worktree's services, never the main stack). A failed `up` exits 1 and removes its container.
 - Use the scripts for ports, proxy, `.env.local` and codegen; never hand-edit them. After `up`, prove the path with one authenticated request through the Vite proxy (200, not 404).
 - The local dev token file is shared by every worktree: to see which user a token belongs to, decode the JWT `sub`; never delete the file between logins.
 
@@ -212,6 +241,12 @@ Checklist for every new api service:
 - [ ] Add the service to the `SERVICES` list and the port maps in `worktree-service.sh`.
 - [ ] Run `bash ~/.claude/scripts/worktree-service.sh up <svc>` — the post-up smoke check
       will fail loudly if the app didn't start listening.
+
+**A service that dies at boot with "Missing X configuration" / "X is not configured"** is a gap in
+this template, not a repo bug: rarely run services got their env vars only when first run. Read the
+error (`worktree-service.sh logs <svc>`), find what the repo's `docker-compose.yml` passes that
+service, and mirror the missing `Section__Key` entries **and volumes** (an mTLS client cert is a
+mount, not an env var) into the template block.
 
 ### `service-a-advisory` and `service-c-service-api`
 Added for PROJ-3184, originally so ServiceA.Advisory could be verified over real HTTP against a

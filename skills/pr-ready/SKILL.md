@@ -290,6 +290,10 @@ does — the reader cannot tell which mode wrote it, so neither can the gate.
    in the reply to the reviewer up front rather than discovering it on the gate run.
 10. **`pr-body-gate.sh` run from the scratchpad** refuses with "cannot determine the repo" (same
    family as 8). Run it from the worktree.
+11. **An unresolved "Look closely: … not checked".** It comes back as the reviewer's blocking
+   question and costs a round (PROJ-4834). Before ready, resolve each one: pin the chosen behaviour
+   in a test and check the claim, or ask the user. A `Look closely` line says where to look, never
+   what was not done.
 
 ## Related
 

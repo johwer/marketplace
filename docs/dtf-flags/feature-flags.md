@@ -23,10 +23,19 @@ Unfinished UI is gated on the frontend (repo `AGENTS.md` "Slice"): read the flag
    - **A flag read before login cannot use a host condition at all** (`$initial_host` only exists after `identify`). If the guarded code runs pre-login, raise it with the user — it needs `posthog.setPersonPropertiesForFlags({ $host: window.location.host })` after `posthog.init` in `apps/web/src/index.tsx` (as SignedIn does), plus a `$host` condition.
 
 3. **Confirm with the user** which environments/rollout they want (the standard is accept + staging at 100%, prod off). Adjust `--hosts` / `--rollout` if they want something different. Hosts: **`app-accept.repo.se` = Repo accept**, `polaris-accept.repo.se` = TT accept, `leo-stg.retailer-b.com` = TT staging. The script's default is the two TT hosts — pass `--hosts app-accept.repo.se` for a Repo-only rollout. Updating an existing flag keeps its description unless `--description` is passed.
+   - **Retailer or unconditional flags:** the script only builds host conditions. For `retailer` (set by `identify` in `AuthContext.tsx`), POST/PATCH `filters.groups[0].properties` via the API. Before identify the property is absent, so an `is_not X` condition briefly matches.
+   - **A host list must cover every host the environment serves** (SignedIn accept serves three retailer hosts), or the other retailers' users are silently un-flagged.
+   - **Diagnose a flag without a browser:** `curl -s -X POST "https://eu.i.posthog.com/flags/?v=2" -H "Content-Type: application/json" -d '{"api_key":"<phc_ public key>","distinct_id":"probe","person_properties":{"$initial_host":"<host>"}}'`. `reason.code` `no_condition_match` = the property filter failed; `out_of_rollout_percentage` = it passed but the hash fell outside. If the answer flips with and without `person_properties`, the condition depends on a property the real browser never sends.
 
 4. The feature ships **flag-off in prod by default** — safe. The user enables/rolls out via PostHog after merge.
 
-5. **Verifying flag-gated UI locally:** read memory `reference_nova_posthog_feature_flags` BEFORE the
-   first browser run. Flags are host-targeted, so localhost renders without the feature even with a
-   real UA, and headless Chromium gets no flags at all. Rewrite PostHog's `/flags` response with a
-   route in the first script instead of discovering this on the third run.
+5. **Verifying flag-gated UI locally:** flags are host-targeted, so localhost renders without the
+   feature even with a real UA, and headless Chromium gets no flags at all. `window.posthog` is
+   undefined and persistence is `memory`, so no localStorage override works. Mock the whole PostHog
+   host before navigating (a `**/flags/**` glob does not match):
+   ```bash
+   B='{"featureFlags":{"<key>":true},"flags":{"<key>":{"key":"<key>","enabled":true,"variant":null,"reason":{"code":"condition_match"},"metadata":{"id":1,"version":1}}},"errorsWhileComputingFlags":false,"featureFlagPayloads":{}}'
+   playwright-cli -s=<s> route "https://eu.i.posthog.com/**" --body="$B"   # then goto; unroute afterwards
+   ```
+   Flag-gated deep links redirect away when the flag is off, so the route must be in place before
+   the first `goto`. In Vitest, test both paths with a hoisted `vi.mock("@posthog/react", ...)`.

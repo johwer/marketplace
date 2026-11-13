@@ -112,6 +112,15 @@ acli jira workitem view KEY-2 --fields issuelinks --json \
 
 Link types that exist: `acli jira workitem link type`. There is no "is caused by"; use `Relates` or `Problem/Incident`.
 
+## Gotchas (NOVA, team-managed)
+
+- `transition --status` needs the **Swedish** workflow name (`Klart`, `Avbruten`, `Att göra`, `Pågående`, `Under granskning`, `Blocked`), though JQL takes the English ones. The workflow is gated: from `Under granskning` go through `Pågående`. Allowed moves: `GET /rest/api/3/issue/<KEY>/transitions`.
+- REST fills the gaps (token as below): epic = `PUT /issue/<KEY> {"fields":{"parent":{"key":"..."}}}`, sprint = `customfield_10122` (ids from `acli jira board list-sprints --id 51 --json`). The Agile API (`/rest/agile/1.0`, rank) returns `401 scope does not match`: board rank is a drag in the UI.
+- `link delete` never returns; use `DELETE /rest/api/3/issueLink/<id>` (id from `view --json --fields issuelinks`). Link type names must match `link type` exactly (`Relates`).
+- `comment create --body` is plain text, so `[~accountId:…]` pings nobody; an @mention needs an ADF `mention` node via `PUT /issue/<KEY>/comment/<id>`.
+- No subtask→story conversion: Move in the web UI, or create a story, transition the subtask to `Avbruten` and link `Cloners`.
+- Atlassian MCP `searchJiraIssuesUsingJql`: results are `data.issues[]`, custom fields sit in `fields.customFields["<label>"]`, and only `view: "full"` returns `resolutiondate`, `statusCategory.key` and `assignee.accountId` (it also returns emails: strip them).
+
 ## Custom Fields via REST API
 
 ACLI doesn't support custom fields (like story points) for editing. Use the helper script that extracts the ACLI OAuth token from macOS keychain and calls the Jira REST API directly.

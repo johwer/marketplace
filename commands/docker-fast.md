@@ -132,6 +132,16 @@ Inside a worktree (`~/Documents/<TICKET>`), the stack runs under a per-slot comp
 - Same modes apply; default to `infra` + only the domain(s) the ticket touches to keep RAM low.
 - Pairs with `/create-stories` Step 0.6 (`docker-health-check.sh`) which *diagnoses*; this command *starts/restarts*.
 
+## Triage before restarting
+
+**Workers at ~100% CPU have four causes, and only one is fixed by `docker restart`:**
+- **R1, migration race** (one worker, log shows `23505` on `__EFMigrationsHistory`): `docker restart <container>`.
+- **R2, disk full** (`53100 No space left on device`; check `docker system df`, `df -h /System/Volumes/Data`): `/docker-cleanup`, then restart.
+- **R3, empty `${VAR:-}` compose default** (`OptionsValidationException`, disk fine): an empty env var beats `appsettings.json`. Set it in `.env`, then `up -d --no-deps --force-recreate <svc>`.
+- **R5, Docker Desktop restarted** (`docker ps -a`: infra exited, workers up; trace ends in `Npgsql ConnectAsync` → `MigrateAsync`): `recover`.
+
+**A page breaks right after a seed change:** check the container's age (`docker ps`) and its log before the diff. An enum-conversion error (`Cannot convert string value 'X' ... to any value in the mapped enum`) means the image predates the repo, not a bad seed. Run the changed service from the worktree (`worktree-service.sh up <svc>`, restart Vite, log in again) rather than rebuilding main. Services that don't auto-migrate (billing-api) drift the same way.
+
 ## How this differs from the other docker commands (no overlap)
 
 | Need | Command |

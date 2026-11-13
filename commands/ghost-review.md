@@ -96,6 +96,10 @@ For every capability the diff adds, answer all four:
    it is.
 4. **Does it change a shared authorization, permission or domain rule?** If yes, that needs
    prealignment before implementation, not review after. Flag it as MUST-FIX regardless of quality.
+   **Unless it is already decided:** read `.dream-team/decisions.md` (and the PR body) first. When
+   the user recorded how the prealignment happens (e.g. "the PR carries the question to the tech
+   lead", lift-the-gaze Step 2b.6), list it under "Already handled in PR description" instead of
+   demanding a Slack yes/no before ready (PROJ-4797).
 
 Write the finding as: *what the change adds → what already provides it → the cheaper route*. Do not
 soften it into a suggestion; a correct implementation of an unnecessary change still gets closed.

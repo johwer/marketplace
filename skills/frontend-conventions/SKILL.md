@@ -40,6 +40,12 @@ These patterns come from team experience and are not in the project-level skills
 - **New or meaningfully-changed visual components should get a Cosmos fixture** in `apps/web/src/fixtures/RetailerBranded/` (run with `npm run cosmos`).
 - Follow the nearest sibling as a template (e.g. a new `DocumentationNoteRow` mirrors the existing `EmployeeDocumentRow.fixture.tsx`). If an analogous component is already fixtured, the new one should be too.
 - Fixtures give an isolated render, so they're also the cheapest way to produce visual proof when the full flow can't run locally (no backend, blocked click-through).
+- One default export per fixture file: named-export multi-fixtures fail here with "Invalid fixture name". Split states into separate files. A fixture colocated in `src/ui/` lands in a stray `ui` group.
+- Select a fixture by URL with `?fixture=<urlencoded {"path":"..."}>`; `fixtureId=` silently falls back to the default. The retailer-theme switcher lives inside the renderer iframe, so flip it by hand for a branded shot.
+
+### ESLint suppressions baseline
+- A disable must sit on the reported statement (`load();`, `setX(...)`), not on `useEffect(`. While the file still has a baseline entry, a misplaced disable reports as "unused" and `eslint --fix` deletes it. Prove a disable with the baseline moved aside.
+- `--prune-suppressions` only prunes files it linted: run it over all of `src`, then `npx prettier --no-editorconfig --write eslint-suppressions.json` (prune drops the trailing newline).
 
 ### Shared Primitives & Types
 - Changing a `ui/` primitive's emitted class or token: grep every consumer test for the OLD value (`grep -rn "<old-class>" --include=*.test.tsx apps/web/src`) or run the full vitest suite. `vitest --changed` skips unedited consumer tests, and CI's full run catches them.

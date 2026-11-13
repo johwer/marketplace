@@ -17,9 +17,12 @@ appears the next time you run it.
 One profile per account/role, named the way the AWS portal names them:
 
 ```
-123456789012_YourRoleName        Repo
-753423979104_RDS-ReadOnly_tt-accept    RetailerB-Accept
+123456789012_YourRoleName        Repo (S3 translations)
+753423979104_RDS_tt-accept_main        tt-accept RDS (Finnish market)
+<account>_RDS_mh-accept_main           mh-accept RDS (Swedish market; not the "Repo" account)
 ```
+
+`RDS-ReadOnly_tt-accept` no longer exists (`ForbiddenException: No access`): anything still naming it is broken.
 
 Set your everyday one as the default in `~/.zshrc`:
 
@@ -30,7 +33,7 @@ export AWS_PROFILE=123456789012_YourRoleName
 and reach for the others per command:
 
 ```bash
-AWS_PROFILE=753423979104_RDS-ReadOnly_tt-accept aws <cmd>
+AWS_PROFILE=753423979104_RDS_tt-accept_main aws <cmd>
 eval $(bash ~/.claude/scripts/aws-profiles.sh use rds)   # or switch the current shell
 ```
 
@@ -105,8 +108,16 @@ Note that plain `register-client` succeeds in **every** region — that is the m
 device-authorization call discriminates. Put the winning region in `~/.aws/config` *and*
 `company-config.json` (so `dtf install` propagates it), clear `~/.aws/sso/cache/*.json`, log in again.
 
+**Accept RDS fails with `password authentication failed`** — DB access needs three things and only the
+first shows in the portal: (1) the `RDS_<env>_main` permission set, (2) `rds-db:connect` on your dbuser
+ARN, (3) a DB role in the cluster (`CREATE USER "<you>" LOGIN; GRANT rds_service-c, pg_read_all_data`). Nothing
+propagates 2 and 3 between environments, and both fail exactly like a wrong password. `aws rds
+generate-db-auth-token` proves nothing (it signs locally). Probe with the repo's
+`scripts/test/probe-accept-auth.sh`, never with a clone (it drops the shared local databases). Needs the
+VPN: without it psql fails at once with "Network is unreachable"; retry the first `nc` after connecting.
+
 **A role authenticates but an API call is denied** — that is the role's ServiceC scope, not your setup. For
-example `RDS-ReadOnly_tt-accept` cannot call `rds:DescribeDBInstances`; despite the name it grants
+example the RDS role cannot call `rds:DescribeDBInstances`; despite the name it grants
 database *data* access (a DB user / `rds-db:connect`), not the RDS control plane. Check
 `aws sts get-caller-identity` first: if that works, credentials are fine and the problem is permissions.
 

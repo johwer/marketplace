@@ -284,6 +284,8 @@ Also read project-level conventions:
 - Every `.claude/rules/*.md` whose `paths:` frontmatter matches a changed file (migrations, generated API clients, ServiceC permissions, tests). These are the repo's path-scoped rules and do not load for a reviewer on their own.
 - The **Comments** section of the root `AGENTS.md` for any comment finding: only its listed exceptions are allowed, and a finding cites it as `AGENTS.md: Comments`.
 - If a test file changed: `.claude/skills/writing-tests/references/mistakes-we-make.md` (when present), the catalogue of test shapes the repo has shipped bugs with.
+- `docs/TESTING_GUIDELINES_BACKEND.md` / `_FRONTEND.md`, `docs/INTERNATIONALIZATION.md` and `apps/web/AGENTS.md`: separate from the CODING_STYLE docs and easy to omit. Tell agents to read changed test files in full, not grep them.
+- The tech-lead patterns in `~/.claude/commands/ghost-review.md`, `owl-review.md` and `zingo-review.md`. They are commands, not under `~/.claude/skills/`, so an agent told to look in skills finds nothing and silently skips them.
 
 Compile a **conventions summary** — a condensed bullet list of the rules that apply to this PR's changed files. This will be passed to all review agents so they don't each re-read the full docs.
 

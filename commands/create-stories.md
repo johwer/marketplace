@@ -266,6 +266,8 @@ Spawn **parallel explore agents** (one per ticket, subagent_type `Explore`, mode
 - Do NOT write full API contracts — just note "full-stack, needs API contract" and let Amara define it
 - Do NOT verify every file path — verify the top 3-5 key files, note the rest as "likely path"
 - If the ticket is clearly small (1-2 files, single area), return after 10-15 tool uses — don't over-explore
+- **Never name an enum value, sub-type or fallback you have not read.** Grep the mapping (e.g. `ServiceASubTypeMapping`) and the seed/default factories first, or write "unverified". Guessed sub-types and an invented "edge case" fallback were both wrong (PROJ-4834).
+- **Cite code by quoted line text plus the commit SHA** (`git rev-parse --short HEAD`), not bare line numbers: they drift before the session starts (NurseForm 47/48/416 vs 48/49/443 on disk, PROJ-4818).
 
 ```
 For each ticket, spawn an explore agent with this prompt:
@@ -672,3 +674,4 @@ When the user says "clean up all done workspaces" or similar:
 - For Jira attachments, use `~/.claude/scripts/jira-download-attachments.sh` (API download via ACLI OAuth token). Falls back to Chrome if API fails.
 - **Phase A** (pre-hydration and worktree creation) runs in parallel across all tickets — Phase B (context files + launch) runs sequentially one ticket at a time
 - When sending ticket text via tmux send-keys, keep it concise if the description is very long — include the essential description and acceptance criteria
+- A long multi-line `send-keys -l` into a running Claude session can collapse into a paste and submit only its last line. Write the message to a scratchpad file, then `tmux load-buffer -b m <file>; tmux paste-buffer -p -d -b m -t <session>; tmux send-keys -t <session> Enter`, and grep the captured pane for the message's first words to confirm it all arrived

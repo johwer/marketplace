@@ -220,6 +220,10 @@ python3 scripts/sync_lokalise_translations.py \
   --s3-location <s3TranslationsBucket>
 ```
 
+**CI never runs this sync** (no workflow under `.github/` mentions TranslationService or the bucket). It is manual after every key change, and a merged PR whose keys were never synced shows raw key names in production.
+
+**A key that already exists in TranslationService with empty values is not filled by the bulk create API.** Update each value with `PUT /api2/projects/{project_id}/translations/{translation_id}` (ids from the key detail response).
+
 **Important:** The AWS env vars don't persist between shell invocations. If using temporary credentials, prepend them to the command or export them in the same `&&` chain.
 
 **The script exits 0 when the upload failed.** With an expired SSO session it prints `✗ Error: Error when retrieving token from sso` as its FIRST line, then carries on and uploads nothing. Run `aws sts get-caller-identity` before syncing, and count the per-language `uploaded to s3://` lines (one per language; fewer means it failed). When verifying a changed value, assert on the changed phrase (`'<new phrase>' in value`), never on a prefix or a length.

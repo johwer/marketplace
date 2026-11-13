@@ -13,7 +13,8 @@
 # main has moved again (PROJ-4472: refused twice in a row). This loops the round-trip. It does NOT
 # push — on success it prints the push command, so the `gate && push` chain stays with the caller.
 #
-# Exit 0 = fresh and green. 1 = gate failed for a reason other than freshness, or rebase conflict.
+# Exit 0 = fresh and green. 1 = gate failed for a reason other than freshness, or rebase conflict
+# (left stopped at the conflict, skip-worktree files aside, restore commands printed).
 # 2 = usage / dirty tree. 3 = still behind after MAX_ROUNDS.
 set -uo pipefail
 
@@ -99,9 +100,32 @@ rebase_once() {
     git rebase "origin/$BASE"
   fi
   local rc=$?
+  if [[ $rc -ne 0 ]] && rebase_in_progress; then
+    leave_stopped_at_conflict
+    exit 1
+  fi
   [[ $rc -ne 0 ]] && git rebase --abort
   restore_skip_worktree
   return $rc
+}
+
+rebase_in_progress() {
+  [[ -d "$(git rev-parse --git-path rebase-merge)" || -d "$(git rev-parse --git-path rebase-apply)" ]]
+}
+
+# A content conflict used to abort the rebase; the manual rebase that followed then failed again on
+# the skip-worktree file until it was moved aside by hand (PROJ-4651). Stop at the conflict instead,
+# with the files already aside, and print how to put them back.
+leave_stopped_at_conflict() {
+  local f
+  echo "✗ rebase stopped at a content conflict (left in progress, not aborted):"
+  git diff --name-only --diff-filter=U | sed 's/^/    /'
+  echo "  Resolve, git add <files>, git rebase --continue. Then, before re-running this script:"
+  for f in "${MOVED[@]+"${MOVED[@]}"}"; do
+    echo "    git show HEAD:$f > $SAVE_DIR/$f.new && git merge-file -p $SAVE_DIR/$f.new $SAVE_DIR/$f.orig $SAVE_DIR/$f.local > $f"
+  done
+  [[ ${#MOVED[@]} -eq 0 ]] && echo "    (no skip-worktree file was moved aside — nothing to restore)"
+  echo "  To give up instead: git rebase --abort$(for f in "${MOVED[@]+"${MOVED[@]}"}"; do printf ' && cp %s %s' "$SAVE_DIR/$f.local" "$f"; done)"
 }
 
 for round in $(seq 1 "$MAX"); do
@@ -109,7 +133,7 @@ for round in $(seq 1 "$MAX"); do
   if [[ -n "${OLD_BASE:-}" ]] || behind; then
     echo "  origin/$BASE moved — rebasing"
     if ! rebase_once; then
-      echo "✗ rebase conflict — resolve manually (rebase aborted, branch unchanged)"
+      echo "✗ rebase failed before replaying commits (aborted, branch unchanged) — see the git output above"
       exit 1
     fi
     OLD_BASE=""

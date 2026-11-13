@@ -70,6 +70,13 @@ name is not a reference.
 - `PermissionResolver.cs` — the dictionaries, including the **Tag-scope-only** buckets: a
   `User`-scoped assignment does *not* grant those
 
+A new **Action** touches only the two mappings files (no seed, no migration: actions derive from
+permissions at runtime). A new grantable **Permission** also needs `ServicePermissionMap` (the sole
+assignability source; `ProductMap.cs` is gone), its label key, a seed if a seeded role should hold it,
+and `ServiceC.API/Services/DefaultRoles.cs` only if a default role should get it. `grep -rn "<Sibling>"
+services shared --include="*.cs" | grep -vi test` shows which layer you are in. Run the full
+`ServiceC.sln` tests: a filtered run skips the composition tests that catch a half-registered permission.
+
 Two more layers people forget:
 
 - **Assignability** — holding a mapping is not enough. `ServicePermissionMap.Compose(retailer,
@@ -80,6 +87,11 @@ Two more layers people forget:
   `CanUserDoCustomerAction` (`services/ServiceC/ServiceC.API/Services/Authorization/AuthorizationService.cs:23,82,113`).
   A global admin (`GlobalUserPermissions.GlobalAdmin`) short-circuits every check to `true`, so
   testing as one proves nothing.
+- **The helper that picks the action** — a controller line often does not name the action it
+  checks; a write-authorization helper chooses it from the request. In ServiceA,
+  `ServiceAWriteAuthorization.ForUpdate` requires `ServiceAEditHistorical` whenever either end date
+  is past and the target is someone else, which covers an ordinary report-healthy. Trace every UI
+  action the ticket touches to that helper before calling an action "decide later" (PROJ-4797).
 
 **Frontend gate** — `apps/web/src/utils/deriveAuthorizedFeatures.ts` is a hand-synced port of
 the backend `AuthorizedFeatureService`. It must change in the **same PR** as the backend rule.

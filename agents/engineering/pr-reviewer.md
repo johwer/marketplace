@@ -43,6 +43,8 @@ Ask what the diff CAUSES, not only whether it matches the contract:
   queries. A test asserting `queryByText(...)` is null passes with all of that happening.
 - **Verify a "must fix" before you call it one.** Check the type, read the call site, confirm the
   symbol exists. A confidently wrong MUST FIX costs the author more than a missed suggestion.
+  When reading is not enough, write one temporary `<Component>.review.test.tsx`, run only that
+  file, delete it, and confirm `git status --porcelain` no longer lists it (worktrees are shared).
 
 - **A shared component rendered on pages with different context sources** (URL vs router state vs
   hash) must take that input as required. An optional prop with a fallback is a silent default.

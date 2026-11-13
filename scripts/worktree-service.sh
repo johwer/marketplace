@@ -7,7 +7,7 @@
 #
 # Usage:
 #   bash ~/.claude/scripts/worktree-service.sh up <service>     Build & start a service
-#   bash ~/.claude/scripts/worktree-service.sh down              Stop all worktree services
+#   bash ~/.claude/scripts/worktree-service.sh down [service]    Stop one service, or all worktree services
 #   bash ~/.claude/scripts/worktree-service.sh logs <service> [-f | --since 5m]   Last 200 log lines (-f follows)
 #   bash ~/.claude/scripts/worktree-service.sh ps               List running worktree services
 #   bash ~/.claude/scripts/worktree-service.sh status           Show port mappings and health
@@ -394,6 +394,8 @@ case "${1:-help}" in
             echo "   ----------------------------------------------------------------"
             compose logs --tail 30 "$COMPOSE_NAME" 2>&1 || true
             echo "   ----------------------------------------------------------------"
+            compose rm -sf "$COMPOSE_NAME" >/dev/null 2>&1 || true
+            echo "   Removed the failed container so it cannot crash-loop at 100% CPU."
             echo "   Fix the boot error above, then re-run: bash ~/.claude/scripts/worktree-service.sh up $SERVICE"
             exit 1
         fi
@@ -432,6 +434,20 @@ case "${1:-help}" in
         echo "  bash ~/.claude/scripts/worktree-service.sh logs $SERVICE"
         ;;
     down)
+        if [ -n "${2:-}" ] && [[ " $SERVICES " == *" $2 "* ]]; then
+            SERVICE="$2"
+            echo "Stopping $SERVICE only ($WORKTREE_DIR)..."
+            compose rm -sf "$(to_compose_name "$SERVICE")"
+            MAIN_PORT=$(main_stack_port "$SERVICE")
+            switch_vite_proxy "$SERVICE" "$MAIN_PORT" 2>/dev/null || true
+            switch_env_local_port "$SERVICE" "$MAIN_PORT" 2>/dev/null || true
+            if [ "$SERVICE" = "service-c-api" ]; then
+                sed -i '' 's/^ServiceC_SERVICE_HOST=.*/ServiceC_SERVICE_HOST=service-c-api/' "$WORKTREE_DIR/.env" 2>/dev/null || true
+                echo "Other worktree services still route to service-c-api-wt until they are re-upped."
+            fi
+            echo "$SERVICE proxy reverted to main stack ($MAIN_PORT)."
+            exit 0
+        fi
         echo "Stopping all worktree services ($WORKTREE_DIR)..."
         # Reset ServiceC host to main stack when stopping
         sed -i '' 's/^ServiceC_SERVICE_HOST=.*/ServiceC_SERVICE_HOST=service-c-api/' "$WORKTREE_DIR/.env" 2>/dev/null || true

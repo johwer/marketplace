@@ -86,6 +86,9 @@ Each service has three file types in `apps/web/src/store/rtk-apis/{service}/`:
    - Removed endpoints that frontend code still imports
    - Changed type shapes that break existing components
    - New enum values that need handling
+   - A diff much larger than your change is usually drift: main's committed client can lag main's
+     backend. Compare exported member sets, not lines, and confirm your new symbols appear. Commit
+     the codegen unedited and say so in the PR.
 
 9. **Stop the container** if no longer needed:
    ```bash

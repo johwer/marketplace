@@ -20,6 +20,7 @@ Turns a dump of `<img>` tags a user pasted into a GitHub PR body into a clean, c
 - **Scroll to the change.** `scrollIntoView({block:'center'})`, then a viewport shot for context plus an element shot for detail.
 - **Mobile (390px) only where the Employee role is the audience** (own service-a, own profile, self-service); HR/admin flows get desktop only.
 - **Save to `~/Downloads/<TICKET>/`**, never `/tmp` or the repo. Only `toHaveScreenshot()` baselines that a test references are ever committed.
+- **The top folder holds only PR-ready files.** Uncropped originals and exploration shots go in `~/Downloads/<TICKET>/originals/`, never a second folder the user may also drag in: dragging both a folder and its `pr/` subfolder put 11 uncropped originals, with a seed persona name in the sidebar, into a PR body's edit history (PROJ-4651).
 - **Look at each shot right after taking it.** If it doesn't visibly show what its filename claims, flag it and re-capture; never hand over unchecked shots or drop screenshots instead. For a URL/redirect/query-param change, make the URL visible in the capture (a stand-in page that renders what it received, or an on-page `location.href` banner).
 - **Never overwrite a shot already handed to someone.** Re-takes get a new name (`04-outcome-v2.png`). On a publish conflict for a shared artifact, diff against the live version: identical means skip, different means merge, never force.
 
@@ -40,7 +41,7 @@ Turns a dump of `<img>` tags a user pasted into a GitHub PR body into a clean, c
 
 4. **Group into before → after pairs by step/feature.** Reorder within the user's image block so each `before` is immediately followed by its `after`. Use `###` section headers (Step 1 — Colors, etc.).
 
-5. **Caption every kept image.** One line under each (or under each pair) saying **what it shows** and **what it proves**. Add a blank line / `<br />` between images so they don't cram. Separate sections with `---`.
+5. **Caption every kept image.** One line under each (or under each pair) saying **what it shows** and **what it proves**, about 10 words each: `pr-body-gate.sh` caps the body, and ~40-word captions got it refused at 342 words (PROJ-4826). Longer detail goes in the Implementation notes comment. Add a blank line / `<br />` between images so they don't cram. Separate sections with `---`.
 
 6. **Preserve user content + restore any clobbered summary.** Keep the user's other prose. If their image-upload overwrote a description you wrote earlier, paste it back below the evidence.
 
@@ -57,6 +58,7 @@ Turns a dump of `<img>` tags a user pasted into a GitHub PR body into a clean, c
 A flow change has a `walkthrough-<flow>.webm` in `~/Downloads/<TICKET_ID>/` next to the stills. The user drags it into the PR like the images; GitHub turns it into a bare `https://github.com/user-attachments/assets/<uuid>` line that plays inline (no `<img>`, no alt, so match it by order and by asking, not by filename).
 - Put it **first** inside `## Visual verification`, under `### Walkthrough`, above the captioned stills. One `### Walkthrough — <flow>` per video when there are several.
 - The URL stays on its own line with blank lines around it, or GitHub shows a link instead of a player.
+- **Wait for the upload to finish before saving.** A body saved while the video is still uploading keeps only the images (PROJ-4826). After the save, re-fetch the body and confirm the `user-attachments/assets/` line for the video is there.
 - Caption it like a still: one quote line with the scripted path, then what it **proves**. Caption from what the video shows, not from the filename. You can't watch it, so caption from the recorded script and its `video-chapter` steps, and ask the user to confirm the video matches.
 - Keep the key states as captioned stills below it: the video shows motion, the stills are what a reviewer scans.
 

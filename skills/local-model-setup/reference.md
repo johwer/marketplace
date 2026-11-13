@@ -298,6 +298,9 @@ actually works (KV 3.00 GiB at 4-bit, weights + KV 5.97 GiB, comfortably inside 
 - **~54K tokens of prefill on the first message of every session**, ~2-3 min at ~340
   tok/s before the first token. Later turns reuse the cached prefix.
 - Launching from a directory without a large global `CLAUDE.md` cuts a big share of it.
+- **Agentic Claude Code on 16 GB does not work, structurally:** 98304 leaves ~44K after the
+  preamble, so autocompact thrashes (context refilled within 3 turns, three times running), and
+  131072 does not fit. Use it for direct API chat and single-turn prompts; revisit at 24 GB.
 
 ### Verdict: a 16 GB Mac cannot run Claude Code agentically
 
