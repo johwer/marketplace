@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: local-model-setup
 description: Set up a local LLM on this Mac via oMLX — sizes the machine's RAM, picks the best model that actually fits, checks whether it clears the context gate, and wires it into Claude Code and DTF. Use when the user wants to run a model locally, asks which local model their Mac can handle, mentions oMLX / MLX / DFlash / speculative decoding, or wants a local model as a Claude Code backend.
 user_invocable: true
