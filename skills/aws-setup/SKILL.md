@@ -212,13 +212,15 @@ Notes:
 ### Sync TranslationService translations to S3
 
 ```bash
-TRANSLATION_SERVICE_KEY=$(grep TRANSLATION_SERVICE_API_KEY apps/web/.env.local | cut -d= -f2)
+TRANSLATION_SERVICE_KEY=$(security find-generic-password -s lokalise -w)
 
 python3 scripts/sync_lokalise_translations.py \
   --project-id 3907704568ac1345097c75.30587214 \
   --api-key "$TRANSLATION_SERVICE_KEY" \
   --s3-location <s3TranslationsBucket>
 ```
+
+**The token lives in the macOS keychain, never in `.env.local` (PROJ-5093).** Missing? Ask the user to run `security add-generic-password -s lokalise -a "$USER" -w` themselves: it prompts for the token, so the value never passes through the session. Never `cat`, `grep` or `echo` the token.
 
 **CI never runs this sync** (no workflow under `.github/` mentions TranslationService or the bucket). It is manual after every key change, and a merged PR whose keys were never synced shows raw key names in production.
 
