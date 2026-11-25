@@ -343,15 +343,22 @@ Learnings split into two tracks based on who they affect:
       ## Summary
       Applies learnings from Dream Team retrospectives to shared repo files.
 
-      ## Changes
-      [table of changes from the routing table]
+      ## Considerations
+      - Where these came from: [production bug / human review / found while building]. Name anything you don't want in the repo and it goes.
+      - <one-line rule> [L1 · found-by: human-review · cost: 2 h · if-missed: prod-error · scope: stack · evidence: <PR comment URL, #PR or PROJ-123>]
+      - <one-line rule> [L2 · found-by: self · cost: 1 h · recurred: 3 · if-missed: wrong-result · scope: <module>]
 
-      ## Source Sessions
-      [list of session IDs these learnings came from]
+      ## Agent
+      - **Source sessions:** [session IDs]
       EOF
       )"
       ```
-      Output: `✓ STEP 5 COMPLETE: Draft PR created at [URL]`
+      One tag line per learning, with the level from STEP 0b. The PR stays a draft until the level gate passes:
+      ```bash
+      python3 ~/.claude/scripts/retro-pr-gate.py <PR_NUMBER>   # exit 1 = REFUSED: regrade or move the item, do not go ready
+      ```
+      The same gate runs as a PreToolUse hook on `gh pr ready` for retro PRs (branch or title contains "retro"), and the hook refuses a retro `gh pr create` without `--draft`. It refuses L3 and Drop in shared files, an L1 without human evidence or a prod-level consequence, an L2 without recurrence or an hour lost, and any level 2 in `docs/` or a root `CLAUDE.md`. Specific is fine; the level decides, not how general the wording sounds.
+      Output: `✓ STEP 5 COMPLETE: Draft PR created at [URL], retro level gate passed`
 
    f. **STEP 6 — Mark items in `dream-team-learnings.md`**:
       - `- ~~[description]~~ → Ticketed as [PROJ-XXXX] / PR #[number] on [date]`
@@ -392,7 +399,7 @@ Before responding to the user with "done", confirm each item:
 - [ ] Branch created → `git checkout -b retro-learnings-<date>`
 - [ ] Each destination file edited on the branch
 - [ ] Committed with message referencing the Jira ticket
-- [ ] Draft PR created → report PR URL to user
+- [ ] Draft PR created → `retro-pr-gate.py <PR>` passes → report PR URL to user
 - [ ] Items marked in `dream-team-learnings.md` as `~~done~~ → Ticketed as PROJ-XXXX / PR #N on <date>`
 
 **If you skipped any Ticket+PR step**, tell the user explicitly which step and why — do not silently omit it.

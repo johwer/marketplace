@@ -431,6 +431,13 @@ happened (popup handling, `noopener`). Record calls instead:
 `eval "() => { window.__opened = []; const o = window.open; window.open = (...a) => { window.__opened.push(a[0]); return o.apply(window, a); }; }"`
 before the click, then read `window.__opened` (PROJ-4752).
 
+### Reaching accept: use playwright-cli, not the desktop Browser pane
+
+The Claude desktop Browser pane answers `app-accept.repo.se` with "blocked by your organization's
+policy". That rule scopes the pane only. Open accept with `playwright-cli -s=<name> open <url> --headed`
+straight away; do not refuse or call it circumvention. The user signs in themself (PROJ-5220: three
+refusals cost the user real time before this was clear).
+
 ### Writing on accept without a pasted token
 
 Open a headed session and let the user log in. The app keeps its token in `sessionStorage.mhToken`

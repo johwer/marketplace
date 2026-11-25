@@ -4,7 +4,11 @@
 # /create-stories; the PR-state and review-thread checks stay with the caller (they need the user).
 #
 # Usage: bash ~/.claude/scripts/cleanup-workspace.sh <TICKET_ID> [--delete-branch] [--discard-local-work] [--dry-run]
-#   --delete-branch       also `git branch -D <TICKET_ID>` (ask the user first)
+#   --delete-branch       also delete the worktree's branch (ask the user first)
+#
+# Finds the worktree at <worktreeParent>/<TICKET_ID>, or else the one git lists whose folder and
+# branch both name the ticket (Claude Desktop: .claude/worktrees/proj-1234-abc on claude/proj-1234-abc).
+# Refuses (exit 3) when the folder names the ticket but holds another branch, or when several match.
 #   --discard-local-work  proceed although the worktree has uncommitted or unpushed work (ask the user first)
 #   --dry-run             print what would be removed, change nothing
 #
@@ -13,7 +17,7 @@
 
 set -uo pipefail
 
-usage() { sed -n 2,12p "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'; }
 
 TICKET_ID=""
 DELETE_BRANCH=0
@@ -36,8 +40,45 @@ WORKTREE_PARENT="${DTF_WORKTREE_PARENT:-$HOME/Documents}"
 MONOREPO="${DTF_MONOREPO:-}"
 [ -d "$MONOREPO/.git" ] || MONOREPO="$HOME/Documents/Repo"
 WORKTREE="$WORKTREE_PARENT/$TICKET_ID"
+BRANCH="$TICKET_ID"
 TICKET_LOWER=$(printf '%s' "$TICKET_ID" | tr '[:upper:]' '[:lower:]')
 TICKET_PATTERN="(^|[^0-9a-z])${TICKET_LOWER}([^0-9]|$)"
+
+matches_ticket() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | grep -qE -- "$TICKET_PATTERN"; }
+
+resolve_worktree() {
+  [ -e "$WORKTREE" ] && return 0
+  local path="" branch="" hits="" mismatched="" line
+  while IFS= read -r line; do
+    case "$line" in
+      "worktree "*) path="${line#worktree }"; branch="" ;;
+      "branch "*) branch="${line#branch refs/heads/}" ;;
+      "") if [ -n "$path" ] && matches_ticket "$(basename "$path")"; then
+            if matches_ticket "$branch"; then hits="$hits$path|$branch"$'\n'
+            else mismatched="$mismatched$path|${branch:-detached}"$'\n'; fi
+          fi
+          path="" ;;
+    esac
+  done < <(git -C "$MONOREPO" worktree list --porcelain; echo)
+  if [ -n "$mismatched" ]; then
+    echo "REFUSED: worktree named for $TICKET_ID now holds another branch, so it is in use for other work:" >&2
+    printf '%s' "$mismatched" | sed 's/^/  /; s/|/ on /' >&2
+    exit 3
+  fi
+  if [ "$(printf '%s' "$hits" | grep -c .)" -gt 1 ]; then
+    echo "REFUSED: more than one worktree matches $TICKET_ID; remove the right one by hand:" >&2
+    printf '%s' "$hits" | sed 's/^/  /; s/|/ on /' >&2
+    exit 3
+  fi
+  if [ -n "$hits" ]; then
+    hits="${hits%$'\n'}"
+    WORKTREE="${hits%%|*}"
+    BRANCH="${hits#*|}"
+    case "$WORKTREE" in
+      "$MONOREPO/.claude/worktrees/"*) echo "Note: $WORKTREE belongs to a Claude Desktop session; archive that session too, or it will point at a missing folder." ;;
+    esac
+  fi
+}
 
 run() {
   if [ "$DRY_RUN" = 1 ]; then echo "  [dry-run] $*"; else "$@"; fi
@@ -58,7 +99,8 @@ kill_port_if_owned() {
 }
 
 cd "$MONOREPO" || { echo "Monorepo not found at $MONOREPO" >&2; exit 1; }
-echo "=== Cleaning up $TICKET_ID (worktree $WORKTREE) ==="
+resolve_worktree
+echo "=== Cleaning up $TICKET_ID (worktree $WORKTREE, branch $BRANCH) ==="
 
 if [ -d "$WORKTREE/.git" ] || [ -f "$WORKTREE/.git" ]; then
   DIRTY=$(git -C "$WORKTREE" status --porcelain 2>/dev/null)
@@ -106,8 +148,8 @@ fi
 run git worktree prune
 run rm -f "$HOME/.claude/workspace-status/$TICKET_ID.json"
 
-if [ "$DELETE_BRANCH" = 1 ] && git show-ref --verify --quiet "refs/heads/$TICKET_ID"; then
-  run git branch -D "$TICKET_ID"
+if [ "$DELETE_BRANCH" = 1 ] && git show-ref --verify --quiet "refs/heads/$BRANCH"; then
+  run git branch -D "$BRANCH"
 fi
 
 echo ""

@@ -63,8 +63,10 @@ If any unresolved threads are found, **STOP** and tell the user which comments a
 Before anything is stopped or deleted:
 
 ```bash
-git -C ~/Documents/<TICKET_ID> status --porcelain
+git -C <WORKTREE> status --porcelain
 ```
+
+`<WORKTREE>` is `~/Documents/<TICKET_ID>`, or for a Claude Desktop session the `.claude/worktrees/<ticket>-<suffix>` folder whose branch names the ticket (`git worktree list`). `cleanup-workspace.sh --dry-run` prints which one it resolved and refuses when the folder now holds another ticket's branch. For a Desktop worktree, archive the session in the app instead when you can: that removes the worktree too.
 
 If there are uncommitted changes, **STOP** and tell the user. Only proceed if they confirm.
 
